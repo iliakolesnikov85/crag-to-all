@@ -1,0 +1,80 @@
+.offline-instructions {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
+}
+
+.offline-instructions__toggle {
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  text-align: left;
+}
+
+.offline-instructions__toggle-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.offline-instructions__chevron {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  font-size: 1.25rem;
+
+  svg {
+    width: 1em;
+    height: 1em;
+  }
+}
+
+.offline-instructions__body {
+  margin-top: 0.75rem;
+  padding: 0.85rem 0.9rem;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #444;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.offline-instructions__heading {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.9rem;
+  color: #333;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.offline-instructions__heading:first-child {
+  margin-top: 0;
+}
+
+.offline-instructions__body ol,
+.offline-instructions__body ul {
+  margin: 0 0 0.75rem;
+  padding-left: 1.15rem;
+}
+
+.offline-instructions__body li {
+  margin-bottom: 0.35rem;
+  overflow-wrap: break-word;
+}
+
+.offline-instructions__platform {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem;
+  background: #fff3cd;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  overflow-wrap: break-word;
+}

@@ -1,0 +1,152 @@
+.team-page {
+  .team-content {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+  }
+
+  .team-description {
+    margin-bottom: 3rem;
+    padding: 2rem;
+    background-color: #f8f9fa;
+    border-radius: 12px;
+    border-left: 4px solid #667eea;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+    h3 {
+      color: #4c63d2;
+      margin-top: 0;
+      margin-bottom: 1.5rem;
+      font-size: 1.6rem;
+      font-weight: 600;
+    }
+
+    p {
+      line-height: 1.7;
+      color: #333;
+      font-size: 1.1rem;
+      margin: 0;
+    }
+  }
+
+  .team-members {
+    h3 {
+      color: #495057;
+      margin-bottom: 2rem;
+      font-size: 1.6rem;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .members-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .member-card {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+
+      &.clickable {
+        cursor: pointer;
+        
+        &:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+          border-color: #667eea;
+        }
+      }
+
+      .member-name {
+        color: #495057;
+        font-size: 1rem;
+        font-weight: 500;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        white-space: nowrap;
+      }
+
+      .social-icon {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+        color: white;
+        border-radius: 4px;
+        padding: 2px;
+        transition: all 0.2s ease;
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+        box-sizing: content-box;
+
+        &--instagram {
+          background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+        }
+
+        &--telegram {
+          background: linear-gradient(45deg, #0088cc 0%, #229ED9 100%);
+        }
+      }
+    }
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .team-page {
+    .team-content {
+      padding: 1rem;
+    }
+
+    .team-description {
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+
+      h3 {
+        font-size: 1.4rem;
+      }
+
+      p {
+        font-size: 1rem;
+      }
+    }
+
+    .team-members {
+      h3 {
+        font-size: 1.4rem;
+      }
+
+      .members-grid {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 0.75rem;
+      }
+
+      .member-card {
+        padding: 0.875rem;
+
+        .member-name {
+          font-size: 0.95rem;
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .team-page {
+    .team-members {
+      .members-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+    }
+  }
+} 

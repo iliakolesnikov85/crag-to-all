@@ -1,0 +1,266 @@
+.map-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+
+  .leaflet-control-fullscreen {
+    width: 30px;
+    height: 30px;
+    color: #333;
+    text-decoration: none;
+    background: white;
+    border: 2px solid rgba(0,0,0,0.2);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    svg {
+      display: block;
+    }
+  }
+  .leaflet-control-fullscreen:hover {
+    background: #f4f4f4;
+    color: #000;
+    text-decoration: none;
+  }
+
+  .leaflet-control-location {
+    width: 30px;
+    height: 30px;
+    color: #333;
+    text-decoration: none;
+    background: white;
+    border: 2px solid rgba(0,0,0,0.2);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    svg {
+      display: block;
+    }
+  }
+  .leaflet-control-location:hover {
+    background: #f4f4f4;
+    color: #000;
+    text-decoration: none;
+  }
+
+  .leaflet-control-reset-bounds {
+    width: 30px;
+    height: 30px;
+    color: #333;
+    text-decoration: none;
+    background: white;
+    border: 2px solid rgba(0,0,0,0.2);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    svg {
+      display: block;
+    }
+  }
+  .leaflet-control-reset-bounds:hover {
+    background: #f4f4f4;
+    color: #000;
+    text-decoration: none;
+  }
+
+  .leaflet-control-layers {
+    border-radius: 4px;
+    box-shadow: none;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+  }
+
+  .leaflet-control-layers-toggle {
+    width: 30px;
+    height: 30px;
+    line-height: 30px;
+    background-color: #fff;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 20px 20px;
+  }
+
+  .leaflet-retina .leaflet-control-layers-toggle {
+    background-size: 20px 20px;
+  }
+
+  .leaflet-control-layers-list {
+    font-size: 0.85rem;
+  }
+
+  .leaflet-control-layers-base label {
+    margin-bottom: 0.35rem;
+  }
+
+  /* Custom marker styles */
+  .custom-marker.leaflet-div-icon:not(.map-marker-host) {
+    overflow: visible;
+    background: transparent;
+    border: none;
+  }
+
+  .custom-marker .marker-container {
+    position: relative;
+    width: 30px;
+    height: 30px;
+    box-sizing: border-box;
+  }
+
+  .custom-marker .pie-chart {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .custom-marker .label {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 2px;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: Arial, sans-serif;
+    color: #333;
+    line-height: 1.2;
+    max-width: 120px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+    pointer-events: none;
+  }
+
+  .map-marker.map-marker--parking svg {
+    display: block;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+  }
+
+  .map-marker.map-marker--generic svg {
+    display: block;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+  }
+
+  .map-marker-host.leaflet-div-icon {
+    background: transparent;
+    border: none;
+  }
+
+  .leaflet-popup-content .map-popup-body {
+    margin-top: 0.35rem;
+    font-size: 0.9rem;
+    line-height: 1.35;
+    color: #333;
+  }
+
+  .leaflet-popup-content .map-popup-muted {
+    color: #6c757d;
+    font-size: 0.85rem;
+  }
+
+  .leaflet-popup-content .map-popup--trail strong {
+    font-size: 0.95rem;
+  }
+
+  .leaflet-popup.sector-map-info-popup .leaflet-popup-content {
+    margin: 10px 12px;
+    min-width: 520px;
+  }
+
+  /* Compass arrow styles */
+  .compass-arrow {
+    z-index: 1000;
+  }
+
+  .routes-filter {
+    flex-shrink: 0;
+  }
+
+  .map-widget {
+    margin-top: 1rem;
+    position: relative;
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .map-container {
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto !important;
+    width: 100%;
+    margin: 0;
+  }
+
+  .map-widget--fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    background: #fff;
+
+    /* Percentage height (parent has definite size via inset:0) — reliable for Leaflet. */
+    .map-container {
+      width: 100%;
+      height: 100% !important;
+    }
+  }
+
+  .sector-map-info-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    padding: 0.6rem 0.8rem 0.8rem 0.8rem;
+    background: #fff;
+    border-top: 1px solid rgba(0, 0, 0, 0.12);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+  }
+
+  @media (max-width: 768px) {
+    .routes-filter {
+      margin: 0.5rem;
+    }
+
+    .map-widget {
+      margin-top: 0;
+    }
+  }
+}
+
+/* Definite height so nested flex:1 map children don't collapse to 0.
+ * Use svh (not dvh) so the shell matches the visible area with browser chrome
+ * shown; override min-height: 100vh from App.scss which would otherwise overrun.
+ * Document scroll lock is handled by setBodyScrollLock(), not here. */
+.app-container:has(.map-page) {
+  height: 100vh;
+  height: 100svh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-container:has(.map-page) .app-main {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.app-container:has(.map-page) .app-header,
+.app-container:has(.map-page) .tab-navigation {
+  flex-shrink: 0;
+}
+
+.app-container:has(.map-page) .footer {
+  display: none !important;
+}

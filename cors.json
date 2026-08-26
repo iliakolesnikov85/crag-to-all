@@ -1,0 +1,13 @@
+[
+    {
+      "origin": [
+        "https://roshkaclimb.ge",
+        "https://www.roshkaclimb.ge",
+        "http://localhost:3005",
+        "http://127.0.0.1:3005"
+      ],
+      "method": ["GET", "HEAD"],
+      "responseHeader": ["Content-Type", "Content-Length", "ETag"],
+      "maxAgeSeconds": 3600
+    }
+]

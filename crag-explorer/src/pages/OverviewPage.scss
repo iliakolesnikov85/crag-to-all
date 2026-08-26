@@ -1,0 +1,196 @@
+/* OverviewPage specific styles moved from App.css */
+.overview-page {
+  .overview-description {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #4c63d2;
+  }
+  .overview-description h3 {
+    color: #4c63d2;
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.4rem;
+    font-weight: 600;
+  }
+  .description-section {
+    margin-bottom: 1.5rem;
+  }
+  .description-section:last-child {
+    margin-bottom: 0;
+  }
+  .description-section h4 {
+    color: #495057;
+    margin-bottom: 0.75rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+  .description-paragraph {
+    margin-bottom: 0.75rem;
+    line-height: 1.6;
+    color: #333;
+    font-size: 1rem;
+  }
+  .description-paragraph:last-child {
+    margin-bottom: 0;
+  }
+  .read-more-inline {
+    display: inline;
+  }
+  .read-more-inline a {
+    color: #4c63d2;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease;
+  }
+  .read-more-inline a:hover {
+    color: #3d52b8;
+    text-decoration: underline;
+  }
+
+  .overview-sectors {
+    margin-bottom: 2rem;
+  }
+
+  .overview-sectors-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+
+  .sector-card {
+    display: flex;
+    flex-direction: column;
+    background-color: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .sector-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.08);
+    text-decoration: none;
+  }
+
+  .sector-card-image {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background-color: #f1f3f5;
+  }
+
+  .sector-card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .sector-card-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .sector-card-text {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .sector-card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #212529;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sector-card-meta {
+    margin-top: 0.15rem;
+    font-size: 0.85rem;
+    color: #6c757d;
+  }
+
+  .sector-card-pie {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+  }
+
+  .sector-card-pie svg {
+    display: block;
+  }
+
+  @media (max-width: 900px) {
+    .overview-sectors-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 560px) {
+    .overview-sectors-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .overview-videos {
+    margin-bottom: 2rem;
+  }
+
+  .overview-videos-caution {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+    color: #6c757d;
+  }
+
+  .overview-videos-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.25rem;
+    align-items: start;
+  }
+
+  .overview-video-card {
+    background-color: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+  }
+
+  .overview-video-iframe {
+    display: block;
+    width: 100%;
+    border: none;
+  }
+
+  .overview-video-iframe--youtube {
+    aspect-ratio: 16 / 9;
+  }
+
+  .overview-video-iframe--instagram {
+    height: 690px;
+  }
+
+  .overview-video-iframe--default {
+    min-height: 480px;
+  }
+
+  @media (max-width: 900px) {
+    .overview-videos-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+}

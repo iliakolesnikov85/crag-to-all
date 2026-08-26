@@ -1,0 +1,39 @@
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 8px 0;
+
+  .pager-see-more {
+    min-width: auto;
+    margin-right: 4px;
+  }
+
+  .pager-ellipsis {
+    min-width: 24px;
+    text-align: center;
+    color: #6c757d;
+    font-weight: 600;
+    user-select: none;
+  }
+
+  @media (max-width: 480px) {
+    gap: 4px;
+
+    .btn--md:not(.btn--icon-only) {
+      min-width: 32px;
+      min-height: 32px;
+      padding: 0 8px;
+      font-size: 13px;
+    }
+
+    .btn--icon-only.btn--md {
+      width: 32px;
+      min-width: 32px;
+      min-height: 32px;
+    }
+  }
+}

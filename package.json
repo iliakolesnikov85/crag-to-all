@@ -1,0 +1,11 @@
+{
+  "name": "crag-to-all",
+  "version": "1.0.0",
+  "description": "Climbing crag explorer PWA",
+  "scripts": {
+    "build-shared-crag": "npm install --prefix packages/shared-crag && npm run build --prefix packages/shared-crag",
+    "dev": "npm run build-shared-crag && npm run dev --prefix crag-explorer",
+    "build": "npm run build-shared-crag && npm ci --prefix crag-explorer && npm run build --prefix crag-explorer"
+  },
+  "private": true
+}

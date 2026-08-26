@@ -1,0 +1,30 @@
+---
+description: Never swallow caught errors — always log them
+globs: crag-explorer/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Error handling
+
+Do not use empty `catch` blocks or catch without logging. Every `catch` must bind the error and log it.
+
+```typescript
+// ❌ BAD — error is swallowed
+try {
+  await fetchData();
+} catch {
+  return fallback;
+}
+
+// ✅ GOOD — log, then recover or rethrow
+try {
+  await fetchData();
+} catch (error) {
+  console.warn('Fetch failed, using fallback:', error);
+  return fallback;
+}
+```
+
+- Use `console.error` when the failure is unexpected or user-facing.
+- Use `console.warn` when falling back to an intentional alternate path (offline cache, precached shell, etc.).
+- Re-throw when the caller should handle the failure.

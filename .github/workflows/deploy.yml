@@ -1,0 +1,39 @@
+name: Build and Deploy Explorer
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Build shared-crag package
+        # dist/ is gitignored; types/main resolve to dist, so CI must compile first.
+        run: npm run build-shared-crag
+
+      - name: Install dependencies for crag-explorer
+        working-directory: crag-explorer
+        run: npm ci
+
+      - name: Deploy to Netlify
+        # --build runs netlify.toml build + bundles edge functions.
+        # Deploying publish-dir alone (old action) never uploaded netlify/edge-functions.
+        working-directory: crag-explorer
+        run: npx netlify-cli deploy --build --prod --message "Deploy from GitHub Actions"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        timeout-minutes: 10

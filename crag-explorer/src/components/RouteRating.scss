@@ -1,0 +1,58 @@
+.route-rating {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.route-rating__stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.route-rating__star {
+  position: relative;
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  font-size: 15px;
+  line-height: 1;
+
+  &::before {
+    position: absolute;
+    left: 0;
+    top: 0;
+    line-height: 1;
+  }
+
+  &--empty::before {
+    content: '☆';
+    color: #bdbdbd;
+  }
+
+  &--full::before {
+    content: '★';
+    color: #f0ad4e;
+  }
+
+  &--half::before {
+    content: '☆';
+    color: #bdbdbd;
+  }
+
+  &--half::after {
+    content: '★';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 50%;
+    overflow: hidden;
+    color: #f0ad4e;
+    line-height: 1;
+  }
+}
+
+.route-rating--inline {
+  margin-left: 8px;
+}

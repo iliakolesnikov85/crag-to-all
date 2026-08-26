@@ -1,0 +1,75 @@
+.beta-videos-page {
+  .beta-videos-header {
+    margin-bottom: 8px;
+  }
+
+  .beta-videos-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    margin-bottom: 24px;
+    color: #666;
+    font-size: 14px;
+  }
+
+  .beta-videos-route {
+    font-weight: 600;
+    color: #333;
+  }
+
+  .beta-videos-grade {
+    color: #007bff;
+    font-weight: 600;
+  }
+
+  .beta-videos-back {
+    margin-left: auto;
+  }
+
+  .beta-videos-empty {
+    color: #666;
+    font-style: italic;
+  }
+
+  .beta-videos-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    max-width: 640px;
+  }
+
+  .beta-video-item {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  }
+
+  .beta-video-iframe {
+    display: block;
+    width: 100%;
+    border: none;
+  }
+
+  .beta-video-iframe--youtube {
+    aspect-ratio: 16 / 9;
+  }
+
+  .beta-video-iframe--instagram {
+    height: 690px;
+  }
+
+  .beta-video-iframe--default {
+    min-height: 480px;
+  }
+
+  .beta-video-credit {
+    margin: 0;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #666;
+    background: #fafafa;
+    border-top: 1px solid #eee;
+  }
+}

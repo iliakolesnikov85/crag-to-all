@@ -1,0 +1,54 @@
+---
+description: JS/TS declaration order — private first, then exports
+globs: **/*.{ts,tsx}
+alwaysApply: false
+---
+
+# JS/TS declaration order
+
+In module files, group declarations in this order:
+
+1. **Imports**
+2. **Private module declarations** (no `export`)
+3. **Export declarations**
+
+Within each group, keep a consistent order: constants → types/interfaces → functions.
+
+## Module-level
+
+```typescript
+// ❌ BAD — exports mixed with private helpers
+export interface MapOption { id: string; }
+
+const TILE_URL = 'https://example.com/{z}/{x}/{y}';
+
+function loadScript(src: string): Promise<void> { /* ... */ }
+
+export function createLayer() { /* ... */ }
+
+const TREE_MIN_ZOOM = 15;
+
+// ✅ GOOD — private first, exports last
+const TILE_URL = 'https://example.com/{z}/{x}/{y}';
+const TREE_MIN_ZOOM = 15;
+
+interface FeatureKind { /* ... */ }
+
+function loadScript(src: string): Promise<void> { /* ... */ }
+
+export interface MapOption { id: string; }
+
+export function createLayer() { /* ... */ }
+```
+
+## Classes
+
+Within a class, put `private` / `#` members before public members.
+
+## Barrel files (`index.ts`)
+
+Re-exports only — this rule does not apply.
+
+## When editing
+
+When touching a file, reorder declarations to match this convention if they are already out of order.

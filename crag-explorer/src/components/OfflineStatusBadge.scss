@@ -1,0 +1,151 @@
+.offline-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: inherit;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.offline-status__icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+
+  svg {
+    display: block;
+    width: 1em;
+    height: 1em;
+  }
+}
+
+.offline-status__label {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  line-height: inherit;
+}
+
+/* Crag list card — top-right corner.
+   Non-action badges must not capture clicks over the card Link. */
+.offline-status--card {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 3;
+  max-width: calc(100% - 1rem);
+  min-height: 1.625rem;
+  padding: 0 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  box-sizing: border-box;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+
+  .offline-status__icon svg {
+    width: 1em;
+    height: 1em;
+  }
+
+  &.offline-status--action {
+    pointer-events: auto;
+  }
+}
+
+.offline-status--card.offline-status--saved {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #a3d9a5;
+}
+
+.offline-status--card.offline-status--not-saved {
+  background: rgba(255, 255, 255, 0.95);
+  color: #5a6268;
+  border: 1px solid #ced4da;
+}
+
+.offline-status--card.offline-status--update {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffc107;
+}
+
+.offline-status--header.offline-status--update {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffc107;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+
+  .offline-status__icon svg {
+    width: 1.8em;
+    height: 1.8em;
+  }
+}
+
+.offline-status--action {
+  cursor: pointer;
+  color: inherit;
+  text-decoration: none;
+}
+
+.offline-status--action:hover:not(.offline-status--busy) {
+  filter: brightness(0.95);
+}
+
+.offline-status--action:focus-visible {
+  outline: 2px solid #1976d2;
+  outline-offset: 2px;
+}
+
+.offline-status--busy {
+  opacity: 0.7;
+  cursor: wait;
+  pointer-events: none;
+}
+
+.offline-status--card.offline-status--inline {
+  position: static;
+  max-width: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+/* Crag page header */
+.offline-status--header {
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.offline-status--header.offline-status--saved {
+  background: rgba(255, 255, 255, 0.95);
+  color: #155724;
+  border: 1px solid #a3d9a5;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.offline-status--header .offline-status__icon svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+
+@media (max-width: 768px) {
+  .offline-status--header {
+    font-size: 0.65rem;
+    padding: 0.3rem 0.5rem;
+  }
+
+  .offline-status--header .offline-status__label {
+    max-width: 5.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
