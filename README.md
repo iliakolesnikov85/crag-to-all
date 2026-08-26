@@ -1,14 +1,18 @@
 # Crag-to-All
 
-A React PWA for browsing climbing crags: topos with route overlays, maps, grades, PDF guides, and offline downloads.
+A web application for browsing climbing crags. Open it in a browser, or install it on a phone like a native app (it is a [progressive web app](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps)).
 
-Live data (JSON, images, GPX, PDF guides, map tiles) is served from public Firebase Storage. The app is a client — it does not write to Storage.
+The live site is **[roshkaclimb.ge](https://roshkaclimb.ge/)** — currently covering Roshka, Georgia.
+
+You can look up sectors and routes, view topo photos with line overlays, check grades and descriptions, watch beta videos, use the map (including your location), and download PDF guides and GPX tracks. Before a trip with no signal, download a crag in the app so topos, routes, and the outdoor/topo map still work offline.
+
+Live data (JSON, images, GPX, PDF guides, map tiles) is served from public Firebase Storage.
 
 ## Packages
 
-| Path | Role |
-| ---- | ---- |
-| [`crag-explorer/`](crag-explorer/) | Vite + React explorer (Netlify) |
+| Path                                             | Role                                             |
+| ------------------------------------------------ | ------------------------------------------------ |
+| [`crag-explorer/`](crag-explorer/)               | Vite + React explorer (Netlify)                  |
 | [`packages/shared-crag/`](packages/shared-crag/) | Shared TypeScript types, geo, and Bézier helpers |
 
 ## Quick start
