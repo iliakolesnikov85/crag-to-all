@@ -9,6 +9,7 @@ import { getCragImageUrl } from '../utils/firebaseStorage';
 import { createPieChartSVG, getGradeCounts, getSectorGradeCounts } from '../utils/grades';
 import { getEmbedKind, EmbedKind } from '../utils/getEmbedKind';
 import { shuffle } from '../utils/shuffle';
+import { pickBestImage } from '../utils/pickBestImage';
 
 interface OverviewPageProps {
   description: DescriptionSection[];
@@ -28,25 +29,6 @@ interface FeaturedVideo {
 
 const FEATURED_COUNT = 6;
 const FEATURED_VIDEO_COUNT = 3;
-
-// Pick the sector image that is referenced by the most routes.
-// Falls back to the first image when none of them have explicit route refs.
-function pickBestImage(sector: Sector): { image: Image } | null {
-  if (!sector.images || sector.images.length === 0) return null;
-  let bestImage = sector.images[0];
-  let bestCount = -1;
-  for (const image of sector.images) {
-    const count = sector.routes.reduce(
-      (acc, route) => acc + (route.images.some((img) => img.imageFile === image.imageFile) ? 1 : 0),
-      0,
-    );
-    if (count > bestCount) {
-      bestCount = count;
-      bestImage = image;
-    }
-  }
-  return { image: bestImage };
-}
 
 const OverviewPage: React.FC<OverviewPageProps> = ({ description, sectors }) => {
   const { crag, getUrl } = useCrag();

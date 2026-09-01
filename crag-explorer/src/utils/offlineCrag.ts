@@ -4,6 +4,7 @@ import { getCragDataUrl } from './firebaseStorage';
 import {
   collectCragImageFiles,
   collectCragOfflineUrls,
+  extractImageFileFromUrl,
   getOfflineCacheName,
   isOptionalOfflineUrl,
 } from './offlineAssets';
@@ -29,19 +30,6 @@ function enrichCragData(data: CragData): CragData {
     });
   });
   return data;
-}
-
-function extractImageFileFromUrl(url: string): string | null {
-  try {
-    const match = url.match(/images%2F([^?&]+)/);
-    if (match) return decodeURIComponent(match[1]);
-    const pathMatch = url.match(/\/images\/([^?&]+)/);
-    if (pathMatch) return decodeURIComponent(pathMatch[1]);
-  } catch (error) {
-    console.warn('Failed to extract image file from URL:', url, error);
-    return null;
-  }
-  return null;
 }
 
 async function fetchAndCache(

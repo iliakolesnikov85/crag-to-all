@@ -81,7 +81,7 @@ const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags
     <CragContext.Provider value={
       { 
         crag: crag, 
-        getUrl: (url: string) => { 
+        getUrl: (url: string) => {
           url = url.startsWith('/') ? url : `/${url}`;
           if (crag.cragId === defaultCragId) {
             return url;

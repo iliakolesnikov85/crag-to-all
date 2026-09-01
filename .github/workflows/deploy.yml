@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  pull_request:
 
 jobs:
   build-and-deploy:
@@ -28,7 +29,12 @@ jobs:
         working-directory: crag-explorer
         run: npm ci
 
+      - name: Run tests
+        working-directory: crag-explorer
+        run: npm test
+
       - name: Deploy to Netlify
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         # --build runs netlify.toml build + bundles edge functions.
         # Deploying publish-dir alone (old action) never uploaded netlify/edge-functions.
         working-directory: crag-explorer

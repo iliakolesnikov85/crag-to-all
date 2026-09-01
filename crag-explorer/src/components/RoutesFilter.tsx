@@ -3,9 +3,9 @@ import { MdClose, MdPlayArrow } from 'react-icons/md';
 import Slider from 'rc-slider';
 import 'rc-slider/assets/index.css';
 import './RoutesFilter.scss';
-import { getBaseGrade } from '../utils/grades';
 import { Route, Sector } from '../types';
 import { useFilter } from '../context/FilterContext';
+import { applyRouteFilters } from '../utils/routesFilter';
 import Button from './Button';
 
 interface RoutesFilterProps {
@@ -33,25 +33,22 @@ const RoutesFilter: React.FC<RoutesFilterProps> = ({
     setIsExpanded
   } = useFilter();
 
-  const routes = React.useMemo(
-    () => sectors.flatMap((sector) => sector.routes),
-    [sectors]
+  const {
+    availableGrades,
+    showGradeSlider,
+    isGradeRangeSet,
+    filteredRoutes,
+    filteredSectors,
+  } = React.useMemo(
+    () =>
+      applyRouteFilters(sectors, {
+        gradeRange,
+        textFilter,
+        hideUnknownGrades,
+        hideSectorsWithoutRoutes,
+      }),
+    [sectors, gradeRange, textFilter, hideUnknownGrades, hideSectorsWithoutRoutes],
   );
-
-  // Get all available grades for the slider
-  const availableGrades = React.useMemo(() => {
-    const grades = new Set<string>();
-    routes.forEach(route => {
-      if (route.grade && route.grade !== '?') {
-        grades.add(getBaseGrade(route.grade));
-      }
-    });
-    return Array.from(grades).sort((a, b) =>
-      a.localeCompare(b, undefined, { numeric: true })
-    );
-  }, [routes]);
-
-  const showGradeSlider = availableGrades.length > 1;
 
   // Initialize grade range when the slider becomes usable; reset if out of bounds
   React.useEffect(() => {
@@ -66,78 +63,6 @@ const RoutesFilter: React.FC<RoutesFilterProps> = ({
       setGradeRange([0, max]);
     }
   }, [availableGrades, showGradeSlider, gradeRange, setGradeRange]);
-
-  const isGradeRangeSet =
-    showGradeSlider &&
-    (gradeRange[0] > 0 || gradeRange[1] < availableGrades.length - 1);
-
-  // Helper function to check if a grade is within the filter range
-  const isGradeInRange = React.useCallback((grade?: string): boolean => {
-    if (!grade || grade === '?') {
-      return hideUnknownGrades || isGradeRangeSet ? false : true;
-    }
-
-    if (!showGradeSlider) return true;
-
-    const baseGrade = getBaseGrade(grade);
-    const gradeIndex = availableGrades.indexOf(baseGrade);
-
-    if (gradeIndex === -1) return true; // Include grades not in available grades
-
-    return gradeIndex >= gradeRange[0] && gradeIndex <= gradeRange[1];
-  }, [availableGrades, gradeRange, hideUnknownGrades, isGradeRangeSet, showGradeSlider]);
-
-  const isTextFilterActive = textFilter.trim().length > 1;
-
-  // Helper function to check if a route matches the text filter
-  const matchesTextFilter = React.useCallback((route: Route): boolean => {
-    if (!isTextFilterActive) return true;
-
-    const searchTerm = textFilter.toLowerCase().trim();
-    const routeName = route.name.toLowerCase();
-    const sectorName = route.sectorName.toLowerCase();
-
-    return routeName.includes(searchTerm) || sectorName.includes(searchTerm);
-  }, [textFilter, isTextFilterActive]);
-
-  // Helper function to check if an empty sector matches the text filter
-  const matchesEmptySectorTextFilter = React.useCallback((sector: Sector): boolean => {
-    if (!isTextFilterActive) return true;
-    const searchTerm = textFilter.toLowerCase().trim();
-    return sector.name.toLowerCase().includes(searchTerm);
-  }, [textFilter, isTextFilterActive]);
-
-  // Compute filtered routes and notify parent component
-  const filteredRoutes = React.useMemo(() => {
-    return routes.filter(route =>
-      isGradeInRange(route.grade) && matchesTextFilter(route)
-    );
-  }, [routes, isGradeInRange, matchesTextFilter]);
-
-  const filteredSectors = React.useMemo(() => {
-    const filteredRouteIds = new Set(
-      filteredRoutes.map(route => `${route.name.toLowerCase()}-${route.sectorName.toLowerCase()}`)
-    );
-
-    return sectors.flatMap((sector) => {
-      const hadNoRoutes = sector.routes.length === 0;
-      const sectorRoutes = sector.routes.filter((route) =>
-        filteredRouteIds.has(`${route.name.toLowerCase()}-${sector.name.toLowerCase()}`)
-      );
-
-      // Drop sectors emptied by the route filter.
-      if (sectorRoutes.length === 0 && !hadNoRoutes) return [];
-
-      // Empty sectors: respect text filter by sector name.
-      if (hadNoRoutes && !matchesEmptySectorTextFilter(sector)) return [];
-
-      // Hide empty sectors when the grade slider is narrowed or the checkbox is on.
-      // "Hide ? grade" does not apply — empty sectors have no grades.
-      if (sectorRoutes.length === 0 && (hideSectorsWithoutRoutes || isGradeRangeSet)) return [];
-
-      return [{ ...sector, routes: sectorRoutes }];
-    });
-  }, [sectors, filteredRoutes, hideSectorsWithoutRoutes, matchesEmptySectorTextFilter, isGradeRangeSet]);
 
   // Notify parent of filtered routes changes
   React.useEffect(() => {

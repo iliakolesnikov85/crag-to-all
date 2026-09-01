@@ -9,35 +9,12 @@ import {
   parseMarkerLatLng,
   parseTrailLatLngs,
 } from './mapUtils';
-
-export type SectorMarkerMode = 'popup' | 'bottom-panel';
-
-export interface RenderMapOverlaysOptions {
-  mode: SectorMarkerMode;
-  onSectorSelect?: (sector: Sector) => void;
-  cragContext: CragContextType;
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-function markerLabelFromType(type: string): string {
-  const t = type.trim().toLowerCase();
-  if (t === 'parking_space') return 'Parking';
-  if (!t) return 'Map marker';
-  return type.replace(/_/g, ' ');
-}
-
-function isParkingMarkerType(type: string): boolean {
-  const t = type.trim().toLowerCase();
-  return t === 'parking_space' || t.includes('parking');
-}
+import {
+  escapeHtml,
+  isParkingMarkerType,
+  markerLabelFromType,
+  resolveTrailColor,
+} from './mapOverlayHelpers';
 
 function createParkingMarkerIconHtml(): string {
   return `<div class="map-marker map-marker--parking" aria-hidden="true">
@@ -56,18 +33,6 @@ function createDefaultMapMarkerIconHtml(label: string): string {
     <text x="16" y="20" text-anchor="middle" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">${safe}</text>
   </svg>
 </div>`;
-}
-
-function resolveTrailColor(rawColor: string | undefined): string {
-  const raw = (rawColor || '').trim();
-  if (
-    /^#[0-9a-fA-F]{3}$/.test(raw) ||
-    /^#[0-9a-fA-F]{6}$/.test(raw) ||
-    /^#[0-9a-fA-F]{8}$/.test(raw)
-  ) {
-    return raw;
-  }
-  return '#c45c26';
 }
 
 function addSectorMarker(
@@ -167,6 +132,14 @@ function addTrail(overlay: L.LayerGroup, trail: CragMapTrail): void {
   const line = L.polyline(latlngs, { color, weight: 4, opacity: 0.88 }).addTo(overlay);
   const title = escapeHtml(trail.name.trim()) || 'Trail';
   line.bindPopup(`<div class="map-popup map-popup--trail"><strong>${title}</strong></div>`);
+}
+
+export type SectorMarkerMode = 'popup' | 'bottom-panel';
+
+export interface RenderMapOverlaysOptions {
+  mode: SectorMarkerMode;
+  onSectorSelect?: (sector: Sector) => void;
+  cragContext: CragContextType;
 }
 
 /** Clear and redraw sectors, map markers, and trails on the overlay layer. */

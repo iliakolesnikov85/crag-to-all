@@ -11,7 +11,7 @@
 const FIREBASE_BUCKET = 'crag-to-all.firebasestorage.app';
 
 // Check if we should use the emulator
-const USE_EMULATOR = (import.meta as any).env?.VITE_USE_FIREBASE_EMULATOR === 'true';
+const USE_EMULATOR = import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true';
 
 // Base URL for Firebase Storage (production or emulator)
 const FIREBASE_BASE_URL = USE_EMULATOR 
