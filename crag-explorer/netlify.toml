@@ -7,7 +7,7 @@
 
 [build.environment]
   # Node version to use for the build
-  NODE_VERSION = "18"
+  NODE_VERSION = "24"
 
 # Redirect rules for SPA - this is the key part for React Router
 [[redirects]]

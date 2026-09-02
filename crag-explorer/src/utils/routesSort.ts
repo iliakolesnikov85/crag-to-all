@@ -1,7 +1,7 @@
 import { Route, Sector } from '../types';
 import { getBaseGrade } from './grades';
 
-function isNullOrEmpty(value: unknown): boolean {
+function isNullOrEmpty(value: unknown): value is null | undefined | '' {
   return value === null || value === undefined || value === '';
 }
 

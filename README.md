@@ -17,6 +17,8 @@ Live data (JSON, images, GPX, PDF guides, map tiles) is served from public Fireb
 
 ## Quick start
 
+Requires **Node 24**.
+
 ```bash
 npm run build-shared-crag
 cd crag-explorer

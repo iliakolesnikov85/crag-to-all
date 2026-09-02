@@ -26,7 +26,7 @@ describe('useOfflineUpdateStatus', () => {
     setNavigatorOnLine(false);
     const { result, rerender } = renderHook(
       ({ cragId }: { cragId: string | undefined }) => useOfflineUpdateStatus(cragId),
-      { wrapper, initialProps: { cragId: SAMPLE_CRAG_ID } },
+      { wrapper, initialProps: { cragId: SAMPLE_CRAG_ID as string | undefined } },
     );
 
     await waitFor(() => {
