@@ -12,15 +12,13 @@ import { useOfflineUpdateStatus } from '../hooks/useOfflineUpdateStatus';
 import {
   estimateCragOfflineSize,
   estimateStorage,
+  getOfflineManifest,
   isCragOffline,
-  OfflineProgress,
+  type OfflineCragManifest,
+  type OfflineProgress,
   removeCragOffline,
   syncCragOffline,
-} from '../utils/offlineCrag';
-import {
-  getOfflineManifest,
-  type OfflineCragManifest,
-} from '../utils/offlineManifestDb';
+} from '../utils/offline';
 import { formatBytes } from '../utils/formatBytes';
 
 interface DownloadPageProps {

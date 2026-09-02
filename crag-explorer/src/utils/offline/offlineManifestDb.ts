@@ -1,4 +1,4 @@
-import type { Crag, OpenTopoTilePackInfo } from '../types';
+import type { Crag, OpenTopoTilePackInfo } from '../../types';
 
 const DB_NAME = 'crag-explorer-offline';
 const DB_VERSION = 2;

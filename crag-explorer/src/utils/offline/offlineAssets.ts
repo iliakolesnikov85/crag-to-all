@@ -1,9 +1,9 @@
-import { CragData } from '../types';
+import { CragData } from '../../types';
 import {
   getCragDataUrl,
   getCragImageUrl,
   getCragSectorsGpxUrl,
-} from './firebaseStorage';
+} from '../firebaseStorage';
 
 /** Collect unique image filenames from crag data. */
 export function collectCragImageFiles(data: CragData): string[] {

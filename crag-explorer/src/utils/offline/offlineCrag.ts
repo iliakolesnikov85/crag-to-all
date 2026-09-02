@@ -1,6 +1,6 @@
-import { CragData } from '../types';
-import { computeCragDataChecksum } from './cragChecksum';
-import { getCragDataUrl } from './firebaseStorage';
+import { CragData } from '../../types';
+import { computeCragDataChecksum } from '../cragChecksum';
+import { getCragDataUrl, getCragImageUrl } from '../firebaseStorage';
 import {
   collectCragImageFiles,
   collectCragOfflineUrls,
@@ -157,11 +157,7 @@ export async function syncCragOffline(
   if (existing) {
     for (const file of existing.imageFiles) {
       if (!newImageFiles.has(file)) {
-        const imageUrl = allUrls.find((u) => {
-          const extracted = extractImageFileFromUrl(u);
-          return extracted === file;
-        });
-        if (imageUrl) await cache.delete(imageUrl);
+        await cache.delete(getCragImageUrl(cragId, file));
       }
     }
   }

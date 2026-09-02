@@ -23,11 +23,13 @@ import { AppOnlineProvider, useAppOnline } from './context/AppOnlineContext';
 import { CragContext } from './context/CragContext';
 import { FilterContext, useFilterState } from './context/FilterContext';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
-import { isCragOffline, loadCragDataJson } from './utils/offlineCrag';
 import {
   getOfflineCragIndex,
+  isCragOffline,
+  loadCragDataJson,
   putOfflineCragIndex,
-} from './utils/offlineManifestDb';
+} from './utils/offline';
+
 const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags, defaultCragId }) => {
   const online = useOnlineStatus();
   const cragId = crags.find(c => c.cragId === location.pathname.split('/')[1])?.cragId;
@@ -120,7 +122,7 @@ const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags
   );
 };
 
-const AppRoutes: React.FC = () => {
+export const AppRoutes: React.FC = () => {
   const { markNetworkLimited, markNetworkOk } = useAppOnline();
   const [crags, setCrags] = useState<Crag[]>([]);
   const [loading, setLoading] = useState(true);

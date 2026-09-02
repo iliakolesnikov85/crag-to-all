@@ -4,7 +4,7 @@ import * as L from 'leaflet';
 import {
   createCachedOpenTopoLayer,
   getCachedOpenTopoTilePack,
-} from './offlineOpenTopoTiles';
+} from './offline';
 
 const ESRI_SATELLITE_URL =
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';

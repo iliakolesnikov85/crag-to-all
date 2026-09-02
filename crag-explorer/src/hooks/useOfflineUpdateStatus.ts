@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { isOfflineDataOutdated } from '../utils/offlineCrag';
+import { isOfflineDataOutdated } from '../utils/offline';
 import { useOnlineStatus } from './useOnlineStatus';
 
 export function useOfflineUpdateStatus(cragId: string | undefined): {

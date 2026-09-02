@@ -1,4 +1,4 @@
-import type { CragData, Route, Sector } from '../../types';
+import type { Crag, CragData, Route, Sector } from '../../types';
 
 const WALL_IMAGE = 'wall.jpg';
 
@@ -38,6 +38,10 @@ const emptySector: Sector = {
 export const SAMPLE_CRAG_ID = 'test-crag';
 
 export const SAMPLE_IMAGE_FILE = WALL_IMAGE;
+
+export const sampleCrags: Crag[] = [
+  { cragId: SAMPLE_CRAG_ID, cragName: 'Test Crag' },
+];
 
 export const sampleCragData: CragData = {
   name: 'Test Crag',

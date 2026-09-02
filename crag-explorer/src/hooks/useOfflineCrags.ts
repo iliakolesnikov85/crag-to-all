@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { isOfflineDataOutdated } from '../utils/offlineCrag';
-import { getAllOfflineManifests } from '../utils/offlineManifestDb';
+import { getAllOfflineManifests, isOfflineDataOutdated } from '../utils/offline';
 import { useOnlineStatus } from './useOnlineStatus';
 
 export function useOfflineCrags(): {

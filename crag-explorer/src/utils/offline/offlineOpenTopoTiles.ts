@@ -10,11 +10,11 @@ import {
   type BBox,
   type OpenTopoTilePackInfo,
 } from '@crag-to-all/shared-crag';
-import { CragData } from '../types';
+import { CragData } from '../../types';
 import {
   getCragOpenTopoPackUrl,
   getCragOpenTopoTileUrl,
-} from './firebaseStorage';
+} from '../firebaseStorage';
 import { getOfflineCacheName } from './offlineAssets';
 import { getOfflineManifest } from './offlineManifestDb';
 import {

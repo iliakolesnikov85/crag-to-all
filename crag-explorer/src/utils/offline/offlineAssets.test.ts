@@ -3,12 +3,12 @@ import {
   SAMPLE_CRAG_ID,
   SAMPLE_IMAGE_FILE,
   sampleCragData,
-} from '../test/fixtures/cragData';
+} from '../../test/fixtures/cragData';
 import {
   getCragDataUrl,
   getCragImageUrl,
   getCragSectorsGpxUrl,
-} from './firebaseStorage';
+} from '../firebaseStorage';
 import {
   collectCragImageFiles,
   collectCragOfflineUrls,

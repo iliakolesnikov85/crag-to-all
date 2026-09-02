@@ -1,4 +1,4 @@
-import type { OpenTopoTilePackInfo } from '../types';
+import type { OpenTopoTilePackInfo } from '../../types';
 
 function bboxEqual(
   a: [number, number, number, number],

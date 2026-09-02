@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { OpenTopoTilePackInfo } from '../types';
-import { getCragOpenTopoTileUrl } from './firebaseStorage';
+import type { OpenTopoTilePackInfo } from '../../types';
+import { getCragOpenTopoTileUrl } from '../firebaseStorage';
 import {
   isOpenTopoTilePacksEquals,
   isOpenTopoTileUrl,

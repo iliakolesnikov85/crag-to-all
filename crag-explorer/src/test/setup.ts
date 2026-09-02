@@ -1,5 +1,6 @@
 import { webcrypto } from 'node:crypto';
 import '@testing-library/jest-dom/vitest';
+import { cleanup } from '@testing-library/react';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, vi } from 'vitest';
 
@@ -99,10 +100,42 @@ vi.stubGlobal('caches', cacheStorage);
 vi.stubGlobal('fetch', fetchMock);
 globalThis.indexedDB = new IDBFactory();
 
+if (!window.matchMedia) {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }),
+  });
+}
+
+if (!window.scrollTo) {
+  Object.defineProperty(window, 'scrollTo', {
+    configurable: true,
+    writable: true,
+    value: () => {},
+  });
+}
+
 afterEach(async () => {
+  cleanup();
+  vi.unstubAllGlobals();
   fetchMock.mockReset();
   fetchMock.mockImplementation(() => Promise.reject(new Error(UNMOCKED_FETCH)));
+  vi.stubGlobal('caches', cacheStorage);
   vi.stubGlobal('fetch', fetchMock);
   await cacheStorage.clear();
   globalThis.indexedDB = new IDBFactory();
+  Object.defineProperty(navigator, 'onLine', {
+    configurable: true,
+    value: true,
+  });
 });
