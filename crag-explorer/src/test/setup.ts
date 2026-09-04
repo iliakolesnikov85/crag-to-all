@@ -117,13 +117,11 @@ if (!window.matchMedia) {
   });
 }
 
-if (!window.scrollTo) {
-  Object.defineProperty(window, 'scrollTo', {
-    configurable: true,
-    writable: true,
-    value: () => {},
-  });
-}
+Object.defineProperty(window, 'scrollTo', {
+  configurable: true,
+  writable: true,
+  value: () => {},
+});
 
 afterEach(async () => {
   cleanup();

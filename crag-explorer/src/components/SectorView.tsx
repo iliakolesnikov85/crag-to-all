@@ -28,17 +28,18 @@ const SectorView: React.FC<SectorViewProps> = ({ cragId, sector, route, imagesPa
 
   const [highlighted, setHighlighted] = useState<number[]>([]);
 
-    // Scroll to top when component mounts
-    useEffect(() => {
-      window.scrollTo(0, 0);
-    }, []);
-  
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const onRouteClick = (imageIdx: number, routeIdx: number) => {
     setHighlighted(h => {
       const newH = Array.isArray(h) ? [...h] : [];
       newH[imageIdx] = h[imageIdx] === routeIdx ? -1 : routeIdx;
       return newH;
-    })};
+    })
+  };
 
   if (!sector || !Array.isArray(sector.images)) return null;
 
@@ -177,11 +178,11 @@ const SectorView: React.FC<SectorViewProps> = ({ cragId, sector, route, imagesPa
                           // Parse "left:X%; top:Y%" format
                           const leftMatch = labelPosition.match(/left:([\d.]+)%/);
                           const topMatch = labelPosition.match(/top:([\d.]+)%/);
-                          
+
                           if (leftMatch && topMatch) {
                             const left = parseFloat(leftMatch[1]);
                             const top = parseFloat(topMatch[1]);
-                            
+
                             return (
                               <div
                                 key={`route-${routeIdx}`}
@@ -203,35 +204,35 @@ const SectorView: React.FC<SectorViewProps> = ({ cragId, sector, route, imagesPa
                   </div>
                 </div>
                 {!route && <div className="topo-routes">
-                  
+
                   {routesForImage.length > 0 ? (
                     <>
-                    <h4>Routes</h4>
-                    <ul className="routes-list">
-                      {routesForImage.map((route, routeIdx) => (
-                        <li
-                          key={routeIdx}
-                          className={`route-item${highlighted[imageIdx] === routeIdx ? ' highlighted' : ''}`}
-                          style={{ cursor: 'pointer' }}
-                          onClick={() => onRouteClick(imageIdx, routeIdx)}
-                        >
-                          <div className="route-content">
-                            <span className="route-number">{routeIdx + 1}. </span>
-                            <span className="route-name">{renderLink(`/sector/${encodeURIComponent(sector.name.toLowerCase())}/${encodeURIComponent(route!.name.toLowerCase())}`, route!.name)}{(route!.grade ? `,` : '')}</span>
-                            {route!.grade && <span className="route-grade"> {route!.grade}</span>}
-                            <RouteRating rating={route!.rating} ratingVotes={route!.ratingVotes} />
-                            {route!.description && <div className="route-desc">{route!.description}</div>}
-                          </div>
-                          {route!.tags && route!.tags.length > 0 && (
-                            <div className="route-tags">
-                              {route!.tags.map((tag, tagIndex) => (
-                                <React.Fragment key={tagIndex}>{renderTagChip(tag, route!)}</React.Fragment>
-                              ))}
+                      <h4>Routes</h4>
+                      <ul className="routes-list">
+                        {routesForImage.map((route, routeIdx) => (
+                          <li
+                            key={routeIdx}
+                            className={`route-item${highlighted[imageIdx] === routeIdx ? ' highlighted' : ''}`}
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => onRouteClick(imageIdx, routeIdx)}
+                          >
+                            <div className="route-content">
+                              <span className="route-number">{routeIdx + 1}. </span>
+                              <span className="route-name">{renderLink(`/sector/${encodeURIComponent(sector.name.toLowerCase())}/${encodeURIComponent(route!.name.toLowerCase())}`, route!.name)}{(route!.grade ? `,` : '')}</span>
+                              {route!.grade && <span className="route-grade"> {route!.grade}</span>}
+                              <RouteRating rating={route!.rating} ratingVotes={route!.ratingVotes} />
+                              {route!.description && <div className="route-desc">{route!.description}</div>}
                             </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
+                            {route!.tags && route!.tags.length > 0 && (
+                              <div className="route-tags">
+                                {route!.tags.map((tag, tagIndex) => (
+                                  <React.Fragment key={tagIndex}>{renderTagChip(tag, route!)}</React.Fragment>
+                                ))}
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
                     </>
                   ) : (
                     <div className="no-routes-message">

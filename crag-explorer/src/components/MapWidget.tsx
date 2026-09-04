@@ -9,16 +9,14 @@ import { useIsMobileLayout } from '../hooks/useIsMobileLayout';
 import { useMapFullscreen } from '../hooks/useMapFullscreen';
 import SectorMapInfo from './SectorMapInfo';
 import {
-  createLocationControl,
-  createResetBoundsControl,
-} from '../utils/mapControls';
-import { buildBaseLayerOptions } from '../utils/mapLayers';
-import {
   applyInitialMapView,
   attachBaseLayers,
+  buildBaseLayerOptions,
+  createLocationControl,
+  createResetBoundsControl,
+  renderMapOverlays,
   saveMapView,
-} from '../utils/mapSetup';
-import { renderMapOverlays } from '../utils/mapOverlays';
+} from '../utils/map';
 
 interface MapWidgetProps {
   cragData: CragData;

@@ -3,7 +3,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as L from 'leaflet';
 import { MdHome } from 'react-icons/md';
-import { CragData } from '../../types';
+import { CragData } from '../../../types';
 import { fitMapToCragBounds } from '../mapSetup';
 import { createControlButton } from './createControlButton';
 

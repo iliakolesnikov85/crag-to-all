@@ -1,8 +1,8 @@
 import * as L from 'leaflet';
-import { CragData, CragMapMarker, CragMapTrail, Sector } from '../types';
-import { mountSectorMapInfo } from '../components/SectorMapInfo';
-import { CragContextType } from '../context/CragContext';
-import { createPieChartSVG, getSectorGradeCounts } from './grades';
+import { CragData, CragMapMarker, CragMapTrail, Sector } from '../../types';
+import { mountSectorMapInfo } from '../../components/SectorMapInfo';
+import { CragContextType } from '../../context/CragContext';
+import { createPieChartSVG, getSectorGradeCounts } from '../grades';
 import { resolveTrailColor } from './mapUtils';
 import { escapeHtml, markerLabelFromType } from './mapOverlayHelpers';
 

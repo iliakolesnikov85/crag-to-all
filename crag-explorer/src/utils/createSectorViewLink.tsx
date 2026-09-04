@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router';
 import type { LatLng } from '../types';
-import { setMapCenter } from './mapSetup';
+import { setMapCenter } from './map';
 
 export function createSectorViewLink(
   getUrl: (to: string) => string,

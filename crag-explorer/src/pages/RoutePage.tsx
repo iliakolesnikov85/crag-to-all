@@ -26,18 +26,18 @@ const RoutePage: React.FC<RoutePageProps> = ({ sectors, onSectorChange, onRouteC
   }, [sectorName, routeName, onSectorChange, onRouteChange]);
 
   const sector = sectors.find(s => s.name.toLowerCase() === (sectorName || '').toLowerCase());
-  
+
   if (!sector) return <div className="page">Sector not found.</div>;
 
   const route = sector.routes.find(r => r.name.toLowerCase() === (routeName || '').toLowerCase());
-  
+
   if (!route) return <div className="page">Route not found.</div>;
 
   return (
     <div className="page">
-      <SectorView 
-        cragId={crag.cragId} 
-        sector={sector} 
+      <SectorView
+        cragId={crag.cragId}
+        sector={sector}
         route={route}
         getImageUrl={getCragImageUrl}
         createLink={createSectorViewLink(getUrl, crag.cragId, sector.geo)}

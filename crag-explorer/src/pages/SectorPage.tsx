@@ -27,9 +27,9 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
 
   return (
     <div className="page">
-      <SectorView 
+      <SectorView
         cragId={crag.cragId}
-        sector={sector} 
+        sector={sector}
         getImageUrl={getCragImageUrl}
         createLink={createSectorViewLink(getUrl, crag.cragId, sector.geo)}
       />

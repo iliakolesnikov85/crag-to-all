@@ -2,7 +2,7 @@ import { createElement, useCallback, useEffect, useRef, useState, type RefObject
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as L from 'leaflet';
 import { MdFullscreen, MdFullscreenExit } from 'react-icons/md';
-import { createControlButton } from '../utils/mapControls/createControlButton';
+import { createControlButton } from '../utils/map';
 
 type FullScreenControlInstance = L.Control & {
   _unbindFullscreenSync?: (() => void) | null;
