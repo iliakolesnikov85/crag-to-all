@@ -31,9 +31,9 @@ const UNSUPPORTED_CRAG_DATA =
   'Crag data is outdated and must be re-downloaded.';
 
 function withoutProtocol(data: CragData): CragData {
-  const copy = structuredClone(data) as CragData & { protocolVersion?: number };
+  const copy: Partial<CragData> = structuredClone(data);
   delete copy.protocolVersion;
-  return copy;
+  return copy as CragData;
 }
 
 function mockSyncFetches(
