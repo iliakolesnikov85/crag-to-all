@@ -1,3 +1,4 @@
+import { CRAG_DATA_PROTOCOL, isCurrentCragDataProtocol } from '@crag-to-all/shared-crag';
 import { CragData } from '../../types';
 import { computeCragDataChecksum } from '../cragChecksum';
 import { getCragDataUrl, getCragImageUrl } from '../firebaseStorage';
@@ -15,13 +16,9 @@ import {
 } from './offlineManifestDb';
 import { syncCragOpenTopoTiles } from './offlineOpenTopoTiles';
 
-export interface OfflineProgress {
-  done: number;
-  total: number;
-  label: string;
-}
-
 const CONCURRENCY = 4;
+const UNSUPPORTED_CRAG_DATA =
+  'Crag data is outdated and must be re-downloaded.';
 
 function enrichCragData(data: CragData): CragData {
   data.sectors.forEach((sector) => {
@@ -30,6 +27,14 @@ function enrichCragData(data: CragData): CragData {
     });
   });
   return data;
+}
+
+async function requireCurrentCragData(cragId: string, raw: unknown): Promise<CragData> {
+  if (!isCurrentCragDataProtocol(raw)) {
+    await removeCragOffline(cragId);
+    throw new Error(UNSUPPORTED_CRAG_DATA);
+  }
+  return enrichCragData(raw);
 }
 
 async function fetchAndCache(
@@ -76,6 +81,12 @@ async function runWithConcurrency(
   await Promise.all(workers);
 }
 
+export interface OfflineProgress {
+  done: number;
+  total: number;
+  label: string;
+}
+
 export async function isCragOffline(cragId: string): Promise<boolean> {
   const manifest = await getOfflineManifest(cragId);
   return manifest !== undefined;
@@ -86,8 +97,9 @@ export async function isOfflineDataOutdated(cragId: string): Promise<boolean> {
   const manifest = await getOfflineManifest(cragId);
   if (!manifest || !navigator.onLine) return false;
 
-  // Legacy packs may lack jsonChecksum — treat as outdated so they re-sync.
+  // Legacy packs may lack jsonChecksum or protocolVersion — treat as outdated so they re-sync.
   if (!manifest.jsonChecksum) return true;
+  if (manifest.protocolVersion !== CRAG_DATA_PROTOCOL) return true;
 
   try {
     const response = await fetch(getCragDataUrl(cragId), { cache: 'no-store' });
@@ -120,8 +132,11 @@ export async function syncCragOffline(
     throw new Error('Failed to fetch latest crag data');
   }
   const rawData = await response.json();
+  if (!isCurrentCragDataProtocol(rawData)) {
+    throw new Error(UNSUPPORTED_CRAG_DATA);
+  }
   const jsonChecksum = await computeCragDataChecksum(rawData);
-  const cragData = enrichCragData(rawData as CragData);
+  const cragData = enrichCragData(rawData);
 
   const existing = await getOfflineManifest(cragId);
   const allUrls = collectCragOfflineUrls(cragId, cragData);
@@ -193,6 +208,7 @@ export async function syncCragOffline(
     downloadedAt: existing?.downloadedAt ?? now,
     lastSyncedAt: now,
     jsonChecksum,
+    protocolVersion: CRAG_DATA_PROTOCOL,
     opentopoTilePack,
   });
   notifyOfflineCragsChanged();
@@ -213,10 +229,13 @@ export async function loadCragDataJson(cragId: string): Promise<CragData> {
       cache: navigator.onLine ? 'no-store' : 'default',
     });
     if (response.ok) {
-      const raw = (await response.json()) as CragData;
-      return enrichCragData(raw);
+      const raw = await response.json();
+      return await requireCurrentCragData(cragId, raw);
     }
   } catch (error) {
+    if (error instanceof Error && error.message === UNSUPPORTED_CRAG_DATA) {
+      throw error;
+    }
     console.warn(
       `Network fetch failed for crag "${cragId}", trying offline pack:`,
       error,
@@ -226,8 +245,8 @@ export async function loadCragDataJson(cragId: string): Promise<CragData> {
   const cache = await caches.open(getOfflineCacheName(cragId));
   const cached = await cache.match(dataUrl);
   if (cached?.ok) {
-    const raw = (await cached.json()) as CragData;
-    return enrichCragData(raw);
+    const raw = await cached.json();
+    return await requireCurrentCragData(cragId, raw);
   }
 
   throw new Error('Failed to load crag data');

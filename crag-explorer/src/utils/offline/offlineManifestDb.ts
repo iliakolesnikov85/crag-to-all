@@ -31,6 +31,8 @@ export interface OfflineCragManifest {
   lastSyncedAt: number;
   /** SHA-256 of stable-stringified crag JSON. */
   jsonChecksum: string;
+  /** Crag JSON protocol written when this pack was last synced. Absent on legacy packs. */
+  protocolVersion?: number;
   /** Cached OpenTopo raster tile pack (from Firebase), absent if never fetched. */
   opentopoTilePack?: OpenTopoTilePackInfo;
 }

@@ -1,6 +1,6 @@
 import * as L from 'leaflet';
+import { computeCragBounds } from '@crag-to-all/shared-crag';
 import { CragData } from '../types';
-import { computeCragBounds } from './mapUtils';
 import { buildBaseLayerOptions } from './mapLayers';
 
 interface SavedMapView {

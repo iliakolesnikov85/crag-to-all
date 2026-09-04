@@ -1,19 +1,15 @@
-import type { CragData } from './types';
+import type { CragData, LatLng } from './types';
 
-function collectCragCoordinates(cragData: CragData): [number, number][] {
-  const coords: [number, number][] = [];
+function collectCragCoordinates(cragData: CragData): LatLng[] {
+  const coords: LatLng[] = [];
   for (const s of cragData.sectors) {
-    const g = s.geo ? parseGeo(s.geo) : null;
-    if (g && isLatLngValid(g[0], g[1])) coords.push(g);
+    if (s.geo) coords.push(s.geo);
   }
   for (const m of cragData.markers ?? []) {
-    const g = parseMarkerLatLng(m);
-    if (g) coords.push(g);
+    coords.push(m.geo);
   }
   for (const t of cragData.trails ?? []) {
-    for (const p of parseTrailLatLngs(t.points)) {
-      coords.push(p);
-    }
+    coords.push(...t.points);
   }
   return coords;
 }
@@ -43,47 +39,6 @@ export interface TileCoord {
   y: number;
 }
 
-export function isLatLngValid(lat: number, lon: number): boolean {
-  return (
-    Number.isFinite(lat) &&
-    Number.isFinite(lon) &&
-    lat >= -90 &&
-    lat <= 90 &&
-    lon >= -180 &&
-    lon <= 180
-  );
-}
-
-export function parseGeo(geo: string | null | undefined): [number, number] | null {
-  if (!geo) return null;
-  const match = geo.match(/([0-9.\-]+),\s*([0-9.\-]+)/);
-  if (!match) return null;
-  return [parseFloat(match[1]), parseFloat(match[2])];
-}
-
-export function parseMarkerLatLng(
-  m: { latitude: string; longitude: string },
-): [number, number] | null {
-  const lat = parseFloat(m.latitude);
-  const lon = parseFloat(m.longitude);
-  if (!isLatLngValid(lat, lon)) return null;
-  return [lat, lon];
-}
-
-export function parseTrailLatLngs(points: string): [number, number][] {
-  const out: [number, number][] = [];
-  for (const segment of points.split(';')) {
-    const trimmed = segment.trim();
-    if (!trimmed) continue;
-    const parts = trimmed.split(',').map((p) => p.trim());
-    if (parts.length < 2) continue;
-    const lat = parseFloat(parts[0]);
-    const lon = parseFloat(parts[1]);
-    if (isLatLngValid(lat, lon)) out.push([lat, lon]);
-  }
-  return out;
-}
-
 export function computeCragBounds(cragData: CragData): BBox | null {
   const coords = collectCragCoordinates(cragData);
   if (coords.length === 0) return null;
@@ -92,7 +47,7 @@ export function computeCragBounds(cragData: CragData): BBox | null {
   let west = Infinity;
   let north = -Infinity;
   let east = -Infinity;
-  for (const [lat, lon] of coords) {
+  for (const { lat, lon } of coords) {
     if (lat < south) south = lat;
     if (lat > north) north = lat;
     if (lon < west) west = lon;

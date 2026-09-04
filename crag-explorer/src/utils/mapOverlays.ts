@@ -3,18 +3,8 @@ import { CragData, CragMapMarker, CragMapTrail, Sector } from '../types';
 import { mountSectorMapInfo } from '../components/SectorMapInfo';
 import { CragContextType } from '../context/CragContext';
 import { createPieChartSVG, getSectorGradeCounts } from './grades';
-import {
-  parseGeo,
-  isLatLngValid,
-  parseMarkerLatLng,
-  parseTrailLatLngs,
-} from './mapUtils';
-import {
-  escapeHtml,
-  isParkingMarkerType,
-  markerLabelFromType,
-  resolveTrailColor,
-} from './mapOverlayHelpers';
+import { resolveTrailColor } from './mapUtils';
+import { escapeHtml, markerLabelFromType } from './mapOverlayHelpers';
 
 function createParkingMarkerIconHtml(): string {
   return `<div class="map-marker map-marker--parking" aria-hidden="true">
@@ -41,8 +31,7 @@ function addSectorMarker(
   navigate: (to: string) => void,
   options: RenderMapOverlaysOptions,
 ): void {
-  const geo = sector.geo ? parseGeo(sector.geo) : null;
-  if (!geo || !isLatLngValid(geo[0], geo[1])) return;
+  if (!sector.geo) return;
 
   const gradeCounts = getSectorGradeCounts(sector);
   const svg = createPieChartSVG(gradeCounts, 30);
@@ -59,7 +48,7 @@ function addSectorMarker(
     popupAnchor: [0, -15],
   });
 
-  const marker = L.marker(geo, { icon }).addTo(overlay);
+  const marker = L.marker([sector.geo.lat, sector.geo.lon], { icon }).addTo(overlay);
 
   if (options.mode === 'bottom-panel') {
     marker.on('click', (e: L.LeafletMouseEvent) => {
@@ -98,13 +87,11 @@ function addSectorMarker(
 }
 
 function addMapMarker(overlay: L.LayerGroup, m: CragMapMarker): void {
-  const geo = parseMarkerLatLng(m);
-  if (!geo) return;
-
-  const parking = isParkingMarkerType(m.type);
+  const parking = m.type === 'parking_space';
+  const label = markerLabelFromType(m.type);
   const html = parking
     ? createParkingMarkerIconHtml()
-    : createDefaultMapMarkerIconHtml(markerLabelFromType(m.type));
+    : createDefaultMapMarkerIconHtml(label);
   const icon = L.divIcon({
     className: parking
       ? 'custom-marker map-marker-host map-marker-host--parking'
@@ -115,21 +102,22 @@ function addMapMarker(overlay: L.LayerGroup, m: CragMapMarker): void {
     popupAnchor: [0, -28],
   });
 
-  const label = markerLabelFromType(m.type);
   const body = m.info.trim()
     ? escapeHtml(m.info.trim()).replace(/\n/g, '<br/>')
     : `<span class="map-popup-muted">${escapeHtml(label)}</span>`;
   const popupHtml = `<div class="map-popup map-popup--marker"><strong>${escapeHtml(label)}</strong><div class="map-popup-body">${body}</div></div>`;
 
-  L.marker(geo, { icon }).addTo(overlay).bindPopup(popupHtml, { maxWidth: 280 });
+  L.marker([m.geo.lat, m.geo.lon], { icon }).addTo(overlay).bindPopup(popupHtml, { maxWidth: 280 });
 }
 
 function addTrail(overlay: L.LayerGroup, trail: CragMapTrail): void {
-  const latlngs = parseTrailLatLngs(trail.points);
-  if (latlngs.length < 2) return;
+  if (trail.points.length < 2) return;
 
   const color = resolveTrailColor(trail.color);
-  const line = L.polyline(latlngs, { color, weight: 4, opacity: 0.88 }).addTo(overlay);
+  const line = L.polyline(
+    trail.points.map((p): L.LatLngTuple => [p.lat, p.lon]),
+    { color, weight: 4, opacity: 0.88 },
+  ).addTo(overlay);
   const title = escapeHtml(trail.name.trim()) || 'Trail';
   line.bindPopup(`<div class="map-popup map-popup--trail"><strong>${title}</strong></div>`);
 }

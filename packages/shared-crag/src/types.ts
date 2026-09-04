@@ -1,6 +1,11 @@
+export interface LatLng {
+  lat: number;
+  lon: number;
+}
+
 export interface Sector {
   name: string;
-  geo: string | null;
+  geo: LatLng | null;
   season?: string;
   approachTime?: string;
   altitude?: string;
@@ -38,17 +43,25 @@ export interface Image {
   lines?: Array<Array<LinePoint>>;
 }
 
+export const CRAG_MAP_MARKER_TYPES = [
+  'parking_space',
+  'water_tap',
+  'camping',
+  'unknown',
+] as const;
+
+export type CragMapMarkerType = (typeof CRAG_MAP_MARKER_TYPES)[number];
+
 export interface CragMapTrail {
   name: string;
   color: string;
-  points: string;
+  points: LatLng[];
 }
 
 export interface CragMapMarker {
-  type: string;
+  type: CragMapMarkerType;
   info: string;
-  latitude: string;
-  longitude: string;
+  geo: LatLng;
 }
 
 /**
@@ -71,7 +84,11 @@ export interface OpenTopoTilePackInfo {
   archiveBytes: number;
 }
 
+/** Bump when the stored crag JSON shape changes incompatibly. */
+export const CRAG_DATA_PROTOCOL = 1;
+
 export interface CragData {
+  protocolVersion: number;
   name: string;
   sectors: Sector[];
   description: DescriptionSection[];

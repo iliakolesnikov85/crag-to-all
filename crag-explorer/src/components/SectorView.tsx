@@ -71,7 +71,9 @@ const SectorView: React.FC<SectorViewProps> = ({ cragId, sector, route, imagesPa
             <div className="sector-property" title="Coordinates">
               <span className="icon"><MdLocationOn aria-hidden="true" /></span>
               <span className="value">
-                {printMode ? sector.geo : renderLink('/map', sector.geo)}
+                {printMode
+                  ? `${sector.geo.lat}, ${sector.geo.lon}`
+                  : renderLink('/map', `${sector.geo.lat}, ${sector.geo.lon}`)}
               </span>
             </div>
           )}

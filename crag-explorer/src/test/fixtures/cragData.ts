@@ -1,4 +1,4 @@
-import type { Crag, CragData, Route, Sector } from '../../types';
+import { CRAG_DATA_PROTOCOL, type Crag, type CragData, type Route, type Sector } from '../../types';
 
 const WALL_IMAGE = 'wall.jpg';
 
@@ -16,7 +16,7 @@ function makeRoute(
 
 const mainWall: Sector = {
   name: 'Main Wall',
-  geo: '42.1234, 44.5678',
+  geo: { lat: 42.1234, lon: 44.5678 },
   routes: [
     makeRoute({
       name: 'Classic',
@@ -44,6 +44,7 @@ export const sampleCrags: Crag[] = [
 ];
 
 export const sampleCragData: CragData = {
+  protocolVersion: CRAG_DATA_PROTOCOL,
   name: 'Test Crag',
   sectors: [mainWall, emptySector],
   description: [],

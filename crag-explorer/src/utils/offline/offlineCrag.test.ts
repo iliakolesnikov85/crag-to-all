@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CragData } from '../../types';
+import { CRAG_DATA_PROTOCOL } from '../../types';
 import {
   SAMPLE_CRAG_ID,
   SAMPLE_IMAGE_FILE,
@@ -26,6 +27,14 @@ import { getOfflineManifest, putOfflineManifest } from './offlineManifestDb';
 
 const STALE_IMAGE_FILE = 'old.jpg';
 const NEW_IMAGE_FILE = 'new-hash.jpg';
+const UNSUPPORTED_CRAG_DATA =
+  'Crag data is outdated and must be re-downloaded.';
+
+function withoutProtocol(data: CragData): CragData {
+  const copy = structuredClone(data) as CragData & { protocolVersion?: number };
+  delete copy.protocolVersion;
+  return copy;
+}
 
 function mockSyncFetches(
   data: CragData,
@@ -106,6 +115,46 @@ describe('loadCragDataJson', () => {
     );
     warn.mockRestore();
   });
+
+  it('rejects unversioned network JSON and deletes the offline pack', async () => {
+    await seedCachedJson();
+    await putOfflineManifest({
+      cragId: SAMPLE_CRAG_ID,
+      cragName: 'Test Crag',
+      imageFiles: [],
+      downloadedAt: 1,
+      lastSyncedAt: 1,
+      jsonChecksum: 'abc',
+    });
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(withoutProtocol(sampleCragData)));
+
+    await expect(loadCragDataJson(SAMPLE_CRAG_ID)).rejects.toThrow(
+      UNSUPPORTED_CRAG_DATA,
+    );
+    expect(await isCragOffline(SAMPLE_CRAG_ID)).toBe(false);
+    expect(await caches.has(getOfflineCacheName(SAMPLE_CRAG_ID))).toBe(false);
+  });
+
+  it('rejects unversioned cached JSON and deletes the offline pack', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await seedCachedJson(withoutProtocol(sampleCragData));
+    await putOfflineManifest({
+      cragId: SAMPLE_CRAG_ID,
+      cragName: 'Test Crag',
+      imageFiles: [],
+      downloadedAt: 1,
+      lastSyncedAt: 1,
+      jsonChecksum: 'abc',
+    });
+    vi.mocked(fetch).mockRejectedValue(new Error('offline'));
+
+    await expect(loadCragDataJson(SAMPLE_CRAG_ID)).rejects.toThrow(
+      UNSUPPORTED_CRAG_DATA,
+    );
+    expect(await isCragOffline(SAMPLE_CRAG_ID)).toBe(false);
+    expect(await caches.has(getOfflineCacheName(SAMPLE_CRAG_ID))).toBe(false);
+    warn.mockRestore();
+  });
 });
 
 describe('isOfflineDataOutdated', () => {
@@ -142,6 +191,35 @@ describe('isOfflineDataOutdated', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('treats a legacy pack without protocolVersion as outdated', async () => {
+    await putOfflineManifest({
+      cragId: SAMPLE_CRAG_ID,
+      cragName: 'Test Crag',
+      imageFiles: [],
+      downloadedAt: 1,
+      lastSyncedAt: 1,
+      jsonChecksum: 'abc',
+    });
+
+    expect(await isOfflineDataOutdated(SAMPLE_CRAG_ID)).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('treats a pack with a mismatched protocolVersion as outdated', async () => {
+    await putOfflineManifest({
+      cragId: SAMPLE_CRAG_ID,
+      cragName: 'Test Crag',
+      imageFiles: [],
+      downloadedAt: 1,
+      lastSyncedAt: 1,
+      jsonChecksum: 'abc',
+      protocolVersion: CRAG_DATA_PROTOCOL - 1,
+    });
+
+    expect(await isOfflineDataOutdated(SAMPLE_CRAG_ID)).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('returns true when the remote checksum differs', async () => {
     await putOfflineManifest({
       cragId: SAMPLE_CRAG_ID,
@@ -150,6 +228,7 @@ describe('isOfflineDataOutdated', () => {
       downloadedAt: 1,
       lastSyncedAt: 1,
       jsonChecksum: 'stale-checksum',
+      protocolVersion: CRAG_DATA_PROTOCOL,
     });
     vi.mocked(fetch).mockResolvedValue(jsonResponse(sampleCragData));
 
@@ -165,6 +244,7 @@ describe('isOfflineDataOutdated', () => {
       downloadedAt: 1,
       lastSyncedAt: 1,
       jsonChecksum,
+      protocolVersion: CRAG_DATA_PROTOCOL,
     });
     vi.mocked(fetch).mockResolvedValue(jsonResponse(sampleCragData));
 
@@ -180,6 +260,7 @@ describe('isOfflineDataOutdated', () => {
       downloadedAt: 1,
       lastSyncedAt: 1,
       jsonChecksum: 'abc',
+      protocolVersion: CRAG_DATA_PROTOCOL,
     });
     vi.mocked(fetch).mockRejectedValue(new Error('timeout'));
 
@@ -205,7 +286,17 @@ describe('syncCragOffline', () => {
     expect(manifest?.cragName).toBe('Test Crag');
     expect(manifest?.imageFiles).toEqual([SAMPLE_IMAGE_FILE]);
     expect(manifest?.jsonChecksum).toHaveLength(64);
+    expect(manifest?.protocolVersion).toBe(CRAG_DATA_PROTOCOL);
     expect(await isCragOffline(SAMPLE_CRAG_ID)).toBe(true);
+  });
+
+  it('refuses to cache JSON with a missing protocol version', async () => {
+    mockSyncFetches(withoutProtocol(sampleCragData));
+
+    await expect(syncCragOffline(SAMPLE_CRAG_ID, () => {})).rejects.toThrow(
+      UNSUPPORTED_CRAG_DATA,
+    );
+    expect(await isCragOffline(SAMPLE_CRAG_ID)).toBe(false);
   });
 
   it('skips images whose hashed filenames are already in the manifest', async () => {
