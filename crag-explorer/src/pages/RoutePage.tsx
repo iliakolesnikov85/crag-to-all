@@ -1,10 +1,10 @@
 import React from 'react';
-import { useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import SectorView from '../components/SectorView';
 import { Sector } from '../types';
 import { useCrag } from '../context/CragContext';
 import { getCragImageUrl } from '../utils/firebaseStorage';
-import { createSectorViewLink } from '../utils/createSectorViewLink';
+import { setMapCenter } from '../utils/map';
 
 interface RoutePageProps {
   sectors: Sector[];
@@ -40,7 +40,18 @@ const RoutePage: React.FC<RoutePageProps> = ({ sectors, onSectorChange, onRouteC
         sector={sector}
         route={route}
         getImageUrl={getCragImageUrl}
-        createLink={createSectorViewLink(getUrl, crag.cragId, sector.geo)}
+        createLink={(to: string, children: React.ReactNode) => (
+          <Link
+            className="link"
+            to={getUrl(to)}
+            onClick={() => {
+              if (to !== '/map') return;
+              if (sector?.geo) setMapCenter(crag.cragId, [sector?.geo.lat, sector?.geo.lon], 17);
+            }}
+          >
+            {children}
+          </Link>
+        )}
       />
     </div>
   );

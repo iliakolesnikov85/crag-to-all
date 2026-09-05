@@ -34,15 +34,19 @@ describe('compareRouteValues', () => {
     expect(compareRouteValues(empty, empty, 'name', 'asc')).toBe(0);
   });
 
-  it('puts ? grades last in both directions', () => {
+  it('puts ? and N/A grades last in both directions', () => {
     const known = route({ name: 'a', grade: '6A', sectorName: 's' });
     const unknown = route({ name: 'b', grade: '?', sectorName: 's' });
+    const na = route({ name: 'c', grade: 'N/A', sectorName: 's' });
 
     expect(compareRouteValues(known, unknown, 'grade', 'asc')).toBe(-1);
     expect(compareRouteValues(unknown, known, 'grade', 'asc')).toBe(1);
     expect(compareRouteValues(known, unknown, 'grade', 'desc')).toBe(-1);
     expect(compareRouteValues(unknown, known, 'grade', 'desc')).toBe(1);
     expect(compareRouteValues(unknown, unknown, 'grade', 'asc')).toBe(0);
+    expect(compareRouteValues(known, na, 'grade', 'asc')).toBe(-1);
+    expect(compareRouteValues(na, known, 'grade', 'desc')).toBe(1);
+    expect(compareRouteValues(unknown, na, 'grade', 'asc')).toBe(0);
   });
 
   it('sorts 6A before 6A+ in asc and after in desc', () => {

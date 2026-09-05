@@ -41,13 +41,12 @@
       .clear-text-btn {
         position: absolute;
         right: 8px;
-        top: 0;
-        bottom: 0;
-        margin: auto 0;
+        top: 50%;
+        transform: translateY(-50%);
 
         &:hover:not(:disabled):not(.btn--disabled),
         &:active:not(:disabled):not(.btn--disabled) {
-          transform: none;
+          transform: translateY(-50%);
           box-shadow: none;
         }
       }
@@ -82,18 +81,18 @@
     }
   }
 
-  .filter-content {    
+  .filter-content {
     overflow: hidden;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     max-height: 0;
     opacity: 0;
-    transform: translateY(-10px);    
-    
+    transform: translateY(-10px);
+
     &.expanded {
       padding-top: 16px;
       max-height: 340px; // Adjust this value based on your content height
       opacity: 1;
-      transform: translateY(0);      
+      transform: translateY(0);
     }
   }
 

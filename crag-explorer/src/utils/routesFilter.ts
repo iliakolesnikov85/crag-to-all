@@ -1,5 +1,5 @@
 import { Route, Sector } from '../types';
-import { getBaseGrade } from './grades';
+import { getBaseGrade, isUnknownGrade } from './grades';
 
 function matchesEmptySectorTextFilter(
   sector: Sector,
@@ -38,7 +38,7 @@ export interface RouteFilterResult {
 export function getAvailableGrades(routes: Route[]): string[] {
   const grades = new Set<string>();
   routes.forEach((route) => {
-    if (route.grade && route.grade !== '?') {
+    if (route.grade && !isUnknownGrade(route.grade)) {
       grades.add(getBaseGrade(route.grade));
     }
   });
@@ -53,7 +53,7 @@ export function isGradeInRange(
   gradeRange: [number, number],
   hideUnknownGrades: boolean,
 ): boolean {
-  if (!grade || grade === '?') {
+  if (!grade || isUnknownGrade(grade)) {
     const sliderNarrowed =
       availableGrades.length > 1 &&
       (gradeRange[0] > 0 || gradeRange[1] < availableGrades.length - 1);

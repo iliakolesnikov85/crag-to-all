@@ -6,6 +6,7 @@ import {
   getGradeColor,
   getGradeCounts,
   getSectorGradeCounts,
+  isUnknownGrade,
 } from './grades';
 
 describe('getBaseGrade', () => {
@@ -20,7 +21,19 @@ describe('getBaseGrade', () => {
 
   it('passes through unknown grades', () => {
     expect(getBaseGrade('?')).toBe('?');
+    expect(getBaseGrade('N/A')).toBe('?');
     expect(getBaseGrade('v4')).toBe('V4');
+  });
+});
+
+describe('isUnknownGrade', () => {
+  it('treats ? and N/A as unknown', () => {
+    expect(isUnknownGrade('?')).toBe(true);
+    expect(isUnknownGrade('N/A')).toBe(true);
+    expect(isUnknownGrade(' n/a ')).toBe(true);
+    expect(isUnknownGrade('6A')).toBe(false);
+    expect(isUnknownGrade('')).toBe(false);
+    expect(isUnknownGrade(undefined)).toBe(false);
   });
 });
 
@@ -39,6 +52,7 @@ describe('getGradeCounts', () => {
     expect(
       getGradeCounts([
         { grade: '?' },
+        { grade: 'N/A' },
         { grade: '6A+' },
         { grade: '7A' },
         { grade: '6A' },
@@ -46,7 +60,7 @@ describe('getGradeCounts', () => {
     ).toEqual([
       { grade: '6A', count: 2 },
       { grade: '7A', count: 1 },
-      { grade: '?', count: 1 },
+      { grade: '?', count: 2 },
     ]);
   });
 

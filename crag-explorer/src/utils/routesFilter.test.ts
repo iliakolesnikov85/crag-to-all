@@ -52,6 +52,7 @@ describe('getAvailableGrades', () => {
       getAvailableGrades([
         makeRoute({ name: 'a', grade: '6A+', sectorName: 's' }),
         makeRoute({ name: 'b', grade: '?', sectorName: 's' }),
+        makeRoute({ name: 'f', grade: 'N/A', sectorName: 's' }),
         makeRoute({ name: 'c', grade: '', sectorName: 's' }),
         makeRoute({ name: 'd', grade: '6C', sectorName: 's' }),
         makeRoute({ name: 'e', grade: '6B', sectorName: 's' }),
@@ -67,9 +68,12 @@ describe('isGradeInRange', () => {
 
   it('includes unknown grades unless hide-unknown or the slider is narrowed', () => {
     expect(isGradeInRange('?', grades, fullRange, false)).toBe(true);
+    expect(isGradeInRange('N/A', grades, fullRange, false)).toBe(true);
     expect(isGradeInRange(undefined, grades, fullRange, false)).toBe(true);
     expect(isGradeInRange('?', grades, fullRange, true)).toBe(false);
+    expect(isGradeInRange('N/A', grades, fullRange, true)).toBe(false);
     expect(isGradeInRange('?', grades, narrowed, false)).toBe(false);
+    expect(isGradeInRange('N/A', grades, narrowed, false)).toBe(false);
   });
 
   it('keeps known grades when the slider is not shown', () => {

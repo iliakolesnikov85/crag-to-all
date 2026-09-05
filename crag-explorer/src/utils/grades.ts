@@ -1,7 +1,14 @@
 import { Sector } from '../types';
 
+export function isUnknownGrade(grade: unknown): boolean {
+  if (typeof grade !== 'string') return false;
+  const normalized = grade.trim().toUpperCase();
+  return normalized === '?' || normalized === 'N/A';
+}
+
 // Helper to get base grade (e.g., '6A' from '6A+', '6A-')
 export function getBaseGrade(grade: string): string {
+  if (isUnknownGrade(grade)) return '?';
   const match = grade.match(/^([0-9]+[A-Ca-c])/);
   return match ? match[1].toUpperCase() : grade.toUpperCase();
 }
@@ -19,7 +26,7 @@ export function getGradeColor(grade: string): string {
       if (parseInt(grade[0]) <= 5) {
         return '#FFFFFF';
       }
-      if (grade[0] === '?') {
+      if (isUnknownGrade(grade)) {
         return '#d3d3d3';
       }
       // Generate a random pastel color based on grade string
@@ -41,8 +48,8 @@ export function getGradeCounts(routes: Array<{ grade: string }>): { grade: strin
   // Sort grades: known grades alphabetically, Unknown last
   return Object.entries(gradeCounts)
     .sort(([a], [b]) => {
-      if (a === '?') return 1;
-      if (b === '?') return -1;
+      if (isUnknownGrade(a)) return 1;
+      if (isUnknownGrade(b)) return -1;
       return a.localeCompare(b, undefined, { numeric: true });
     })
     .map(([grade, count]) => ({ grade, count }));

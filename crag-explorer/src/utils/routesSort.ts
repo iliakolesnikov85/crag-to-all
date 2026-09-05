@@ -1,5 +1,5 @@
 import { Route, Sector } from '../types';
-import { getBaseGrade } from './grades';
+import { getBaseGrade, isUnknownGrade } from './grades';
 
 function isNullOrEmpty(value: unknown): value is null | undefined | '' {
   return value === null || value === undefined || value === '';
@@ -46,9 +46,9 @@ export function compareRouteValues(
   }
 
   if (field === 'grade') {
-    if (aValue === '?' && bValue === '?') return 0;
-    if (aValue === '?') return 1;
-    if (bValue === '?') return -1;
+    if (isUnknownGrade(aValue) && isUnknownGrade(bValue)) return 0;
+    if (isUnknownGrade(aValue)) return 1;
+    if (isUnknownGrade(bValue)) return -1;
 
     aValue = getBaseGrade(aValue as string) + ((aValue as string).includes('+') ? '1' : '0');
     bValue = getBaseGrade(bValue as string) + ((bValue as string).includes('+') ? '1' : '0');
