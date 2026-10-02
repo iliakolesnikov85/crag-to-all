@@ -7,6 +7,34 @@ on:
   pull_request:
 
 jobs:
+  crag-api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 24
+
+      - name: Build shared-crag package
+        run: npm run build-shared-crag
+
+      - name: Cache MongoDB binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-memory-server-7
+
+      - name: Install dependencies for crag-api
+        working-directory: crag-api
+        run: npm ci
+
+      - name: Run API tests
+        working-directory: crag-api
+        run: npm test
+
   build-and-deploy:
     runs-on: ubuntu-latest
     strategy:

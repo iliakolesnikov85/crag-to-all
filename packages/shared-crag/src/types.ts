@@ -1,9 +1,29 @@
+export const CRAG_MAP_MARKER_TYPES = [
+  'parking_space',
+  'water_tap',
+  'camping',
+  'unknown',
+] as const;
+
+export const CRAG_SOURCES = ['external', 'explorer'] as const;
+
+/** Bump when the stored crag JSON shape changes incompatibly. */
+export const CRAG_DATA_PROTOCOL = 1;
+
+export type CragMapMarkerType = (typeof CRAG_MAP_MARKER_TYPES)[number];
+
+export type CragSource = (typeof CRAG_SOURCES)[number];
+
 export interface LatLng {
   lat: number;
   lon: number;
 }
 
 export interface Sector {
+  /** Stable document id. For source=external, defaults to externalId. */
+  id?: string;
+  /** Thetopo (or other upstream) sector id. */
+  externalId?: string;
   name: string;
   geo: LatLng | null;
   season?: string;
@@ -13,6 +33,8 @@ export interface Sector {
   timeInSun?: string;
   routes: Route[];
   images: Image[];
+  version?: number;
+  updatedAt?: string;
 }
 
 export interface DescriptionSection {
@@ -21,6 +43,7 @@ export interface DescriptionSection {
 }
 
 export interface Route {
+  id?: string;
   name: string;
   grade: string;
   sectorName: string;
@@ -42,15 +65,6 @@ export interface Image {
   labelPositions?: any[];
   lines?: Array<Array<LinePoint>>;
 }
-
-export const CRAG_MAP_MARKER_TYPES = [
-  'parking_space',
-  'water_tap',
-  'camping',
-  'unknown',
-] as const;
-
-export type CragMapMarkerType = (typeof CRAG_MAP_MARKER_TYPES)[number];
 
 export interface CragMapTrail {
   name: string;
@@ -84,20 +98,32 @@ export interface OpenTopoTilePackInfo {
   archiveBytes: number;
 }
 
-/** Bump when the stored crag JSON shape changes incompatibly. */
-export const CRAG_DATA_PROTOCOL = 1;
-
 export interface CragData {
   protocolVersion: number;
+  /** Stable document id. For source=external, defaults to externalId. */
+  id?: string;
+  /** Catalog / URL slug; same as id when both are present. */
+  cragId?: string;
+  /** Thetopo (or other upstream) crag id. */
+  externalId?: string;
+  source?: CragSource;
   name: string;
   sectors: Sector[];
   description: DescriptionSection[];
   trails?: CragMapTrail[];
   markers?: CragMapMarker[];
   opentopoTilePack?: OpenTopoTilePackInfo;
+  version?: number;
+  updatedAt?: string;
 }
 
 export interface Crag {
+  /** Stable document id. For source=external, defaults to externalId. */
+  id?: string;
   cragName: string;
+  /** Catalog / URL slug; same as id when both are present. */
   cragId: string;
+  /** Thetopo (or other upstream) crag id. */
+  externalId?: string;
+  source?: CragSource;
 }

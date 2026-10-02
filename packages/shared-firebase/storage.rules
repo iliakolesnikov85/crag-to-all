@@ -1,0 +1,20 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Named segments are strings. `{allPaths=**}` is a Path; Path and string
+    // both have size() and [i], so a helper on allPaths does not type-check.
+    match /{first}/{second}/{rest=**} {
+      allow read: if second != 'history';
+    }
+    match /{first}/{second} {
+      allow read: if second != 'history';
+    }
+    match /{first} {
+      allow read: if true;
+    }
+
+    match /{allPaths=**} {
+      allow write: if false;
+    }
+  }
+}

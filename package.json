@@ -4,7 +4,11 @@
   "description": "Climbing crag explorer PWA",
   "scripts": {
     "build-shared-crag": "npm install --prefix packages/shared-crag && npm run build --prefix packages/shared-crag",
+    "build-shared-firebase": "npm install --prefix packages/shared-firebase && npm run build --prefix packages/shared-firebase",
     "dev": "npm run build-shared-crag && npm run dev --prefix crag-explorer",
+    "dev:api": "npm run build-shared-crag && npm run build-shared-firebase && npm run dev --prefix crag-api",
+    "test:api": "npm run build-shared-crag && npm test --prefix crag-api",
+    "emulator:start": "npm install --prefix packages/shared-firebase && npm run emulator:start --prefix packages/shared-firebase",
     "build": "npm run build-shared-crag && npm ci --prefix crag-explorer && npm run build --prefix crag-explorer"
   },
   "private": true

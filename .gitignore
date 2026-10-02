@@ -44,6 +44,7 @@ jspm_packages/
 .yarn-integrity
 
 # Env
+.env
 .env.test
 .env.local
 
