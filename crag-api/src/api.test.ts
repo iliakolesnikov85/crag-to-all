@@ -161,6 +161,59 @@ describe('crag-api', () => {
     expect(afterDelete.body.version).toBe(1);
   });
 
+  it('rejects sector writes on an extracted crag', async () => {
+    await db.collection('crags').insertOne({
+      _id: 'roshka',
+      name: 'Roshka',
+      source: 'external',
+      protocolVersion: 1,
+      description: [],
+      trails: [],
+      markers: [],
+      externalId: 'roshka-35366',
+      version: 1,
+      updatedAt: new Date(),
+    });
+    await db.collection('sectors').insertOne({
+      _id: 'cave-1',
+      cragId: 'roshka',
+      name: 'Cave',
+      geo: { lat: 44.1, lon: 6.2 },
+      routes: [],
+      images: [],
+      order: 0,
+      externalId: 'cave-1',
+      version: 3,
+      updatedAt: new Date(),
+    });
+
+    const created = await request(app).post('/api/crags/roshka/sectors').send({
+      name: 'New',
+      geo: { lat: 44.2, lon: 6.3 },
+    });
+    expect(created.status).toBe(403);
+    expect(created.body).toEqual({
+      error: 'read_only',
+      message: 'Sectors on an extracted crag are read-only',
+    });
+
+    const replaced = await request(app).put('/api/crags/roshka/sectors/cave-1').send({
+      version: 3,
+      name: 'Renamed',
+      geo: { lat: 44.1, lon: 6.2 },
+    });
+    expect(replaced.status).toBe(403);
+    expect(replaced.body.error).toBe('read_only');
+
+    const removed = await request(app).delete('/api/crags/roshka/sectors/cave-1');
+    expect(removed.status).toBe(403);
+    expect(removed.body.error).toBe('read_only');
+
+    const assembled = await request(app).get('/api/crags/roshka');
+    expect(assembled.status).toBe(200);
+    expect(assembled.body.sectors).toMatchObject([{ id: 'cave-1', name: 'Cave', version: 3 }]);
+  });
+
   it('returns 404 for a missing crag or sector', async () => {
     const missingCrag = await request(app).get('/api/crags/missing');
     expect(missingCrag.status).toBe(404);
@@ -170,6 +223,62 @@ describe('crag-api', () => {
       '/api/crags/roshka/sectors/00000000-0000-0000-0000-000000000000',
     );
     expect(missingSector.status).toBe(404);
+  });
+
+  it('keeps explorer sectors in insert order across delete and GPX', async () => {
+    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    for (const name of ['Sector 10', 'Cave', 'Sector 2']) {
+      const created = await request(app).post('/api/crags/roshka/sectors').send({
+        name,
+        geo: { lat: 44.1, lon: 6.2 },
+      });
+      expect(created.status).toBe(201);
+      expect(created.body.order).toBeUndefined();
+    }
+
+    const assembled = await request(app).get('/api/crags/roshka');
+    expect(assembled.body.sectors.map((sector: { name: string }) => sector.name)).toEqual([
+      'Sector 10',
+      'Cave',
+      'Sector 2',
+    ]);
+    expect(assembled.body.sectors[0].order).toBeUndefined();
+
+    const gpx = await request(app).get('/api/crags/roshka/gpx');
+    expect(gpx.status).toBe(200);
+    const waypointNames = [...gpx.text.matchAll(/<wpt\b[^>]*>[\s\S]*?<name>([^<]*)<\/name>/g)].map(
+      (match) => match[1],
+    );
+    expect(waypointNames).toEqual(['Sector 10', 'Cave', 'Sector 2']);
+
+    const cave = assembled.body.sectors[1];
+    const renamed = await request(app).put(`/api/crags/roshka/sectors/${cave.id}`).send({
+      version: cave.version,
+      name: 'Zebra',
+      geo: { lat: 44.1, lon: 6.2 },
+    });
+    expect(renamed.status).toBe(200);
+    const afterRename = await request(app).get('/api/crags/roshka');
+    expect(afterRename.body.sectors.map((sector: { name: string }) => sector.name)).toEqual([
+      'Sector 10',
+      'Zebra',
+      'Sector 2',
+    ]);
+
+    const removed = await request(app).delete(`/api/crags/roshka/sectors/${cave.id}`);
+    expect(removed.status).toBe(204);
+    const added = await request(app).post('/api/crags/roshka/sectors').send({
+      name: 'Alpha',
+      geo: { lat: 44.2, lon: 6.3 },
+    });
+    expect(added.status).toBe(201);
+
+    const after = await request(app).get('/api/crags/roshka');
+    expect(after.body.sectors.map((sector: { name: string }) => sector.name)).toEqual([
+      'Sector 10',
+      'Sector 2',
+      'Alpha',
+    ]);
   });
 
   it('builds GPX from the current database state without writing to Storage', async () => {

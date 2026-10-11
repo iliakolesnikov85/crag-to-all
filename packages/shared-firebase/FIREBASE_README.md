@@ -66,7 +66,7 @@ Use `.env.example` in this package as the source of truth:
 
 Behavior:
 
-- In emulator mode (`--use-emulator`), service account is not required.
+- In local mode (`--dev-local`), service account is not required.
 - In production mode, all vars above are required and startup fails fast if any are missing.
 
 ## Production Setup

@@ -68,6 +68,7 @@ export function toSectorDocument(
   cragId: string,
   sectorId: string,
   sector: SectorWriteInput,
+  order: number,
   version: number,
   updatedAt: Date,
 ): SectorDocument {
@@ -78,6 +79,7 @@ export function toSectorDocument(
     geo: sector.geo,
     routes: sector.routes,
     images: sector.images,
+    order,
     version,
     updatedAt,
   };

@@ -7,8 +7,14 @@ import type {
   CragDocument,
   CragPatchInput,
   CragResponse,
+  SectorDocument,
 } from '../types';
 import { cragsCol, now, sectorsCol } from './collections';
+
+function compareSectorsByOrder(a: SectorDocument, b: SectorDocument): number {
+  if (a.order !== b.order) return a.order - b.order;
+  return a.name.localeCompare(b.name, undefined, { numeric: true });
+}
 
 export async function listCrags(db: Db) {
   const docs = await cragsCol(db).find().sort({ name: 1 }).toArray();
@@ -44,6 +50,7 @@ export async function getAssembledCrag(db: Db, cragId: string): Promise<CragData
   const crag = await cragsCol(db).findOne({ _id: cragId });
   if (!crag) throw notFound('crag');
   const sectors = await sectorsCol(db).find({ cragId }).toArray();
+  sectors.sort(compareSectorsByOrder);
   return toCragData(crag, sectors);
 }
 

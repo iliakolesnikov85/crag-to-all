@@ -45,6 +45,10 @@ export function alreadyExists(message: string): HttpError {
   return new HttpError(409, { error: 'already_exists', message });
 }
 
+export function readOnly(message: string): HttpError {
+  return new HttpError(403, { error: 'read_only', message });
+}
+
 export function storageUnavailable(message = 'Image storage is not configured'): HttpError {
   return new HttpError(503, { error: 'storage_unavailable', message });
 }

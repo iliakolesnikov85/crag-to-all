@@ -37,6 +37,8 @@ export interface SectorDocument {
   timeInSun?: string;
   routes: Route[];
   images: Image[];
+  /** Position in the assembled crag. Extracted sectors use name order; explorer sectors append. */
+  order: number;
   externalId?: string;
   version: number;
   updatedAt: Date;

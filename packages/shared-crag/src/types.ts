@@ -33,6 +33,8 @@ export interface Sector {
   timeInSun?: string;
   routes: Route[];
   images: Image[];
+  /** Stored sector position. Present on extract payloads; the API does not return it. */
+  order?: number;
   version?: number;
   updatedAt?: string;
 }

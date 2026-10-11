@@ -20,7 +20,7 @@ export type CragPatchInput = Pick<CragDocument, 'version'> &
     opentopoTilePack?: OpenTopoTilePackInfo | null;
   };
 
-export type SectorWriteInput = Omit<Sector, 'id' | 'version' | 'updatedAt'>;
+export type SectorWriteInput = Omit<Sector, 'id' | 'order' | 'version' | 'updatedAt'>;
 
 export interface ImageUploadResponse {
   imageFile: string;
