@@ -1,11 +1,11 @@
 import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
+import { getCragApiUrl, getCragsApiUrl } from './api/client';
 import { AppRoutes } from './App';
 import { AppOnlineProvider } from './context/AppOnlineContext';
 import { SAMPLE_CRAG_ID, sampleCrags } from './test/fixtures/cragData';
 import { jsonResponse, requestUrl } from './test/helpers';
-import { getCragDataUrl, getCragIndexUrl } from './utils/firebaseStorage';
 import { getOfflineCragIndex, putOfflineCragIndex } from './utils/offline';
 
 vi.mock('./components/MapWidget', () => ({
@@ -25,7 +25,7 @@ function renderApp(path = '/') {
 function mockIndexOk(): void {
   vi.mocked(fetch).mockImplementation((input) => {
     const url = requestUrl(input);
-    if (url === getCragIndexUrl()) {
+    if (url === getCragsApiUrl()) {
       return Promise.resolve(jsonResponse(sampleCrags));
     }
     return Promise.reject(new Error(`unexpected fetch: ${url}`));
@@ -69,10 +69,10 @@ describe('App load', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.mocked(fetch).mockImplementation((input) => {
       const url = requestUrl(input);
-      if (url === getCragIndexUrl()) {
+      if (url === getCragsApiUrl()) {
         return Promise.resolve(jsonResponse(sampleCrags));
       }
-      if (url === getCragDataUrl(SAMPLE_CRAG_ID)) {
+      if (url === getCragApiUrl(SAMPLE_CRAG_ID)) {
         return Promise.reject(new Error('no json'));
       }
       return Promise.reject(new Error(`unexpected fetch: ${url}`));

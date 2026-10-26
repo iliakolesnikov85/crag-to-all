@@ -8,6 +8,8 @@ const CRAG_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const MAX_CRAG_ID_LENGTH = 64;
 const MAX_NAME_LENGTH = 200;
 const MAX_TEXT_LENGTH = 2000;
+/** One HTML document per description section, same cap as a route description. */
+const MAX_DESCRIPTION_HTML_LENGTH = 20_000;
 
 function nonemptyString(max: number) {
   return z.string().trim().min(1).max(max);
@@ -92,7 +94,7 @@ const routeSchema = z.object({
 
 const descriptionSchema = z.object({
   subheader: nonemptyString(MAX_NAME_LENGTH),
-  paragraphs: z.array(nonemptyString(MAX_TEXT_LENGTH)),
+  paragraphs: z.array(nonemptyString(MAX_DESCRIPTION_HTML_LENGTH)),
 });
 
 const trailSchema = z.object({

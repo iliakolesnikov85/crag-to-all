@@ -1,9 +1,62 @@
-/* DescriptionPage specific styles moved from App.css */
 .description-content {
   line-height: 1.6;
   color: #333;
 }
-.description-content p {
-  margin-bottom: 1.5rem;
+
+.description-section-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.35rem;
+  margin-bottom: 0.75rem;
+
+  h3 {
+    margin: 0;
+    color: #333;
+  }
+}
+
+.description-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.description-body {
+  margin: 0 0 1.5rem;
   font-size: 1.1rem;
-} 
+
+  p,
+  ul,
+  ol {
+    margin: 0 0 1.5rem;
+  }
+
+  > :last-child {
+    margin-bottom: 0;
+  }
+
+  ul,
+  ol {
+    padding-left: 1.25rem;
+  }
+}
+
+.description-action-error {
+  margin: 0 0 1rem;
+  color: #c82333;
+}
+
+.description-add.btn {
+  background: transparent;
+  border-color: transparent;
+  min-height: 0;
+  padding: 0;
+  color: #1976d2;
+  font-weight: 600;
+
+  &:hover:not(:disabled):not(.btn--disabled) {
+    background: transparent;
+    text-decoration: underline;
+  }
+}

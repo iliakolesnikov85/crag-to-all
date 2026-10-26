@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CragData } from '../../types';
 import { CRAG_DATA_PROTOCOL } from '../../types';
+import { getCragApiUrl } from '../../api/client';
 import {
   SAMPLE_CRAG_ID,
   SAMPLE_IMAGE_FILE,
@@ -9,7 +10,6 @@ import {
 import { jsonResponse, okResponse, requestUrl, setNavigatorOnLine } from '../../test/helpers';
 import { computeCragDataChecksum } from '../cragChecksum';
 import {
-  getCragDataUrl,
   getCragImageUrl,
   getCragOpenTopoPackUrl,
   getCragSectorsGpxUrl,
@@ -50,7 +50,7 @@ function mockSyncFetches(
     fetched.push(url);
     const extra = options.extra?.(url);
     if (extra) return extra;
-    if (url === getCragDataUrl(SAMPLE_CRAG_ID)) {
+    if (url === getCragApiUrl(SAMPLE_CRAG_ID)) {
       return Promise.resolve(jsonResponse(data));
     }
     if (url === getCragSectorsGpxUrl(SAMPLE_CRAG_ID)) {
@@ -67,7 +67,7 @@ function mockSyncFetches(
 
 async function seedCachedJson(data: CragData = sampleCragData): Promise<void> {
   const cache = await caches.open(getOfflineCacheName(SAMPLE_CRAG_ID));
-  await cache.put(getCragDataUrl(SAMPLE_CRAG_ID), jsonResponse(data));
+  await cache.put(getCragApiUrl(SAMPLE_CRAG_ID), jsonResponse(data));
 }
 
 describe('loadCragDataJson', () => {
@@ -80,7 +80,7 @@ describe('loadCragDataJson', () => {
 
     expect(data.name).toBe('Test Crag');
     expect(data.sectors[0].routes[0].sectorName).toBe('Main Wall');
-    expect(fetch).toHaveBeenCalledWith(getCragDataUrl(SAMPLE_CRAG_ID), {
+    expect(fetch).toHaveBeenCalledWith(getCragApiUrl(SAMPLE_CRAG_ID), {
       cache: 'no-store',
     });
   });
@@ -98,12 +98,15 @@ describe('loadCragDataJson', () => {
   });
 
   it('falls back to the offline pack when the network response is not ok', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await seedCachedJson();
     vi.mocked(fetch).mockResolvedValue(new Response('nope', { status: 503 }));
 
     const data = await loadCragDataJson(SAMPLE_CRAG_ID);
 
     expect(data.sectors).toHaveLength(2);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it('throws when both network and the offline pack fail', async () => {
@@ -277,7 +280,7 @@ describe('syncCragOffline', () => {
     await syncCragOffline(SAMPLE_CRAG_ID, () => {});
 
     const cache = await caches.open(getOfflineCacheName(SAMPLE_CRAG_ID));
-    expect(await cache.match(getCragDataUrl(SAMPLE_CRAG_ID))).toBeDefined();
+    expect(await cache.match(getCragApiUrl(SAMPLE_CRAG_ID))).toBeDefined();
     expect(await cache.match(getCragSectorsGpxUrl(SAMPLE_CRAG_ID))).toBeDefined();
     expect(
       await cache.match(getCragImageUrl(SAMPLE_CRAG_ID, SAMPLE_IMAGE_FILE)),
@@ -308,7 +311,7 @@ describe('syncCragOffline', () => {
     const fetched = mockSyncFetches(data);
     await syncCragOffline(SAMPLE_CRAG_ID, () => {});
 
-    expect(fetched).toContain(getCragDataUrl(SAMPLE_CRAG_ID));
+    expect(fetched).toContain(getCragApiUrl(SAMPLE_CRAG_ID));
     expect(fetched).toContain(getCragSectorsGpxUrl(SAMPLE_CRAG_ID));
     expect(fetched).toContain(getCragImageUrl(SAMPLE_CRAG_ID, NEW_IMAGE_FILE));
     expect(fetched).not.toContain(getCragImageUrl(SAMPLE_CRAG_ID, SAMPLE_IMAGE_FILE));

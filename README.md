@@ -6,7 +6,7 @@ The live site is **[roshkaclimb.ge](https://roshkaclimb.ge/)** — currently cov
 
 You can look up sectors and routes, view topo photos with line overlays, check grades and descriptions, watch beta videos, use the map (including your location), and download PDF guides and GPX tracks. Before a trip with no signal, download a crag in the app so topos, routes, and the outdoor/topo map still work offline.
 
-Live data (JSON, images, GPX, PDF guides, map tiles) is served from public Firebase Storage.
+Crag documents come from crag-api. Images, GPX, PDF guides, and map tiles are served from public Firebase Storage.
 
 ## Packages
 
@@ -28,7 +28,19 @@ npm ci
 npm run dev
 ```
 
-The default `npm run dev` talks to production Firebase Storage. To point at a local Storage emulator on port 9199:
+`npm run dev` loads crag documents from the local API (Vite proxies `/api` to port 3010) and files from production Firebase Storage. Install MongoDB locally (default `mongodb://127.0.0.1:27017`), then start the API:
+
+```bash
+npm run dev:api
+```
+
+In another terminal, from `crag-explorer`:
+
+```bash
+npm run dev
+```
+
+To point file URLs at a local Storage emulator on port 9199:
 
 ```bash
 npm run emulator:start
@@ -38,16 +50,10 @@ In another terminal:
 
 ```bash
 cd crag-explorer
-npm run dev:use-emulator
+npm run dev-local
 ```
 
-Local crag/sector JSON (feature branch) lives in MongoDB, not Storage. Install MongoDB locally (default `mongodb://127.0.0.1:27017`), then start the API:
-
-```bash
-npm run dev:api
-```
-
-See [`crag-api/README.md`](crag-api/README.md). Do not deploy `crag-api` until auth exists. Explorer still loads catalog JSON from Storage until a later stage. Image upload uses the Storage emulator via Admin SDK.
+See [`crag-api/README.md`](crag-api/README.md). Do not deploy `crag-api` until auth exists. Crag-management writes will send a bearer token through the explorer API client; reads stay anonymous until then. Set `VITE_API_BASE_URL` (no trailing slash) on production builds once the API is public. Image upload uses the Storage emulator via Admin SDK.
 
 ## Build
 

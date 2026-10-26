@@ -66,27 +66,20 @@ function calculateGradeRange(routes) {
 }
 
 // ---------------------------------------------------------------------------
-// Firebase data loading
+// crag-api data loading
 // ---------------------------------------------------------------------------
 
-function getFirebaseDataUrl(cragId) {
-  const bucket = process.env.FIREBASE_STORAGE_BUCKET || 'crag-to-all.firebasestorage.app';
-  const useEmulator =
-    process.env.SEO_PATCH_USE_FIREBASE_EMULATOR === 'true' ||
-    process.env.VITE_USE_FIREBASE_EMULATOR === 'true';
-  const baseUrl = useEmulator
-    ? `http://localhost:9199/v0/b/${bucket}/o`
-    : `https://firebasestorage.googleapis.com/v0/b/${bucket}/o`;
-  const encodedPath = encodeURIComponent(`${cragId}/${cragId}.json`);
-  return `${baseUrl}/${encodedPath}?alt=media`;
+function getCragApiUrl(cragId) {
+  const base = (process.env.VITE_API_BASE_URL || 'http://localhost:3010').replace(/\/$/, '');
+  return `${base}/api/crags/${encodeURIComponent(cragId)}`;
 }
 
 async function loadCragData(cragId) {
-  const dataUrl = getFirebaseDataUrl(cragId);
+  const dataUrl = getCragApiUrl(cragId);
   const response = await fetch(dataUrl, { headers: { 'Cache-Control': 'no-cache' } });
   if (!response.ok) {
     throw new Error(
-      `Failed to fetch Firebase crag data for "${cragId}" (${response.status} ${response.statusText})`
+      `Failed to fetch crag data for "${cragId}" (${response.status} ${response.statusText})`
     );
   }
   return response.json();
@@ -379,7 +372,7 @@ async function main() {
   const allCragConfigs = Object.values(cragConfigs);
 
   try {
-    log(`☁️  Loading data for ${allCragConfigs.length} crag(s) from Firebase`, 'blue');
+    log(`Loading data for ${allCragConfigs.length} crag(s) from crag-api`, 'blue');
     const summaries = await Promise.all(allCragConfigs.map(summarizeCrag));
 
     summaries.forEach((s) => {

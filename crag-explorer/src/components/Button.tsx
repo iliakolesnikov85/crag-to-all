@@ -17,7 +17,9 @@ export type ButtonProps = {
   className?: string;
   children?: React.ReactNode;
   type?: 'button' | 'submit' | 'reset';
+  form?: string;
   onClick?: React.MouseEventHandler<HTMLElement>;
+  onMouseDown?: React.MouseEventHandler<HTMLElement>;
   as?: ButtonAs;
   href?: string;
   to?: string;
@@ -70,7 +72,9 @@ const Button: React.FC<ButtonProps> = ({
   className,
   children,
   type = 'button',
+  form,
   onClick,
+  onMouseDown,
   as = 'button',
   href,
   to,
@@ -119,6 +123,7 @@ const Button: React.FC<ButtonProps> = ({
         target={target}
         rel={rel}
         onClick={onClick}
+        onMouseDown={onMouseDown}
         {...sharedAria}
       >
         {children}
@@ -147,6 +152,7 @@ const Button: React.FC<ButtonProps> = ({
         target={target}
         rel={rel}
         onClick={onClick}
+        onMouseDown={onMouseDown}
         {...sharedAria}
       >
         {children}
@@ -157,9 +163,11 @@ const Button: React.FC<ButtonProps> = ({
   return (
     <button
       type={type}
+      form={form}
       className={classes}
       disabled={disabled}
       onClick={onClick}
+      onMouseDown={onMouseDown}
       {...sharedAria}
     >
       {children}

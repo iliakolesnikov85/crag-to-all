@@ -2,7 +2,8 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_USE_FIREBASE_EMULATOR: string
+  readonly VITE_API_BASE_URL?: string
+  readonly VITE_DEV_LOCAL?: string
 }
 
 interface ImportMeta {

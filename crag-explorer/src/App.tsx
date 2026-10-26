@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router';
 import './App.scss';
+import { listCrags } from './api/client';
 import { CragData, Crag } from './types';
-import { getCragIndexUrl } from './utils/firebaseStorage';
 import { getDefaultCragForHost } from './utils/defaultCrag';
 import { 
   OverviewPage, 
@@ -102,7 +102,20 @@ const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags
                 <Route path={`/overview`} element={<OverviewPage description={cragData.description} sectors={cragData.sectors} />} />
                 <Route path={`/routes`} element={<RoutesPage sectors={cragData.sectors} />} />
                 <Route path={`/map`} element={<MapPage cragData={cragData} />} />
-                <Route path={`/description`} element={<DescriptionPage description={cragData.description} />} />
+                <Route
+                  path={`/description`}
+                  element={
+                    <DescriptionPage
+                      description={cragData.description}
+                      version={cragData.version}
+                      onDescriptionChange={({ description, version }) => {
+                        setCragData((current) =>
+                          current ? { ...current, description, version } : current,
+                        );
+                      }}
+                    />
+                  }
+                />
                 <Route
                   path={`/download`}
                   element={<DownloadPage cragData={cragData} />}
@@ -133,12 +146,10 @@ export const AppRoutes: React.FC = () => {
 
     const loadIndex = async () => {
       try {
-        const res = await fetch(getCragIndexUrl(), {
+        const data = await listCrags({
           cache: navigator.onLine ? 'no-store' : 'default',
           signal,
         });
-        if (!res.ok) throw new Error('index fetch failed');
-        const data: Crag[] = await res.json();
         if (signal.aborted) return;
         await putOfflineCragIndex(data);
         setCrags(data);

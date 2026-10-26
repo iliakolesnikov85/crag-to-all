@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  getCragDataUrl,
   getCragGuideUrl,
   getCragImageUrl,
-  getCragIndexUrl,
   getCragOpenTopoPackUrl,
   getCragOpenTopoTileUrl,
   getCragSectorsGpxUrl,
@@ -25,11 +23,7 @@ describe('firebaseStorage URLs', () => {
     );
   });
 
-  it('builds index, JSON, GPX, PDF, pack, and tile URLs', () => {
-    expect(getCragIndexUrl()).toBe(`${PROD_HOST}/index.json?alt=media`);
-    expect(getCragDataUrl('roshka')).toBe(
-      `${PROD_HOST}/roshka%2Froshka.json?alt=media`,
-    );
+  it('builds GPX, PDF, pack, and tile URLs', () => {
     expect(getCragSectorsGpxUrl('roshka')).toBe(
       `${PROD_HOST}/roshka%2Froshka-sectors.gpx?alt=media`,
     );

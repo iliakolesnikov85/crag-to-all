@@ -1,28 +1,22 @@
 /**
- * Firebase Storage URL utilities
+ * Firebase Storage URL utilities for images, PDFs, GPX, and map tiles.
  *
- * Optional local emulator: start Storage on port 9199, then
- * `npm run dev:use-emulator`.
- *
- * VITE_USE_FIREBASE_EMULATOR=true  → http://localhost:9199
- * VITE_USE_FIREBASE_EMULATOR unset → production Firebase Storage
+ * Crag documents come from crag-api. File URLs use production Storage unless
+ * `npm run dev-local` sets VITE_DEV_LOCAL=true (localhost:9199).
  */
 
 const FIREBASE_BUCKET = 'crag-to-all.firebasestorage.app';
 
-// Check if we should use the emulator
-const USE_EMULATOR = import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true';
+const DEV_LOCAL = import.meta.env.VITE_DEV_LOCAL === 'true';
 
-// Base URL for Firebase Storage (production or emulator)
-const FIREBASE_BASE_URL = USE_EMULATOR 
+const FIREBASE_BASE_URL = DEV_LOCAL
   ? `http://localhost:9199/v0/b/${FIREBASE_BUCKET}/o`
   : `https://firebasestorage.googleapis.com/v0/b/${FIREBASE_BUCKET}/o`;
 
-// Log which mode we're using
-if (USE_EMULATOR) {
-  console.log('🔥 Using Firebase Storage Emulator at http://localhost:9199');
+if (DEV_LOCAL) {
+  console.log('Using Firebase Storage emulator at http://localhost:9199');
 } else {
-  console.log('☁️ Using Firebase Storage Production');
+  console.log('Using Firebase Storage production');
 }
 
 /**
@@ -33,23 +27,6 @@ if (USE_EMULATOR) {
 export function getFirebaseStorageUrl(filePath: string): string {
   const encodedPath = encodeURIComponent(filePath);
   return `${FIREBASE_BASE_URL}/${encodedPath}?alt=media`;
-}
-
-/**
- * Get the URL for crag data JSON file
- * @param cragId - The crag identifier
- * @returns The Firebase Storage URL for the crag data
- */
-export function getCragDataUrl(cragId: string): string {
-  return getFirebaseStorageUrl(`${cragId}/${cragId}.json`);
-}
-
-/**
- * Get the URL for the crag index JSON file
- * @returns The Firebase Storage URL for the index file
- */
-export function getCragIndexUrl(): string {
-  return getFirebaseStorageUrl('index.json');
 }
 
 /**

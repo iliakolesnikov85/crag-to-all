@@ -11,4 +11,5 @@ export { default as Pager } from './Pager';
 export { default as MapWidget } from './MapWidget';
 export { default as RouteRating } from './RouteRating';
 export { default as LoadingScreen } from './LoadingScreen';
+export { default as Modal } from './Modal';
 export { default as SectorView } from './SectorView';

@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
+import { getCragApiUrl } from '../../api/client';
 import {
   SAMPLE_CRAG_ID,
   SAMPLE_IMAGE_FILE,
   sampleCragData,
 } from '../../test/fixtures/cragData';
 import {
-  getCragDataUrl,
   getCragImageUrl,
   getCragSectorsGpxUrl,
 } from '../firebaseStorage';
@@ -27,7 +27,7 @@ describe('collectCragOfflineUrls', () => {
   it('includes JSON, optional GPX, and image URLs', () => {
     const urls = collectCragOfflineUrls(SAMPLE_CRAG_ID, sampleCragData);
     expect(urls).toEqual([
-      getCragDataUrl(SAMPLE_CRAG_ID),
+      getCragApiUrl(SAMPLE_CRAG_ID),
       getCragSectorsGpxUrl(SAMPLE_CRAG_ID),
       getCragImageUrl(SAMPLE_CRAG_ID, SAMPLE_IMAGE_FILE),
     ]);
@@ -43,7 +43,7 @@ describe('getOfflineCacheName', () => {
 describe('isOptionalOfflineUrl', () => {
   it('treats the sectors GPX as optional', () => {
     expect(isOptionalOfflineUrl(getCragSectorsGpxUrl(SAMPLE_CRAG_ID))).toBe(true);
-    expect(isOptionalOfflineUrl(getCragDataUrl(SAMPLE_CRAG_ID))).toBe(false);
+    expect(isOptionalOfflineUrl(getCragApiUrl(SAMPLE_CRAG_ID))).toBe(false);
     expect(
       isOptionalOfflineUrl(getCragImageUrl(SAMPLE_CRAG_ID, SAMPLE_IMAGE_FILE)),
     ).toBe(false);
@@ -64,7 +64,7 @@ describe('extractImageFileFromUrl', () => {
     expect(
       extractImageFileFromUrl('https://example.com/images/wall.jpg?alt=media'),
     ).toBe('wall.jpg');
-    expect(extractImageFileFromUrl(getCragDataUrl(SAMPLE_CRAG_ID))).toBeNull();
+    expect(extractImageFileFromUrl(getCragApiUrl(SAMPLE_CRAG_ID))).toBeNull();
   });
 
   it('returns null when the encoded filename cannot be decoded', () => {

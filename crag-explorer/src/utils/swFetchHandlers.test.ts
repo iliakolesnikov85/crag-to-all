@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SAMPLE_CRAG_ID } from '../test/fixtures/cragData';
-import { getCragDataUrl, getCragOpenTopoTileUrl } from './firebaseStorage';
+import { getCragImageUrl, getCragOpenTopoTileUrl } from './firebaseStorage';
 import { getOfflineCacheName } from './offline';
 import {
   fetchFirebaseWithOfflineFallback,
@@ -99,7 +99,7 @@ describe('handleAppNavigation', () => {
 
 describe('findCachedResponse and fetchFirebaseWithOfflineFallback', () => {
   it('reads only crag-offline caches', async () => {
-    const url = getCragDataUrl(SAMPLE_CRAG_ID);
+    const url = getCragImageUrl(SAMPLE_CRAG_ID, 'topo.jpg');
     const other = await caches.open('workbox-precache');
     await other.put(url, new Response('precached'));
     const pack = await caches.open(getOfflineCacheName(SAMPLE_CRAG_ID));
@@ -120,7 +120,7 @@ describe('findCachedResponse and fetchFirebaseWithOfflineFallback', () => {
   });
 
   it('returns a network error when offline with no cache', async () => {
-    const request = new Request(getCragDataUrl(SAMPLE_CRAG_ID));
+    const request = new Request(getCragImageUrl(SAMPLE_CRAG_ID, 'topo.jpg'));
     const response = await fetchFirebaseWithOfflineFallback(request, undefined, {
       online: false,
       fetchFromNetwork: () => Promise.reject(new Error('should not fetch')),
@@ -129,7 +129,7 @@ describe('findCachedResponse and fetchFirebaseWithOfflineFallback', () => {
   });
 
   it('uses cache when the online Firebase response is not ok', async () => {
-    const request = new Request(getCragDataUrl(SAMPLE_CRAG_ID));
+    const request = new Request(getCragImageUrl(SAMPLE_CRAG_ID, 'topo.jpg'));
     const response = await fetchFirebaseWithOfflineFallback(
       request,
       new Response('cached-json'),
@@ -143,7 +143,7 @@ describe('findCachedResponse and fetchFirebaseWithOfflineFallback', () => {
 
   it('uses cache when the online Firebase fetch throws', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const request = new Request(getCragDataUrl(SAMPLE_CRAG_ID));
+    const request = new Request(getCragImageUrl(SAMPLE_CRAG_ID, 'topo.jpg'));
     const response = await fetchFirebaseWithOfflineFallback(
       request,
       new Response('cached-json'),
@@ -159,7 +159,7 @@ describe('findCachedResponse and fetchFirebaseWithOfflineFallback', () => {
 
   it('rethrows when the online Firebase fetch throws and nothing is cached', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const request = new Request(getCragDataUrl(SAMPLE_CRAG_ID));
+    const request = new Request(getCragImageUrl(SAMPLE_CRAG_ID, 'topo.jpg'));
     await expect(
       fetchFirebaseWithOfflineFallback(request, undefined, {
         online: true,

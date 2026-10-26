@@ -1,0 +1,37 @@
+.description-section-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: 1rem;
+  min-height: 100%;
+}
+
+.description-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.description-field-label {
+  font-weight: 600;
+  color: #333;
+}
+
+.description-name-input {
+  width: 100%;
+  font: inherit;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  color: #333;
+
+  &:focus {
+    outline: 2px solid #1976d2;
+    outline-offset: 1px;
+  }
+}
+
+.description-form-error {
+  margin: 0;
+  color: #c82333;
+}

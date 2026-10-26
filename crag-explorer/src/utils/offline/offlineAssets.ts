@@ -1,6 +1,6 @@
+import { getCragApiUrl } from '../../api/client';
 import { CragData } from '../../types';
 import {
-  getCragDataUrl,
   getCragImageUrl,
   getCragSectorsGpxUrl,
 } from '../firebaseStorage';
@@ -21,10 +21,10 @@ export function collectCragImageFiles(data: CragData): string[] {
   return Array.from(files);
 }
 
-/** All Firebase URLs to store for offline use (JSON, images, GPX). */
+/** URLs to store for offline use (crag JSON from the API, images, GPX). */
 export function collectCragOfflineUrls(cragId: string, data: CragData): string[] {
   const urls = [
-    getCragDataUrl(cragId),
+    getCragApiUrl(cragId),
     getCragSectorsGpxUrl(cragId),
   ];
   for (const imageFile of collectCragImageFiles(data)) {
