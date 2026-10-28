@@ -16,10 +16,11 @@ import {
   getAssembledCrag,
   listCrags,
   patchCrag,
+  patchSectorGeo,
   replaceSector,
 } from './store';
 import type { ImageStorage, ImageUploadResponse } from './types';
-import { parseCragId, parseCreateCrag, parseCragPatch, parseReplaceSector, parseSectorId, parseSectorWrite } from './validate';
+import { parseCragId, parseCreateCrag, parseCragPatch, parseReplaceSector, parseSectorGeoPatch, parseSectorId, parseSectorWrite } from './validate';
 
 export interface AppOptions {
   storage?: ImageStorage;
@@ -126,6 +127,16 @@ export function createApp(db: Db, options: AppOptions = {}): Express {
       const sectorId = parseSectorId(req.params.sectorId);
       const { version, sector } = parseReplaceSector(req.body);
       res.json(await replaceSector(db, cragId, sectorId, version, sector));
+    }),
+  );
+
+  app.patch(
+    '/api/crags/:cragId/sectors/:sectorId',
+    asyncHandler(async (req, res) => {
+      const cragId = parseCragId(req.params.cragId);
+      const sectorId = parseSectorId(req.params.sectorId);
+      const { version, geo } = parseSectorGeoPatch(req.body);
+      res.json(await patchSectorGeo(db, cragId, sectorId, version, geo));
     }),
   );
 

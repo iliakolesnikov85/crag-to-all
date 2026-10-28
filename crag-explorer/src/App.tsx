@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router';
 import './App.scss';
 import { listCrags } from './api/client';
-import { CragData, Crag } from './types';
+import { CragData, Crag, Sector } from './types';
 import { getDefaultCragForHost } from './utils/defaultCrag';
 import { 
   OverviewPage, 
@@ -74,6 +74,16 @@ const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags
     setCurrentRoute(routeName);
   }, []);
 
+  const handleSectorGeoSaved = useCallback((sector: Sector) => {
+    setCragData((current) => {
+      if (!current || sector.id == null) return current;
+      return {
+        ...current,
+        sectors: current.sectors.map((item) => (item.id === sector.id ? sector : item)),
+      };
+    });
+  }, []);
+
   if (!crag) return <div className="page">Crag not found.</div>;
   if (loading) return <LoadingScreen message="Loading crag data..." />;
   if (error) return <div className="page">Error: {error}</div>;
@@ -101,7 +111,10 @@ const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags
               <Routes>
                 <Route path={`/overview`} element={<OverviewPage description={cragData.description} sectors={cragData.sectors} />} />
                 <Route path={`/routes`} element={<RoutesPage sectors={cragData.sectors} />} />
-                <Route path={`/map`} element={<MapPage cragData={cragData} />} />
+                <Route
+                  path={`/map`}
+                  element={<MapPage cragData={cragData} onSectorGeoSaved={handleSectorGeoSaved} />}
+                />
                 <Route
                   path={`/description`}
                   element={

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { MdDelete, MdEdit } from 'react-icons/md';
 import { patchCragDescription, type DescriptionPatchResult } from '../api/client';
-import { canManageCrag } from '../api/permissions';
+import { canEditCrag } from '../api/permissions';
 import Button from '../components/Button';
 import DescriptionSectionModal from '../components/DescriptionSectionModal';
 import { useCrag } from '../context/CragContext';
@@ -40,7 +40,7 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const canEdit = canManageCrag(crag.cragId);
+  const canEdit = canEditCrag(crag);
   const busy = saving || removing;
   const editingSection = editor?.mode === 'edit' ? description[editor.index] : undefined;
 
@@ -65,7 +65,7 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
   };
 
   const handleSave = async (section: DescriptionSection) => {
-    if (!canManageCrag(crag.cragId)) {
+    if (!canEditCrag(crag)) {
       setSaveError(PERMISSION_MESSAGE);
       return;
     }
@@ -97,7 +97,7 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
   const handleRemove = async (index: number) => {
     const section = description[index];
     if (!section || busy) return;
-    if (!canManageCrag(crag.cragId)) {
+    if (!canEditCrag(crag)) {
       setActionError(PERMISSION_MESSAGE);
       return;
     }

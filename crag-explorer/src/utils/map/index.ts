@@ -4,9 +4,10 @@ export {
   createResetBoundsControl,
 } from './mapControls';
 export { buildBaseLayerOptions } from './mapLayers';
-export { escapeHtml, markerLabelFromType } from './mapOverlayHelpers';
+export { escapeHtml, mapOverlayRenderKey, markerLabelFromType } from './mapOverlayHelpers';
 export type { RenderMapOverlaysOptions, SectorMarkerMode } from './mapOverlays';
 export { renderMapOverlays } from './mapOverlays';
+export type { SectorGeoEditHost, SectorGeoEditor, SectorGeoEditorSnapshot } from './sectorGeoEditor';
 export {
   applyInitialMapView,
   attachBaseLayers,

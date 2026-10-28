@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Sector } from '@crag-to-all/shared-crag';
+import type { LatLng, Sector } from '@crag-to-all/shared-crag';
 import type { Db } from 'mongodb';
 import { toSector, toSectorDocument } from '../convertors';
 import { notFound, readOnly, versionConflict } from '../http';
@@ -69,6 +69,28 @@ export async function replaceSector(
     throw versionConflict(current.version);
   }
   return toSector(next);
+}
+
+export async function patchSectorGeo(
+  db: Db,
+  cragId: string,
+  sectorId: string,
+  version: number,
+  geo: LatLng,
+): Promise<Sector> {
+  await requireWritableCrag(db, cragId);
+
+  const updated = await sectorsCol(db).findOneAndUpdate(
+    { _id: sectorId, cragId, version },
+    { $set: { geo, updatedAt: now() }, $inc: { version: 1 } },
+    { returnDocument: 'after' },
+  );
+  if (!updated) {
+    const current = await sectorsCol(db).findOne({ _id: sectorId, cragId });
+    if (!current) throw notFound('sector');
+    throw versionConflict(current.version);
+  }
+  return toSector(updated);
 }
 
 export async function deleteSector(db: Db, cragId: string, sectorId: string): Promise<void> {

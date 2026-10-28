@@ -161,6 +161,51 @@ describe('crag-api', () => {
     expect(afterDelete.body.version).toBe(1);
   });
 
+  it('patches sector coordinates without replacing routes', async () => {
+    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    const created = await request(app)
+      .post('/api/crags/roshka/sectors')
+      .send({
+        name: 'Main Wall',
+        geo: { lat: 42.5, lon: 45.2 },
+        routes: [{ name: 'Classic', grade: '6a' }],
+      });
+    expect(created.status).toBe(201);
+    const sectorId = created.body.id as string;
+    const routeId = created.body.routes[0].id as string;
+
+    const patched = await request(app)
+      .patch(`/api/crags/roshka/sectors/${sectorId}`)
+      .send({ version: 1, geo: { lat: 42.6, lon: 45.3 } });
+    expect(patched.status).toBe(200);
+    expect(patched.body.version).toBe(2);
+    expect(patched.body.geo).toEqual({ lat: 42.6, lon: 45.3 });
+    expect(patched.body.name).toBe('Main Wall');
+    expect(patched.body.routes).toEqual([
+      expect.objectContaining({ id: routeId, name: 'Classic', grade: '6a' }),
+    ]);
+
+    const conflict = await request(app)
+      .patch(`/api/crags/roshka/sectors/${sectorId}`)
+      .send({ version: 1, geo: { lat: 1, lon: 2 } });
+    expect(conflict.status).toBe(409);
+    expect(conflict.body).toEqual({ error: 'version_conflict', currentVersion: 2 });
+
+    const invalid = await request(app)
+      .patch(`/api/crags/roshka/sectors/${sectorId}`)
+      .send({ version: 2, geo: { lat: 120, lon: 45.3 } });
+    expect(invalid.status).toBe(400);
+
+    const missing = await request(app)
+      .patch('/api/crags/roshka/sectors/missing-sector')
+      .send({ version: 1, geo: { lat: 1, lon: 2 } });
+    expect(missing.status).toBe(404);
+
+    const assembled = await request(app).get('/api/crags/roshka');
+    expect(assembled.body.sectors[0].geo).toEqual({ lat: 42.6, lon: 45.3 });
+    expect(assembled.body.sectors[0].routes[0].name).toBe('Classic');
+  });
+
   it('rejects sector writes on an extracted crag', async () => {
     await db.collection('crags').insertOne({
       _id: 'roshka',
@@ -208,6 +253,13 @@ describe('crag-api', () => {
     const removed = await request(app).delete('/api/crags/roshka/sectors/cave-1');
     expect(removed.status).toBe(403);
     expect(removed.body.error).toBe('read_only');
+
+    const patched = await request(app).patch('/api/crags/roshka/sectors/cave-1').send({
+      version: 3,
+      geo: { lat: 44.2, lon: 6.3 },
+    });
+    expect(patched.status).toBe(403);
+    expect(patched.body.error).toBe('read_only');
 
     const assembled = await request(app).get('/api/crags/roshka');
     expect(assembled.status).toBe(200);

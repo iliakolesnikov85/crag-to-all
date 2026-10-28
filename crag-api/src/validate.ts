@@ -166,6 +166,11 @@ const replaceSectorBodySchema = sectorBodySchema.extend({
   version: versionSchema,
 });
 
+const sectorGeoPatchSchema = z.object({
+  version: versionSchema,
+  geo: latLngSchema,
+});
+
 function toSectorWrite(body: z.infer<typeof sectorBodySchema>): SectorWriteInput {
   const sector: SectorWriteInput = {
     name: body.name,
@@ -212,6 +217,10 @@ function parseSectorWrite(body: unknown): SectorWriteInput {
   return toSectorWrite(parseWith(sectorBodySchema, body));
 }
 
+function parseSectorGeoPatch(body: unknown): { version: number; geo: z.infer<typeof latLngSchema> } {
+  return parseWith(sectorGeoPatchSchema, body);
+}
+
 function parseReplaceSector(body: unknown): { version: number; sector: SectorWriteInput } {
   const parsed = parseWith(replaceSectorBodySchema, body);
   const { version, ...sectorBody } = parsed;
@@ -223,6 +232,7 @@ export {
   parseCragPatch,
   parseCreateCrag,
   parseReplaceSector,
+  parseSectorGeoPatch,
   parseSectorId,
   parseSectorWrite,
   slugifyCragId,

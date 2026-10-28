@@ -1,4 +1,4 @@
-import type { Crag, CragData, DescriptionSection } from '../types';
+import type { Crag, CragData, DescriptionSection, LatLng, Sector } from '../types';
 import { getAccessToken } from './auth';
 
 const CRAGS_PATH = '/api/crags';
@@ -11,14 +11,18 @@ function cragDocumentPath(cragId: string): string {
   return `${CRAGS_PATH}/${encodeURIComponent(cragId)}`;
 }
 
-async function readErrorMessage(response: Response, fallback: string): Promise<string> {
+async function readErrorMessage(
+  response: Response,
+  fallback: string,
+  conflictMessage = 'This crag was updated somewhere else. Reload the page and try again.',
+): Promise<string> {
   try {
     const body = (await response.json()) as { message?: unknown; error?: unknown };
     if (typeof body.message === 'string' && body.message.trim()) {
       return body.message;
     }
     if (body.error === 'version_conflict') {
-      return 'This crag was updated somewhere else. Reload the page and try again.';
+      return conflictMessage;
     }
   } catch (error) {
     console.warn('Could not read API error response:', error);
@@ -96,4 +100,40 @@ export async function patchCragDescription(
     description: body.description as DescriptionSection[],
     version: body.version,
   };
+}
+
+export async function patchSectorGeo(
+  cragId: string,
+  sectorId: string,
+  version: number,
+  geo: LatLng,
+): Promise<Sector> {
+  const response = await apiFetch(
+    `${cragDocumentPath(cragId)}/sectors/${encodeURIComponent(sectorId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ version, geo }),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(
+        response,
+        `Failed to save coordinates (${response.status})`,
+        'This sector was updated somewhere else. Reload the page and try again.',
+      ),
+    );
+  }
+  const body = (await response.json()) as Partial<Sector>;
+  if (
+    typeof body.id !== 'string'
+    || typeof body.version !== 'number'
+    || !body.geo
+    || typeof body.geo.lat !== 'number'
+    || typeof body.geo.lon !== 'number'
+  ) {
+    throw new Error('Coordinate save returned an unexpected response');
+  }
+  return body as Sector;
 }

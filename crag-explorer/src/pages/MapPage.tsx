@@ -6,10 +6,18 @@ import { setBodyScrollLock } from '../utils/bodyScrollLock';
 
 interface MapPageProps {
   cragData: CragData;
+  onSectorGeoSaved?: (sector: Sector) => void;
 }
 
-const MapPage: React.FC<MapPageProps> = ({ cragData }) => {
+const MapPage: React.FC<MapPageProps> = ({ cragData, onSectorGeoSaved }) => {
   const [filteredSectors, setFilteredSectors] = React.useState<Sector[]>(cragData.sectors);
+
+  const handleSectorGeoSaved = React.useCallback((sector: Sector) => {
+    setFilteredSectors((current) =>
+      current.map((item) => (sector.id != null && item.id === sector.id ? sector : item)),
+    );
+    onSectorGeoSaved?.(sector);
+  }, [onSectorGeoSaved]);
 
   // Map fills the viewport; body scroll only causes rubber-banding / accidental pans.
   React.useEffect(() => {
@@ -31,7 +39,7 @@ const MapPage: React.FC<MapPageProps> = ({ cragData }) => {
         onFilteredSectorsChange={setFilteredSectors}
       />
       
-      <MapWidget cragData={mapCragData} />
+      <MapWidget cragData={mapCragData} onSectorGeoSaved={handleSectorGeoSaved} />
     </div>
   );
 };

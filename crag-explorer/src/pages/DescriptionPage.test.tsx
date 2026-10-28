@@ -1,14 +1,14 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { patchCragDescription } from '../api/client';
-import { canManageCrag } from '../api/permissions';
+import { canEditCrag } from '../api/permissions';
 import { CragContext } from '../context/CragContext';
 import type { DescriptionSection } from '../types';
 import { paragraphsToHtml } from '../utils/descriptionHtml';
 import DescriptionPage from './DescriptionPage';
 
 vi.mock('../api/permissions', () => ({
-  canManageCrag: vi.fn(() => true),
+  canEditCrag: vi.fn(() => true),
 }));
 
 vi.mock('../api/client', () => ({
@@ -61,7 +61,7 @@ function renderPage(description: DescriptionSection[] = sections, version?: numb
 
 describe('DescriptionPage', () => {
   beforeEach(() => {
-    vi.mocked(canManageCrag).mockReturnValue(true);
+    vi.mocked(canEditCrag).mockReturnValue(true);
     vi.mocked(patchCragDescription).mockReset();
   });
 
@@ -78,7 +78,7 @@ describe('DescriptionPage', () => {
   });
 
   it('shows a loading message when a visitor has no description', () => {
-    vi.mocked(canManageCrag).mockReturnValue(false);
+    vi.mocked(canEditCrag).mockReturnValue(false);
     renderPage([]);
 
     expect(screen.getByText('Loading description...')).toBeInTheDocument();
@@ -87,7 +87,7 @@ describe('DescriptionPage', () => {
   });
 
   it('hides edit controls when the user cannot manage the crag', () => {
-    vi.mocked(canManageCrag).mockReturnValue(false);
+    vi.mocked(canEditCrag).mockReturnValue(false);
     renderPage(sections, 3);
 
     expect(screen.queryByRole('button', { name: 'Edit Access' })).not.toBeInTheDocument();
@@ -171,7 +171,7 @@ describe('DescriptionPage', () => {
   it('refuses to save when the guard returns false', () => {
     renderPage(sections, 3);
     fireEvent.click(screen.getByRole('button', { name: 'Edit Access' }));
-    vi.mocked(canManageCrag).mockReturnValue(false);
+    vi.mocked(canEditCrag).mockReturnValue(false);
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('permission');

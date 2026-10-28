@@ -38,6 +38,7 @@ Optional `.env` (see `.env.example`): `PORT`, `MONGODB_URI`, `MONGODB_DB`, `FIRE
 | PATCH | `/api/crags/:cragId` | Crag-level fields; body must include `version`; stale version → **409** |
 | POST | `/api/crags/:cragId/sectors` | Add a sector (UUID id, `version: 1`) |
 | PUT | `/api/crags/:cragId/sectors/:sectorId` | Replace that sector; body includes `version`; stale → **409** |
+| PATCH | `/api/crags/:cragId/sectors/:sectorId` | Update sector coordinates (`{ version, geo }`); stale version → **409** |
 | DELETE | `/api/crags/:cragId/sectors/:sectorId` | Remove that sector |
 | POST | `/api/crags/:cragId/images` | Multipart field `image`; Admin SDK upload to `{cragId}/images/{sha256}.{ext}` |
 | GET | `/api/crags/:cragId/gpx` | GPX built from current Mongo state (`application/gpx+xml`; no Storage write) |
