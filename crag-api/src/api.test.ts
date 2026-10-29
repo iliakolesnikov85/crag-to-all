@@ -206,6 +206,165 @@ describe('crag-api', () => {
     expect(assembled.body.sectors[0].routes[0].name).toBe('Classic');
   });
 
+  it('renames a sector, updates route names, and rejects a duplicate', async () => {
+    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    const created = await request(app)
+      .post('/api/crags/roshka/sectors')
+      .send({
+        name: 'Main Wall',
+        geo: { lat: 42.5, lon: 45.2 },
+        routes: [{ name: 'Classic', grade: '6a' }],
+      });
+    expect(created.status).toBe(201);
+    const other = await request(app)
+      .post('/api/crags/roshka/sectors')
+      .send({ name: 'Cave', geo: { lat: 42.4, lon: 45.1 } });
+    expect(other.status).toBe(201);
+
+    const sectorId = created.body.id as string;
+    const routeId = created.body.routes[0].id as string;
+    const renamed = await request(app)
+      .patch(`/api/crags/roshka/sectors/${sectorId}`)
+      .send({ version: 1, name: 'North Wall' });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.version).toBe(2);
+    expect(renamed.body.name).toBe('North Wall');
+    expect(renamed.body.geo).toEqual({ lat: 42.5, lon: 45.2 });
+    expect(renamed.body.routes).toEqual([
+      expect.objectContaining({
+        id: routeId,
+        name: 'Classic',
+        sectorName: 'North Wall',
+      }),
+    ]);
+
+    const recased = await request(app)
+      .patch(`/api/crags/roshka/sectors/${sectorId}`)
+      .send({ version: 2, name: 'north wall' });
+    expect(recased.status).toBe(200);
+    expect(recased.body.name).toBe('north wall');
+    expect(recased.body.routes[0].sectorName).toBe('north wall');
+
+    const duplicate = await request(app)
+      .patch(`/api/crags/roshka/sectors/${sectorId}`)
+      .send({ version: 3, name: 'cave' });
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body).toEqual({
+      error: 'already_exists',
+      message: 'A sector with this name already exists.',
+    });
+
+    const versionOnly = await request(app)
+      .patch(`/api/crags/roshka/sectors/${sectorId}`)
+      .send({ version: 3 });
+    expect(versionOnly.status).toBe(400);
+
+    const assembled = await request(app).get('/api/crags/roshka');
+    const sector = assembled.body.sectors.find((item: { id: string }) => item.id === sectorId);
+    expect(sector.name).toBe('north wall');
+    expect(sector.routes[0].sectorName).toBe('north wall');
+  });
+
+  it('rejects a case-insensitive duplicate sector name on create and replace', async () => {
+    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await request(app).post('/api/crags').send({ name: 'Other', cragId: 'other' });
+
+    const created = await request(app)
+      .post('/api/crags/roshka/sectors')
+      .send({
+        name: 'Main Wall',
+        geo: { lat: 42.5, lon: 45.2 },
+        routes: [{ name: 'Classic', grade: '6a', sectorName: 'Old' }],
+      });
+    expect(created.status).toBe(201);
+    expect(created.body.nameKey).toBeUndefined();
+    expect(created.body.routes[0].sectorName).toBe('Main Wall');
+    const sectorId = created.body.id as string;
+    const routeId = created.body.routes[0].id as string;
+
+    const sameCrag = await request(app)
+      .post('/api/crags/roshka/sectors')
+      .send({ name: 'main wall', geo: { lat: 42.4, lon: 45.1 } });
+    expect(sameCrag.status).toBe(409);
+    expect(sameCrag.body).toEqual({
+      error: 'already_exists',
+      message: 'A sector with this name already exists.',
+    });
+
+    const otherCrag = await request(app)
+      .post('/api/crags/other/sectors')
+      .send({ name: 'Main Wall', geo: { lat: 1, lon: 2 } });
+    expect(otherCrag.status).toBe(201);
+
+    const cave = await request(app)
+      .post('/api/crags/roshka/sectors')
+      .send({
+        name: 'Cave',
+        geo: { lat: 42.4, lon: 45.1 },
+        routes: [{ name: 'Dark', grade: '6b', sectorName: 'Somewhere' }],
+      });
+    expect(cave.status).toBe(201);
+    const caveId = cave.body.id as string;
+
+    const taken = await request(app)
+      .put(`/api/crags/roshka/sectors/${caveId}`)
+      .send({
+        version: 1,
+        name: 'MAIN WALL',
+        geo: { lat: 42.4, lon: 45.1 },
+        routes: [{ name: 'Dark', grade: '6b', sectorName: 'Cave' }],
+      });
+    expect(taken.status).toBe(409);
+    expect(taken.body).toEqual({
+      error: 'already_exists',
+      message: 'A sector with this name already exists.',
+    });
+
+    const recased = await request(app)
+      .put(`/api/crags/roshka/sectors/${caveId}`)
+      .send({
+        version: 1,
+        name: 'cave',
+        geo: { lat: 42.4, lon: 45.1 },
+        routes: [{ name: 'Dark', grade: '6b', sectorName: 'Cave' }],
+      });
+    expect(recased.status).toBe(200);
+    expect(recased.body.name).toBe('cave');
+    expect(recased.body.routes[0].sectorName).toBe('cave');
+
+    const renamed = await request(app)
+      .put(`/api/crags/roshka/sectors/${sectorId}`)
+      .send({
+        version: 1,
+        name: 'North Wall',
+        geo: { lat: 42.5, lon: 45.2 },
+        routes: [{ id: routeId, name: 'Classic', grade: '6a', sectorName: 'Main Wall' }],
+      });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.name).toBe('North Wall');
+    expect(renamed.body.routes[0]).toEqual(
+      expect.objectContaining({ id: routeId, sectorName: 'North Wall' }),
+    );
+  });
+
+  it('keeps one sector when two creates race for the same name', async () => {
+    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    const [first, second] = await Promise.all([
+      request(app).post('/api/crags/roshka/sectors').send({ name: 'Cave', geo: { lat: 1, lon: 2 } }),
+      request(app).post('/api/crags/roshka/sectors').send({ name: 'cave', geo: { lat: 3, lon: 4 } }),
+    ]);
+    const statuses = [first.status, second.status].sort();
+    expect(statuses).toEqual([201, 409]);
+    const rejected = first.status === 409 ? first : second;
+    expect(rejected.body).toEqual({
+      error: 'already_exists',
+      message: 'A sector with this name already exists.',
+    });
+
+    const assembled = await request(app).get('/api/crags/roshka');
+    expect(assembled.body.sectors).toHaveLength(1);
+  });
+
   it('rejects sector writes on an extracted crag', async () => {
     await db.collection('crags').insertOne({
       _id: 'roshka',

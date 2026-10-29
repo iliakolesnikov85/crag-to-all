@@ -1,4 +1,5 @@
 import type { LatLng, Sector } from '../../types';
+import { validateSectorName } from '../sectorName';
 import {
   formatSectorCoordinate,
   parseLatitude,
@@ -8,16 +9,23 @@ import {
 
 let activeEditor: SectorGeoEditor | null = null;
 
-function viewSnapshot(geo: LatLng): SectorGeoEditorSnapshot {
+function viewSnapshot(geo: LatLng, name: string): SectorGeoEditorSnapshot {
   return {
     editing: false,
     saving: false,
     latText: formatSectorCoordinate(geo.lat),
     lonText: formatSectorCoordinate(geo.lon),
+    nameText: name,
     latError: null,
     lonError: null,
+    nameError: null,
     saveError: null,
   };
+}
+
+export interface SectorEditPatch {
+  name?: string;
+  geo?: LatLng;
 }
 
 export interface SectorGeoEditorSnapshot {
@@ -25,8 +33,10 @@ export interface SectorGeoEditorSnapshot {
   saving: boolean;
   latText: string;
   lonText: string;
+  nameText: string;
   latError: string | null;
   lonError: string | null;
+  nameError: string | null;
   saveError: string | null;
 }
 
@@ -39,7 +49,7 @@ export interface SectorGeoEditHost {
   centerOn(geo: LatLng): void;
   hidePopup(): void;
   showPopup(): void;
-  save(geo: LatLng): Promise<Sector>;
+  save(patch: SectorEditPatch): Promise<Sector>;
 }
 
 export interface SectorGeoEditor {
@@ -50,6 +60,7 @@ export interface SectorGeoEditor {
   apply(): void;
   setLatText(value: string): void;
   setLonText(value: string): void;
+  setNameText(value: string): void;
   /** Move the marker from the typed coordinates. Call when an input loses focus. */
   commitDraft(): void;
   beginDrag(): void;
@@ -63,14 +74,18 @@ export interface SectorGeoEditor {
 
 export function createSectorGeoEditor(options: {
   geo: LatLng;
+  name: string;
+  takenNames?: readonly string[];
   host: SectorGeoEditHost;
 }): SectorGeoEditor {
   const { host } = options;
+  const takenNames = options.takenNames ?? [];
   let disposed = false;
   let dragging = false;
   let original: LatLng = { lat: options.geo.lat, lon: options.geo.lon };
   let current: LatLng = original;
-  let snapshot = viewSnapshot(original);
+  let originalName = options.name;
+  let snapshot = viewSnapshot(original, originalName);
   const listeners = new Set<() => void>();
 
   function emit(): void {
@@ -95,6 +110,23 @@ export function createSectorGeoEditor(options: {
     return null;
   }
 
+  function readEditOrShowErrors(): { name: string; geo: LatLng } | null {
+    const lat = parseLatitude(snapshot.latText);
+    const lon = parseLongitude(snapshot.lonText);
+    const name = validateSectorName(snapshot.nameText, takenNames);
+    if (lat.ok && lon.ok && name.ok) {
+      return { name: name.name, geo: { lat: lat.value, lon: lon.value } };
+    }
+    snapshot = {
+      ...snapshot,
+      latError: lat.ok ? null : lat.error,
+      lonError: lon.ok ? null : lon.error,
+      nameError: name.ok ? null : name.error,
+    };
+    emit();
+    return null;
+  }
+
   function placeMarker(next: LatLng): void {
     if (sameSectorGeo(current, next)) return;
     current = next;
@@ -106,7 +138,7 @@ export function createSectorGeoEditor(options: {
     dragging = false;
     host.setDragging(false);
     host.setEditing(false);
-    snapshot = viewSnapshot(current);
+    snapshot = viewSnapshot(current, originalName);
     if (activeEditor === api) activeEditor = null;
     emit();
   }
@@ -131,23 +163,24 @@ export function createSectorGeoEditor(options: {
     emit();
   }
 
-  async function persist(next: LatLng): Promise<void> {
+  async function persist(patch: SectorEditPatch): Promise<void> {
     try {
-      const saved = await host.save(next);
+      const saved = await host.save(patch);
       if (disposed) return;
-      const savedGeo = saved.geo ?? next;
+      const savedGeo = saved.geo ?? patch.geo ?? current;
       original = savedGeo;
       current = savedGeo;
+      originalName = saved.name;
       exitEdit();
     } catch (error) {
-      console.error('Failed to save sector coordinates:', error);
+      console.error('Failed to save sector:', error);
       if (disposed) return;
       snapshot = {
         ...snapshot,
         saving: false,
         saveError: error instanceof Error && error.message.trim()
           ? error.message
-          : 'Could not save coordinates',
+          : 'Could not save sector',
       };
       emit();
     }
@@ -168,7 +201,7 @@ export function createSectorGeoEditor(options: {
         activeEditor.dismiss();
       }
       original = current;
-      snapshot = { ...viewSnapshot(current), editing: true };
+      snapshot = { ...viewSnapshot(current, originalName), editing: true };
       activeEditor = api;
       host.setEditing(true);
       host.setDragging(true);
@@ -179,17 +212,29 @@ export function createSectorGeoEditor(options: {
     },
     apply() {
       if (!canMutate()) return;
-      const next = readDraftOrShowErrors();
+      const next = readEditOrShowErrors();
       if (!next) return;
-      placeMarker(next);
-      if (sameSectorGeo(next, original)) {
+      placeMarker(next.geo);
+      const patch: SectorEditPatch = {};
+      if (next.name !== originalName) patch.name = next.name;
+      if (!sameSectorGeo(next.geo, original)) patch.geo = next.geo;
+      if (patch.name === undefined && patch.geo === undefined) {
         exitEdit();
         return;
       }
-      publishDraft(next);
-      snapshot = { ...snapshot, saving: true };
+      snapshot = {
+        ...snapshot,
+        latText: formatSectorCoordinate(next.geo.lat),
+        lonText: formatSectorCoordinate(next.geo.lon),
+        nameText: next.name,
+        latError: null,
+        lonError: null,
+        nameError: null,
+        saveError: null,
+        saving: true,
+      };
       emit();
-      void persist(next);
+      void persist(patch);
     },
     setLatText(value: string) {
       if (!canMutate()) return;
@@ -199,6 +244,11 @@ export function createSectorGeoEditor(options: {
     setLonText(value: string) {
       if (!canMutate()) return;
       snapshot = { ...snapshot, lonText: value, lonError: null, saveError: null };
+      emit();
+    },
+    setNameText(value: string) {
+      if (!canMutate()) return;
+      snapshot = { ...snapshot, nameText: value, nameError: null, saveError: null };
       emit();
     },
     commitDraft() {

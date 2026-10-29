@@ -4,7 +4,7 @@ import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { patchSectorGeo } from '../api/client';
 import { canEditCrag } from '../api/permissions';
-import { CragData, LatLng, Sector } from '../types';
+import { CragData, Sector } from '../types';
 import { useCrag } from '../context/CragContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useIsMobileLayout } from '../hooks/useIsMobileLayout';
@@ -19,6 +19,7 @@ import {
   mapOverlayRenderKey,
   renderMapOverlays,
   saveMapView,
+  type SectorEditPatch,
   type SectorGeoEditor,
 } from '../utils/map';
 
@@ -81,11 +82,11 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved }) => 
     });
   }, []);
 
-  const saveSectorGeo = useCallback((sector: Sector, geo: LatLng) => {
+  const saveSectorGeo = useCallback((sector: Sector, patch: SectorEditPatch) => {
     if (!sector.id || typeof sector.version !== 'number') {
       return Promise.reject(new Error('This sector cannot be saved because it has no id or version.'));
     }
-    return patchSectorGeo(crag.cragId, sector.id, sector.version, geo);
+    return patchSectorGeo(crag.cragId, sector.id, sector.version, patch);
   }, [crag.cragId]);
 
   // Create map instance, controls, and base layers.

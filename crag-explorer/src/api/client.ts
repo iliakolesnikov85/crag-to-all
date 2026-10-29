@@ -106,21 +106,21 @@ export async function patchSectorGeo(
   cragId: string,
   sectorId: string,
   version: number,
-  geo: LatLng,
+  patch: { name?: string; geo?: LatLng },
 ): Promise<Sector> {
   const response = await apiFetch(
     `${cragDocumentPath(cragId)}/sectors/${encodeURIComponent(sectorId)}`,
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ version, geo }),
+      body: JSON.stringify({ version, ...patch }),
     },
   );
   if (!response.ok) {
     throw new Error(
       await readErrorMessage(
         response,
-        `Failed to save coordinates (${response.status})`,
+        `Failed to save sector (${response.status})`,
         'This sector was updated somewhere else. Reload the page and try again.',
       ),
     );
@@ -128,12 +128,13 @@ export async function patchSectorGeo(
   const body = (await response.json()) as Partial<Sector>;
   if (
     typeof body.id !== 'string'
+    || typeof body.name !== 'string'
     || typeof body.version !== 'number'
     || !body.geo
     || typeof body.geo.lat !== 'number'
     || typeof body.geo.lon !== 'number'
   ) {
-    throw new Error('Coordinate save returned an unexpected response');
+    throw new Error('Sector save returned an unexpected response');
   }
   return body as Sector;
 }

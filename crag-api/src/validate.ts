@@ -166,10 +166,15 @@ const replaceSectorBodySchema = sectorBodySchema.extend({
   version: versionSchema,
 });
 
-const sectorGeoPatchSchema = z.object({
-  version: versionSchema,
-  geo: latLngSchema,
-});
+const sectorGeoPatchSchema = z
+  .object({
+    version: versionSchema,
+    geo: latLngSchema.optional(),
+    name: nonemptyString(MAX_NAME_LENGTH).optional(),
+  })
+  .refine((patch) => patch.geo !== undefined || patch.name !== undefined, {
+    message: 'PATCH body must include geo or name',
+  });
 
 function toSectorWrite(body: z.infer<typeof sectorBodySchema>): SectorWriteInput {
   const sector: SectorWriteInput = {
@@ -178,7 +183,7 @@ function toSectorWrite(body: z.infer<typeof sectorBodySchema>): SectorWriteInput
     routes: body.routes.map((route) => ({
       ...route,
       id: route.id ?? randomUUID(),
-      sectorName: route.sectorName ?? body.name,
+      sectorName: body.name,
     })),
     images: body.images,
   };
@@ -217,8 +222,15 @@ function parseSectorWrite(body: unknown): SectorWriteInput {
   return toSectorWrite(parseWith(sectorBodySchema, body));
 }
 
-function parseSectorGeoPatch(body: unknown): { version: number; geo: z.infer<typeof latLngSchema> } {
-  return parseWith(sectorGeoPatchSchema, body);
+function parseSectorGeoPatch(
+  body: unknown,
+): { version: number; geo?: z.infer<typeof latLngSchema>; name?: string } {
+  const parsed = parseWith(sectorGeoPatchSchema, body);
+  return {
+    version: parsed.version,
+    ...(parsed.geo !== undefined ? { geo: parsed.geo } : {}),
+    ...(parsed.name !== undefined ? { name: parsed.name } : {}),
+  };
 }
 
 function parseReplaceSector(body: unknown): { version: number; sector: SectorWriteInput } {

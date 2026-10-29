@@ -34,6 +34,14 @@ describe('validate', () => {
     expect(sector.routes[0]?.sectorName).toBe('Main Wall');
   });
 
+  it('keeps route sector names aligned with the sector name', () => {
+    const sector = parseSectorWrite({
+      name: 'Main Wall',
+      routes: [{ name: 'Classic', grade: '6a', sectorName: 'Cave' }],
+    });
+    expect(sector.routes[0]?.sectorName).toBe('Main Wall');
+  });
+
   it('parses a sector coordinate patch and rejects latitudes outside range', () => {
     expect(parseSectorGeoPatch({ version: 1, geo: { lat: 42.5, lon: 45.2 } })).toEqual({
       version: 1,
@@ -46,5 +54,24 @@ describe('validate', () => {
       expect(error).toBeInstanceOf(HttpError);
       expect((error as HttpError).status).toBe(400);
     }
+  });
+
+  it('parses a sector name patch and rejects a body with only a version', () => {
+    expect(parseSectorGeoPatch({ version: 2, name: ' North Wall ' })).toEqual({
+      version: 2,
+      name: 'North Wall',
+    });
+    try {
+      parseSectorGeoPatch({ version: 1 });
+      throw new Error('expected parseSectorGeoPatch to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(HttpError);
+      expect((error as HttpError).status).toBe(400);
+      expect((error as HttpError).message).toBe('PATCH body must include geo or name');
+    }
+    expect(parseSectorGeoPatch({ version: 1, name: 'Loaf 6*(^&%&$^%' })).toEqual({
+      version: 1,
+      name: 'Loaf 6*(^&%&$^%',
+    });
   });
 });

@@ -135,8 +135,8 @@ export function createApp(db: Db, options: AppOptions = {}): Express {
     asyncHandler(async (req, res) => {
       const cragId = parseCragId(req.params.cragId);
       const sectorId = parseSectorId(req.params.sectorId);
-      const { version, geo } = parseSectorGeoPatch(req.body);
-      res.json(await patchSectorGeo(db, cragId, sectorId, version, geo));
+      const patch = parseSectorGeoPatch(req.body);
+      res.json(await patchSectorGeo(db, cragId, sectorId, patch.version, patch));
     }),
   );
 

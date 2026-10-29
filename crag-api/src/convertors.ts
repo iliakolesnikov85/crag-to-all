@@ -64,6 +64,10 @@ export function toCragData(crag: CragDocument, sectors: SectorDocument[]): CragD
   };
 }
 
+export function sectorNameKey(name: string): string {
+  return name.toLowerCase();
+}
+
 export function toSectorDocument(
   cragId: string,
   sectorId: string,
@@ -76,6 +80,7 @@ export function toSectorDocument(
     _id: sectorId,
     cragId,
     name: sector.name,
+    nameKey: sectorNameKey(sector.name),
     geo: sector.geo,
     routes: sector.routes,
     images: sector.images,

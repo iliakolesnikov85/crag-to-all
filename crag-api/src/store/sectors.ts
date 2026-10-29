@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import type { LatLng, Sector } from '@crag-to-all/shared-crag';
+import type { LatLng, Route, Sector } from '@crag-to-all/shared-crag';
 import type { Db } from 'mongodb';
-import { toSector, toSectorDocument } from '../convertors';
-import { notFound, readOnly, versionConflict } from '../http';
+import { sectorNameKey, toSector, toSectorDocument } from '../convertors';
+import { alreadyExists, isDuplicateKeyError, notFound, readOnly, versionConflict } from '../http';
 import type { SectorWriteInput } from '../types';
 import { cragsCol, now, sectorsCol } from './collections';
+
+const SECTOR_NAME_TAKEN = 'A sector with this name already exists.';
 
 async function requireWritableCrag(db: Db, cragId: string): Promise<void> {
   const crag = await cragsCol(db).findOne({ _id: cragId });
@@ -12,6 +14,46 @@ async function requireWritableCrag(db: Db, cragId: string): Promise<void> {
   if (crag.source === 'external') {
     throw readOnly('Sectors on an extracted crag are read-only');
   }
+}
+
+async function sectorNameTaken(
+  db: Db,
+  cragId: string,
+  sectorId: string,
+  name: string,
+): Promise<boolean> {
+  const nameKey = sectorNameKey(name);
+  const indexed = await sectorsCol(db).findOne(
+    { cragId, nameKey, _id: { $ne: sectorId } },
+    { projection: { _id: 1 } },
+  );
+  if (indexed) return true;
+  const legacy = await sectorsCol(db)
+    .find(
+      { cragId, _id: { $ne: sectorId }, nameKey: { $exists: false } },
+      { projection: { name: 1 } },
+    )
+    .toArray();
+  return legacy.some((sector) => sectorNameKey(sector.name) === nameKey);
+}
+
+async function assertSectorNameAvailable(
+  db: Db,
+  cragId: string,
+  sectorId: string,
+  name: string,
+): Promise<void> {
+  if (await sectorNameTaken(db, cragId, sectorId, name)) {
+    throw alreadyExists(SECTOR_NAME_TAKEN);
+  }
+}
+
+function rethrowSectorWriteError(error: unknown, action: string): never {
+  if (isDuplicateKeyError(error)) {
+    throw alreadyExists(SECTOR_NAME_TAKEN);
+  }
+  console.error(`Failed to ${action} sector:`, error);
+  throw error;
 }
 
 async function nextSectorOrder(db: Db, cragId: string): Promise<number> {
@@ -28,13 +70,13 @@ export async function addSector(
   await requireWritableCrag(db, cragId);
 
   const sectorId = randomUUID();
+  await assertSectorNameAvailable(db, cragId, sectorId, sector.name);
   const order = await nextSectorOrder(db, cragId);
   const doc = toSectorDocument(cragId, sectorId, sector, order, 1, now());
   try {
     await sectorsCol(db).insertOne(doc);
   } catch (error) {
-    console.error('Failed to insert sector:', error);
-    throw error;
+    rethrowSectorWriteError(error, 'insert');
   }
   return toSector(doc);
 }
@@ -58,11 +100,17 @@ export async function replaceSector(
     sector.externalId === undefined && existing.externalId
       ? { ...sector, externalId: existing.externalId }
       : sector;
+  await assertSectorNameAvailable(db, cragId, sectorId, write.name);
   const next = toSectorDocument(cragId, sectorId, write, existing.order, existing.version + 1, now());
-  const result = await sectorsCol(db).replaceOne(
-    { _id: sectorId, cragId, version },
-    next,
-  );
+  let result;
+  try {
+    result = await sectorsCol(db).replaceOne(
+      { _id: sectorId, cragId, version },
+      next,
+    );
+  } catch (error) {
+    rethrowSectorWriteError(error, 'replace');
+  }
   if (result.matchedCount === 0) {
     const current = await sectorsCol(db).findOne({ _id: sectorId, cragId });
     if (!current) throw notFound('sector');
@@ -76,15 +124,46 @@ export async function patchSectorGeo(
   cragId: string,
   sectorId: string,
   version: number,
-  geo: LatLng,
+  patch: { geo?: LatLng; name?: string },
 ): Promise<Sector> {
   await requireWritableCrag(db, cragId);
 
-  const updated = await sectorsCol(db).findOneAndUpdate(
-    { _id: sectorId, cragId, version },
-    { $set: { geo, updatedAt: now() }, $inc: { version: 1 } },
-    { returnDocument: 'after' },
-  );
+  const existing = await sectorsCol(db).findOne({ _id: sectorId, cragId });
+  if (!existing) throw notFound('sector');
+  if (existing.version !== version) {
+    throw versionConflict(existing.version);
+  }
+  if (patch.name !== undefined) {
+    await assertSectorNameAvailable(db, cragId, sectorId, patch.name);
+  }
+
+  const $set: {
+    updatedAt: Date;
+    geo?: LatLng;
+    name?: string;
+    nameKey?: string;
+    routes?: Route[];
+  } = { updatedAt: now() };
+  if (patch.geo !== undefined) $set.geo = patch.geo;
+  if (patch.name !== undefined) {
+    const name = patch.name;
+    $set.name = name;
+    $set.nameKey = sectorNameKey(name);
+    if (existing.routes?.length) {
+      $set.routes = existing.routes.map((route) => ({ ...route, sectorName: name }));
+    }
+  }
+
+  let updated;
+  try {
+    updated = await sectorsCol(db).findOneAndUpdate(
+      { _id: sectorId, cragId, version },
+      { $set, $inc: { version: 1 } },
+      { returnDocument: 'after' },
+    );
+  } catch (error) {
+    rethrowSectorWriteError(error, 'update');
+  }
   if (!updated) {
     const current = await sectorsCol(db).findOne({ _id: sectorId, cragId });
     if (!current) throw notFound('sector');

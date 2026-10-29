@@ -6,7 +6,12 @@ import { CragData, CragMapMarker, CragMapTrail, LatLng, Sector } from '../../typ
 import { createPieChartSVG, getSectorGradeCounts } from '../grades';
 import { escapeHtml, markerLabelFromType } from './mapOverlayHelpers';
 import { resolveTrailColor } from './mapUtils';
-import { createSectorGeoEditor, type SectorGeoEditHost, type SectorGeoEditor } from './sectorGeoEditor';
+import {
+  createSectorGeoEditor,
+  type SectorEditPatch,
+  type SectorGeoEditHost,
+  type SectorGeoEditor,
+} from './sectorGeoEditor';
 
 const POPUP_VIEW_PADDING_PX = 12;
 // Long enough for the click that left the coordinate field to arrive after blur.
@@ -99,12 +104,18 @@ function revealPopup(marker: L.Marker): void {
   container.style.transition = '';
 }
 
+function setSectorMarkerLabel(marker: L.Marker, name: string): void {
+  const label = marker.getElement()?.querySelector('.label');
+  if (!label) return;
+  label.textContent = name;
+}
+
 function createSectorMarkerHost(
   marker: L.Marker,
   map: L.Map,
   sector: Sector,
   options: RenderMapOverlaysOptions,
-  saveSectorGeo: (sector: Sector, geo: LatLng) => Promise<Sector>,
+  saveSectorGeo: (sector: Sector, patch: SectorEditPatch) => Promise<Sector>,
   popupMoveGuard: SectorPopupMoveGuard,
 ): SectorGeoEditHost {
   const sectorId = sector.id ?? '';
@@ -232,9 +243,11 @@ function createSectorMarkerHost(
         marker.openPopup();
       }, 0);
     },
-    async save(geo) {
-      const saved = await saveSectorGeo(savedSector, geo);
+    async save(patch) {
+      const previousName = savedSector.name;
+      const saved = await saveSectorGeo(savedSector, patch);
       savedSector = saved;
+      if (saved.name !== previousName) setSectorMarkerLabel(marker, saved.name);
       options.onSectorGeoSaved?.(saved);
       return saved;
     },
@@ -344,6 +357,7 @@ function addSectorMarker(
   sector: Sector,
   navigate: (to: string) => void,
   options: RenderMapOverlaysOptions,
+  takenNames: readonly string[],
 ): void {
   if (!sector.geo) return;
 
@@ -381,6 +395,8 @@ function addSectorMarker(
   if (editable && saveSectorGeo && sectorId && popupMoveGuard) {
     editor = createSectorGeoEditor({
       geo: sector.geo,
+      name: sector.name,
+      takenNames,
       host: createSectorMarkerHost(
         marker,
         options.map,
@@ -464,7 +480,7 @@ export interface RenderMapOverlaysOptions {
   openPopupForSectorId?: string | null;
   onSectorGeoSaved?: (sector: Sector) => void;
   onSectorDragChange?: (sectorId: string, dragging: boolean) => void;
-  saveSectorGeo?: (sector: Sector, geo: LatLng) => Promise<Sector>;
+  saveSectorGeo?: (sector: Sector, patch: SectorEditPatch) => Promise<Sector>;
 }
 
 /** Clear and redraw sectors, map markers, and trails on the overlay layer. */
@@ -477,7 +493,10 @@ export function renderMapOverlays(
   overlay.clearLayers();
 
   for (const sector of cragData.sectors) {
-    addSectorMarker(overlay, sector, navigate, options);
+    const takenNames = cragData.sectors
+      .filter((other) => other !== sector)
+      .map((other) => other.name);
+    addSectorMarker(overlay, sector, navigate, options, takenNames);
   }
   for (const marker of cragData.markers ?? []) {
     addMapMarker(overlay, marker);

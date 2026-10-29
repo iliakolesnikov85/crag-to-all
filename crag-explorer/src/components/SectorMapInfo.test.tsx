@@ -1,9 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CragContext } from '../context/CragContext';
-import type { LatLng, Sector } from '../types';
+import type { Sector } from '../types';
 import {
   createSectorGeoEditor,
+  type SectorEditPatch,
   type SectorGeoEditHost,
   type SectorGeoEditor,
 } from '../utils/map/sectorGeoEditor';
@@ -41,13 +42,18 @@ function createHost(inView = true) {
     centerOn: vi.fn(),
     hidePopup: vi.fn(),
     showPopup: vi.fn(),
-    save: vi.fn(async (geo: LatLng) => ({ ...sector, geo, version: 4 })),
+    save: vi.fn(async (patch: SectorEditPatch) => ({
+      ...sector,
+      geo: patch.geo ?? sector.geo,
+      name: patch.name ?? sector.name,
+      version: 4,
+    })),
   } satisfies SectorGeoEditHost;
 }
 
 function renderInfo(host?: SectorGeoEditHost) {
   const editor = host
-    ? createSectorGeoEditor({ geo: sector.geo!, host })
+    ? createSectorGeoEditor({ geo: sector.geo!, name: sector.name, host })
     : null;
   render(
     <CragContext.Provider value={cragValue}>
@@ -76,7 +82,7 @@ describe('SectorMapInfo coordinates', () => {
     renderInfo();
 
     expect(screen.getByText('42.500000, 45.250000')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Edit coordinates for Shaumian' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit sector Shaumian' })).not.toBeInTheDocument();
   });
 
   it('omits the coordinate row when the sector has no location', () => {
@@ -103,7 +109,7 @@ describe('SectorMapInfo coordinates', () => {
       images: [],
     }));
     const host = createHost();
-    const editor = createSectorGeoEditor({ geo: sector.geo!, host });
+    const editor = createSectorGeoEditor({ geo: sector.geo!, name: sector.name, host });
     editors.push(editor);
     render(
       <CragContext.Provider value={cragValue}>
@@ -119,22 +125,22 @@ describe('SectorMapInfo coordinates', () => {
     expect(screen.queryByText('Route 5, 6A')).not.toBeInTheDocument();
     expect(screen.getByText('and 1 more...')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit coordinates for Shaumian' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit sector Shaumian' }));
 
     expect(host.hidePopup).not.toHaveBeenCalled();
     expect(screen.queryByText('Route 4, 6A')).not.toBeInTheDocument();
     expect(screen.queryByText('and 1 more...')).not.toBeInTheDocument();
     expect(screen.getByText('You can drag the marker on the map to move it.')).toBeInTheDocument();
     const hint = screen.getByText('You can drag the marker on the map to move it.');
-    const save = screen.getByRole('button', { name: 'Save coordinates for Shaumian' });
+    const save = screen.getByRole('button', { name: 'Save sector Shaumian' });
     expect(save).toHaveTextContent('Save');
-    expect(screen.getByRole('button', { name: 'Cancel coordinate edit for Shaumian' })).toHaveTextContent('Cancel');
+    expect(screen.getByRole('button', { name: 'Cancel sector edit for Shaumian' })).toHaveTextContent('Cancel');
     expect(hint.compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('turns coordinates into inputs and moves the marker after blur', () => {
     const host = openEditor(false);
-    fireEvent.click(screen.getByRole('button', { name: 'Edit coordinates for Shaumian' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit sector Shaumian' }));
 
     const latitude = screen.getByRole('textbox', { name: 'Latitude' });
     expect(latitude).toHaveValue('42.500000');
@@ -152,7 +158,7 @@ describe('SectorMapInfo coordinates', () => {
 
   it('shows a validation error and does not move the marker', () => {
     const host = openEditor();
-    fireEvent.click(screen.getByRole('button', { name: 'Edit coordinates for Shaumian' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit sector Shaumian' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Latitude' }), {
       target: { value: 'north' },
     });
@@ -164,11 +170,11 @@ describe('SectorMapInfo coordinates', () => {
 
   it('restores the original coordinates on cancel', () => {
     const host = openEditor();
-    fireEvent.click(screen.getByRole('button', { name: 'Edit coordinates for Shaumian' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit sector Shaumian' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Latitude' }), {
       target: { value: '43' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel coordinate edit for Shaumian' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel sector edit for Shaumian' }));
 
     expect(host.setLatLng).toHaveBeenCalledWith({ lat: 42.5, lon: 45.25 });
     expect(screen.getByText('42.500000, 45.250000')).toBeInTheDocument();
@@ -179,16 +185,16 @@ describe('SectorMapInfo coordinates', () => {
 
   it('saves coordinates and leaves edit mode', async () => {
     const host = openEditor();
-    fireEvent.click(screen.getByRole('button', { name: 'Edit coordinates for Shaumian' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit sector Shaumian' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Longitude' }), {
       target: { value: '46' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save coordinates for Shaumian' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save sector Shaumian' }));
 
     await waitFor(() => {
       expect(screen.queryByRole('textbox', { name: 'Longitude' })).not.toBeInTheDocument();
     });
-    expect(host.save).toHaveBeenCalledWith({ lat: 42.5, lon: 46 });
+    expect(host.save).toHaveBeenCalledWith({ geo: { lat: 42.5, lon: 46 } });
     expect(screen.getByText('42.500000, 46.000000')).toBeInTheDocument();
   });
 
@@ -196,14 +202,90 @@ describe('SectorMapInfo coordinates', () => {
     const host = openEditor();
     host.save.mockRejectedValue(new Error('Could not save coordinates'));
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    fireEvent.click(screen.getByRole('button', { name: 'Edit coordinates for Shaumian' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit sector Shaumian' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Latitude' }), {
       target: { value: '41' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save coordinates for Shaumian' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save sector Shaumian' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not save coordinates');
     expect(screen.getByRole('textbox', { name: 'Latitude' })).toBeInTheDocument();
     errorSpy.mockRestore();
+  });
+
+  it('turns the name into an input and saves a rename without coordinates', async () => {
+    const host = openEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit sector Shaumian' }));
+
+    expect(screen.getByText('Name')).toBeInTheDocument();
+    const name = screen.getByRole('textbox', { name: 'Name' });
+    expect(name).toHaveValue('Shaumian');
+    fireEvent.change(name, { target: { value: 'North Wall' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save sector North Wall' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('textbox', { name: 'Name' })).not.toBeInTheDocument();
+    });
+    expect(host.save).toHaveBeenCalledWith({ name: 'North Wall' });
+    expect(screen.getByRole('link', { name: 'North Wall' })).toHaveAttribute(
+      'href',
+      'sector/north%20wall',
+    );
+  });
+
+  it('keeps edit mode when the name is empty', () => {
+    const host = openEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit sector Shaumian' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), {
+      target: { value: '   ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Save sector/ }));
+
+    expect(host.save).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a sector name.');
+    expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument();
+  });
+
+  it('unlinks the sector image while the name is edited', () => {
+    const host = createHost();
+    const editor = createSectorGeoEditor({ geo: sector.geo!, name: sector.name, host });
+    editors.push(editor);
+    const { container } = render(
+      <CragContext.Provider value={cragValue}>
+        <SectorMapInfo
+          sector={{ ...sector, images: [{ imageFile: 'shaumian.jpg' }] }}
+          navigate={() => {}}
+          geoEditor={editor}
+        />
+      </CragContext.Provider>,
+    );
+
+    const imageLink = container.querySelector('img')?.closest('a');
+    expect(imageLink).toHaveAttribute('href', 'sector/shaumian');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit sector Shaumian' }));
+    expect(container.querySelector('img')?.closest('a')).toBeNull();
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), {
+      target: { value: 'North Wall' },
+    });
+    expect(container.querySelector('img')?.closest('a')).toBeNull();
+    expect(container.querySelector('a[href*="north"]')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel sector edit for North Wall' }));
+    expect(container.querySelector('img')?.closest('a')).toHaveAttribute('href', 'sector/shaumian');
+  });
+
+  it('restores the sector name on cancel', () => {
+    const host = openEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit sector Shaumian' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), {
+      target: { value: 'Other' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel sector edit for Other' }));
+
+    expect(host.save).not.toHaveBeenCalled();
+    expect(screen.getByRole('link', { name: 'Shaumian' })).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Name' })).not.toBeInTheDocument();
   });
 });

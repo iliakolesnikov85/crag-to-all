@@ -2,7 +2,7 @@ import * as L from 'leaflet';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CRAG_DATA_PROTOCOL, type CragData, type Sector } from '../../types';
 import { renderMapOverlays } from './mapOverlays';
-import type { SectorGeoEditor } from './sectorGeoEditor';
+import type { SectorEditPatch, SectorGeoEditor } from './sectorGeoEditor';
 
 vi.mock('../../components/SectorMapInfo', () => ({
   renderSectorMapInfo: vi.fn(),
@@ -108,5 +108,37 @@ describe('renderMapOverlays sector popup', () => {
     vi.runAllTimers();
 
     expect(editor.getSnapshot().editing).toBe(false);
+  });
+
+  it('updates the pin label after a rename', async () => {
+    const overlay = L.layerGroup().addTo(map);
+    const editors = new Map<string, SectorGeoEditor>();
+    const saveSectorGeo = vi.fn(async (sector: Sector, patch: SectorEditPatch) => ({
+      ...sector,
+      name: patch.name ?? sector.name,
+      geo: patch.geo ?? sector.geo,
+      version: 2,
+    }));
+    renderMapOverlays(overlay, CRAG_DATA, vi.fn(), {
+      mode: 'popup',
+      cragContext: { crag: { cragId: 'test', cragName: 'Test' }, getUrl: (url) => url },
+      map,
+      canEditSectorGeo: true,
+      editors,
+      saveSectorGeo,
+    });
+    const marker = overlay.getLayers()[0] as L.Marker;
+    const editor = editors.get('s1');
+    if (!editor) throw new Error('expected an editor for the sector');
+
+    expect(marker.getElement()?.querySelector('.label')?.textContent).toBe('Cave');
+    editor.startEdit();
+    editor.setNameText('North Wall');
+    editor.apply();
+    await saveSectorGeo.mock.results[0]?.value;
+    await Promise.resolve();
+
+    expect(saveSectorGeo).toHaveBeenCalledWith(SECTOR, { name: 'North Wall' });
+    expect(marker.getElement()?.querySelector('.label')?.textContent).toBe('North Wall');
   });
 });

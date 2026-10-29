@@ -2,16 +2,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LatLng, Sector } from '../../types';
 import {
   createSectorGeoEditor,
+  type SectorEditPatch,
   type SectorGeoEditHost,
   type SectorGeoEditor,
 } from './sectorGeoEditor';
 
 const ORIGIN: LatLng = { lat: 42.5, lon: 45.25 };
 
-function sectorAt(geo: LatLng, version = 2): Sector {
+function sectorAt(geo: LatLng, version = 2, name = 'Shaumian'): Sector {
   return {
     id: 'sector-1',
-    name: 'Shaumian',
+    name,
     version,
     geo,
     routes: [],
@@ -28,15 +29,20 @@ function createHost(inView = true) {
     centerOn: vi.fn(),
     hidePopup: vi.fn(),
     showPopup: vi.fn(),
-    save: vi.fn(async (geo: LatLng) => sectorAt(geo, 3)),
+    save: vi.fn(async (patch: SectorEditPatch) => sectorAt(patch.geo ?? ORIGIN, 3, patch.name)),
   } satisfies SectorGeoEditHost;
 }
 
 describe('createSectorGeoEditor', () => {
   const editors: SectorGeoEditor[] = [];
 
-  function editorFor(host: SectorGeoEditHost, geo: LatLng = ORIGIN) {
-    const editor = createSectorGeoEditor({ geo, host });
+  function editorFor(
+    host: SectorGeoEditHost,
+    geo: LatLng = ORIGIN,
+    name = 'Shaumian',
+    takenNames: readonly string[] = [],
+  ) {
+    const editor = createSectorGeoEditor({ geo, name, takenNames, host });
     editors.push(editor);
     return editor;
   }
@@ -199,7 +205,7 @@ describe('createSectorGeoEditor', () => {
     editor.setLatText('43');
     editor.apply();
 
-    expect(host.save).toHaveBeenCalledWith({ lat: 43, lon: ORIGIN.lon });
+    expect(host.save).toHaveBeenCalledWith({ geo: { lat: 43, lon: ORIGIN.lon } });
     await host.save.mock.results[0]?.value;
     expect(editor.getSnapshot().editing).toBe(false);
     expect(editor.getSnapshot().latText).toBe('43.000000');
@@ -237,5 +243,88 @@ describe('createSectorGeoEditor', () => {
     const other = editorFor(createHost(), { lat: 5, lon: 6 });
     other.startEdit();
     expect(other.getSnapshot().editing).toBe(true);
+  });
+
+  it('leaves edit mode without a request when only the name whitespace changed', () => {
+    const host = createHost();
+    const editor = editorFor(host);
+    editor.startEdit();
+    editor.setNameText('  Shaumian  ');
+    editor.apply();
+
+    expect(host.save).not.toHaveBeenCalled();
+    expect(editor.getSnapshot().editing).toBe(false);
+    expect(editor.getSnapshot().nameText).toBe('Shaumian');
+  });
+
+  it('does not save when the name is empty', () => {
+    const host = createHost();
+    const editor = editorFor(host);
+    editor.startEdit();
+    editor.setLatText('43');
+    editor.setNameText('  ');
+    editor.apply();
+
+    expect(host.save).not.toHaveBeenCalled();
+    expect(host.setLatLng).not.toHaveBeenCalled();
+    expect(editor.getSnapshot().nameError).toBe('Enter a sector name.');
+    expect(editor.getSnapshot().editing).toBe(true);
+  });
+
+  it('does not save a name another sector already uses', () => {
+    const host = createHost();
+    const editor = editorFor(host, ORIGIN, 'Shaumian', ['Cave']);
+    editor.startEdit();
+    editor.setNameText('cave');
+    editor.apply();
+
+    expect(host.save).not.toHaveBeenCalled();
+    expect(editor.getSnapshot().nameError).toBe('A sector with this name already exists.');
+    expect(editor.getSnapshot().editing).toBe(true);
+  });
+
+  it('restores the original name on cancel', () => {
+    const host = createHost();
+    const editor = editorFor(host);
+    editor.startEdit();
+    editor.setNameText('Other');
+    editor.cancel();
+
+    expect(host.save).not.toHaveBeenCalled();
+    expect(editor.getSnapshot().editing).toBe(false);
+    expect(editor.getSnapshot().nameText).toBe('Shaumian');
+  });
+
+  it('saves a renamed sector without sending coordinates', async () => {
+    const host = createHost();
+    const editor = editorFor(host);
+    editor.startEdit();
+    editor.setNameText(' North Wall ');
+    editor.apply();
+
+    expect(host.save).toHaveBeenCalledWith({ name: 'North Wall' });
+    await host.save.mock.results[0]?.value;
+    expect(editor.getSnapshot().editing).toBe(false);
+    expect(editor.getSnapshot().nameText).toBe('North Wall');
+  });
+
+  it('saves a new name and a moved point in one request', async () => {
+    const host = createHost();
+    const editor = editorFor(host);
+    editor.startEdit();
+    editor.setNameText('North Wall');
+    editor.setLatText('43');
+    editor.apply();
+
+    expect(host.save).toHaveBeenCalledWith({
+      name: 'North Wall',
+      geo: { lat: 43, lon: ORIGIN.lon },
+    });
+    await host.save.mock.results[0]?.value;
+    expect(editor.getSnapshot()).toMatchObject({
+      editing: false,
+      nameText: 'North Wall',
+      latText: '43.000000',
+    });
   });
 });

@@ -18,13 +18,15 @@ const READ_ONLY_SNAPSHOT: SectorGeoEditorSnapshot = {
   saving: false,
   latText: '',
   lonText: '',
+  nameText: '',
   latError: null,
   lonError: null,
+  nameError: null,
   saveError: null,
 };
 
 function subscribeToNothing(): () => void {
-  return () => {};
+  return () => { };
 }
 
 function getReadOnlySnapshot(): SectorGeoEditorSnapshot {
@@ -48,7 +50,7 @@ function keepCoordinateFocus(event: React.MouseEvent<HTMLElement>): void {
   event.stopPropagation();
 }
 
-function onCoordinateKeyDown(
+function onEditKeyDown(
   event: React.KeyboardEvent<HTMLDivElement>,
   editor: SectorGeoEditor,
 ): void {
@@ -66,6 +68,12 @@ function coordinateInputClass(invalid: boolean): string {
   return invalid
     ? 'sector-map-info__coord-input sector-map-info__coord-input--invalid'
     : 'sector-map-info__coord-input';
+}
+
+function nameInputClass(invalid: boolean): string {
+  return invalid
+    ? 'sector-map-info__name-input sector-map-info__name-input--invalid'
+    : 'sector-map-info__name-input';
 }
 
 function SectorNavLink({
@@ -120,12 +128,12 @@ function SectorCoordinates({
       <div
         className="sector-map-info__coords sector-map-info__coords--editing"
         aria-busy={disabled || undefined}
-        onKeyDown={(event) => onCoordinateKeyDown(event, geoEditor)}
+        onKeyDown={(event) => onEditKeyDown(event, geoEditor)}
       >
         <MdLocationOn className="sector-map-info__coords-pin" aria-hidden="true" />
         <div className="sector-map-info__coords-fields">
           <label className="sector-map-info__coord">
-            <span className="sector-map-info__coord-label">Lat</span>
+            <span className="sector-map-info__coord-label">Latitude</span>
             <input
               className={coordinateInputClass(snapshot.latError != null)}
               aria-label="Latitude"
@@ -139,7 +147,7 @@ function SectorCoordinates({
             />
           </label>
           <label className="sector-map-info__coord">
-            <span className="sector-map-info__coord-label">Lon</span>
+            <span className="sector-map-info__coord-label">Longitude</span>
             <input
               className={coordinateInputClass(snapshot.lonError != null)}
               aria-label="Longitude"
@@ -182,8 +190,8 @@ function SectorCoordinates({
             iconOnly
             size="sm"
             variant="ghost"
-            aria-label={`Edit coordinates for ${sector.name}`}
-            title="Edit coordinates"
+            aria-label={`Edit sector ${snapshot.nameText}`}
+            title="Edit sector"
             onMouseDown={keepCoordinateFocus}
             onClick={(event) => {
               keepCoordinateFocus(event);
@@ -216,8 +224,9 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
   const { crag, getUrl } = useCrag();
   const snapshot = useGeoEditorSnapshot(geoEditor);
   const editing = snapshot.editing;
+  const displayName = geoEditor ? snapshot.nameText : sector.name;
   const sectorPath = getUrl(
-    `sector/${encodeURIComponent(sector.name.toLowerCase())}`,
+    `sector/${encodeURIComponent(displayName.toLowerCase())}`,
   );
   const firstImage = sector.images?.[0];
   const imageUrl = firstImage
@@ -229,23 +238,52 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
 
   return (
     <div className="sector-map-info">
-      <SectorNavLink
-        to={sectorPath}
-        className="sector-map-info__name"
-        navigate={navigate}
-      >
-        {sector.name}
-      </SectorNavLink>
+      {editing && geoEditor ? (
+        <div
+          className="sector-map-info__name-edit"
+          onKeyDown={(event) => onEditKeyDown(event, geoEditor)}
+        >
+          <label className="sector-map-info__name-field">
+            <span className="sector-map-info__name-label">Name</span>
+            <input
+              className={nameInputClass(snapshot.nameError != null)}
+              aria-label="Name"
+              autoComplete="off"
+              spellCheck={false}
+              disabled={snapshot.saving}
+              value={snapshot.nameText}
+              onChange={(event) => geoEditor.setNameText(event.target.value)}
+            />
+          </label>
+          {snapshot.nameError ? (
+            <p className="sector-map-info__name-error" role="alert">{snapshot.nameError}</p>
+          ) : null}
+        </div>
+      ) : (
+        <SectorNavLink
+          to={sectorPath}
+          className="sector-map-info__name"
+          navigate={navigate}
+        >
+          {displayName}
+        </SectorNavLink>
+      )}
       <div className="sector-map-info__body">
-        {imageUrl && (
-          <SectorNavLink
-            to={sectorPath}
-            className="sector-map-info__image-link"
-            navigate={navigate}
-          >
-            <img className="sector-map-info__image" src={imageUrl} alt="" />
-          </SectorNavLink>
-        )}
+        {imageUrl ? (
+          editing ? (
+            <span className="sector-map-info__image-frame">
+              <img className="sector-map-info__image" src={imageUrl} alt="" />
+            </span>
+          ) : (
+            <SectorNavLink
+              to={sectorPath}
+              className="sector-map-info__image-link"
+              navigate={navigate}
+            >
+              <img className="sector-map-info__image" src={imageUrl} alt="" />
+            </SectorNavLink>
+          )
+        ) : null}
         <div className="sector-map-info__details">
           <SectorCoordinates sector={sector} geoEditor={geoEditor} />
           {editing && geoEditor ? (
@@ -259,7 +297,7 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
                   type="button"
                   size="sm"
                   variant="primary"
-                  aria-label={`Save coordinates for ${sector.name}`}
+                  aria-label={`Save sector ${displayName}`}
                   disabled={snapshot.saving}
                   onMouseDown={keepCoordinateFocus}
                   onClick={(event) => {
@@ -273,7 +311,7 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
                   type="button"
                   size="sm"
                   variant="secondary"
-                  aria-label={`Cancel coordinate edit for ${sector.name}`}
+                  aria-label={`Cancel sector edit for ${displayName}`}
                   disabled={snapshot.saving}
                   onMouseDown={keepCoordinateFocus}
                   onClick={(event) => {

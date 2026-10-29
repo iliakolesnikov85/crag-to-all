@@ -6,9 +6,15 @@ import type {
   DescriptionSection,
   OpenTopoTilePackInfo,
   Sector,
+  SectorDocument as SharedSectorDocument,
 } from '@crag-to-all/shared-crag';
 
-export type { CragDocument, SectorDocument } from '@crag-to-all/shared-crag';
+export type { CragDocument } from '@crag-to-all/shared-crag';
+
+export interface SectorDocument extends SharedSectorDocument {
+  /** Lowercase name for the per-crag unique index. Omitted on extracted sectors. */
+  nameKey?: string;
+}
 
 export interface CragCreateInput {
   name: string;
