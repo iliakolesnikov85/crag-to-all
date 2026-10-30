@@ -25,7 +25,7 @@ interface PlaceSectorMapButtonProps {
   onCreated?: (sector: Sector) => void;
 }
 
-export interface PlaceSectorMapButtonHandle {
+interface PlaceSectorMapButtonHandle {
   /** Drop the unsaved marker, e.g. when another sector is selected. */
   dismiss(): void;
 }
@@ -41,18 +41,11 @@ const PlaceSectorMapButton = React.forwardRef<PlaceSectorMapButtonHandle, PlaceS
     const [draftDragging, setDraftDragging] = useState(false);
     const controlRef = useRef<AddSectorControl | null>(null);
     const draftRef = useRef<DraftSectorMarker | null>(null);
+    // The placing effect and an in-flight save both outlive this render.
     const onStartRef = useRef(onStart);
     const onCreatedRef = useRef(onCreated);
-    const takenNamesRef = useRef(takenNames);
-    const getUrlRef = useRef(getUrl);
-    const navigateRef = useRef(navigate);
-    const isMobileRef = useRef(isMobile);
     onStartRef.current = onStart;
     onCreatedRef.current = onCreated;
-    takenNamesRef.current = takenNames;
-    getUrlRef.current = getUrl;
-    navigateRef.current = navigate;
-    isMobileRef.current = isMobile;
 
     useImperativeHandle(ref, () => ({
       dismiss() {
@@ -60,20 +53,18 @@ const PlaceSectorMapButton = React.forwardRef<PlaceSectorMapButtonHandle, PlaceS
       },
     }), []);
 
+    // Rewritten each render so the map-click listener, bound only while placing, calls the latest one.
     const placeDraftRef = useRef<(geo: LatLng) => void>(() => {});
-    placeDraftRef.current = (geo: LatLng) => {
+    placeDraftRef.current = (geo) => {
       if (!map) return;
       draftRef.current?.remove();
       const placed = addDraftSectorMarker({
         map,
         geo,
-        mode: isMobileRef.current ? 'bottom-panel' : 'popup',
-        takenNames: takenNamesRef.current,
-        cragContext: {
-          crag,
-          getUrl: (url: string) => getUrlRef.current(url),
-        },
-        navigate: (to) => navigateRef.current(to),
+        mode: isMobile ? 'bottom-panel' : 'popup',
+        takenNames,
+        cragContext: { crag, getUrl },
+        navigate,
         createSector: (sector) => createSector(crag.cragId, sector),
         onCreated: (sector) => onCreatedRef.current?.(sector),
         onClose: () => {
@@ -178,5 +169,7 @@ const PlaceSectorMapButton = React.forwardRef<PlaceSectorMapButtonHandle, PlaceS
     );
   },
 );
+
+export type { PlaceSectorMapButtonHandle };
 
 export default PlaceSectorMapButton;

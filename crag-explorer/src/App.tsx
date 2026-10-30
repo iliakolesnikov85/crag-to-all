@@ -90,6 +90,16 @@ const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags
     );
   }, []);
 
+  const handleSectorDeleted = useCallback((sectorId: string) => {
+    setCragData((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        sectors: current.sectors.filter((sector) => sector.id !== sectorId),
+      };
+    });
+  }, []);
+
   if (!crag) return <div className="page">Crag not found.</div>;
   if (loading) return <LoadingScreen message="Loading crag data..." />;
   if (error) return <div className="page">Error: {error}</div>;
@@ -146,7 +156,16 @@ const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags
                   element={<DownloadPage cragData={cragData} />}
                 />
                 <Route path={`/team`} element={<TeamPage />} />
-                <Route path={`/sector/:sectorName`} element={<SectorPage sectors={cragData.sectors} onSectorChange={handleSectorChange} />} />
+                <Route
+                  path={`/sector/:sectorName`}
+                  element={
+                    <SectorPage
+                      sectors={cragData.sectors}
+                      onSectorChange={handleSectorChange}
+                      onSectorDeleted={handleSectorDeleted}
+                    />
+                  }
+                />
                 <Route path={`/sector/:sectorName/:routeName`} element={<RoutePage sectors={cragData.sectors} onSectorChange={handleSectorChange} onRouteChange={handleRouteChange} />} />
                 <Route path={`/beta-videos/:sectorName/:routeName`} element={<BetaVideos sectors={cragData.sectors} />} />
                 <Route path="*" element={<NotFound />} />

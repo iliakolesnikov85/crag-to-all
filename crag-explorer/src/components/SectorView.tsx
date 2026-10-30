@@ -22,9 +22,21 @@ export interface SectorViewProps {
   getImageUrl?: (cragId: string, imageFile: string) => string;
   printMode?: boolean;
   createLink?: (to: string, children: React.ReactNode) => React.ReactNode;
+  headerActions?: React.ReactNode;
+  headerAlert?: string | null;
 }
 
-const SectorView: React.FC<SectorViewProps> = ({ cragId, sector, route, imagesPaths, getImageUrl, printMode, createLink }) => {
+const SectorView: React.FC<SectorViewProps> = ({
+  cragId,
+  sector,
+  route,
+  imagesPaths,
+  getImageUrl,
+  printMode,
+  createLink,
+  headerActions,
+  headerAlert,
+}) => {
 
   const [highlighted, setHighlighted] = useState<number[]>([]);
 
@@ -62,9 +74,23 @@ const SectorView: React.FC<SectorViewProps> = ({ cragId, sector, route, imagesPa
     return <span className="tag-chip">{tag}</span>;
   };
 
+  const title = route?.name || sector.name;
+
   return (
     <div className={`sector-view ${printMode ? 'print-mode' : ''} ${route ? 'route-view' : ''}`}>
-      <h2>{route?.name || sector.name}</h2>
+      {headerActions || headerAlert ? (
+        <div className="sector-view-header">
+          <h2>{title}</h2>
+          {headerActions}
+          {headerAlert ? (
+            <p className="sector-view-header__alert" role="alert">
+              {headerAlert}
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <h2>{title}</h2>
+      )}
       {route ? <div className="sector-link-container">Sector: {renderLink(`/sector/${encodeURIComponent(sector.name.toLowerCase())}`, sector.name)}</div> : null}
       <div className="sector-info">
         <div className="sector-properties">

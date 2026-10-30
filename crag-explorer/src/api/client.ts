@@ -159,3 +159,15 @@ export async function createSector(
   }
   return readSectorResponse(response);
 }
+
+export async function deleteSector(cragId: string, sectorId: string): Promise<void> {
+  const response = await apiFetch(
+    `${cragDocumentPath(cragId)}/sectors/${encodeURIComponent(sectorId)}`,
+    { method: 'DELETE' },
+  );
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, `Failed to delete sector (${response.status})`),
+    );
+  }
+}
