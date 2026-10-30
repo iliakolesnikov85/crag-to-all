@@ -143,9 +143,37 @@ export async function patchSectorGeo(
   return readSectorResponse(response);
 }
 
+export interface CreateSectorInput {
+  name: string;
+  geo: LatLng;
+  images?: Array<{ imageFile: string }>;
+}
+
+export async function uploadCragImage(
+  cragId: string,
+  file: File,
+): Promise<{ imageFile: string }> {
+  const body = new FormData();
+  body.append('image', file);
+  const response = await apiFetch(`${cragDocumentPath(cragId)}/images`, {
+    method: 'POST',
+    body,
+  });
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, `Failed to upload image (${response.status})`),
+    );
+  }
+  const uploaded = (await response.json()) as { imageFile?: unknown };
+  if (typeof uploaded.imageFile !== 'string' || !uploaded.imageFile.trim()) {
+    throw new Error('Image upload returned an unexpected response');
+  }
+  return { imageFile: uploaded.imageFile };
+}
+
 export async function createSector(
   cragId: string,
-  sector: { name: string; geo: LatLng },
+  sector: CreateSectorInput,
 ): Promise<Sector> {
   const response = await apiFetch(`${cragDocumentPath(cragId)}/sectors`, {
     method: 'POST',

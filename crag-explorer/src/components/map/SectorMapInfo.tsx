@@ -3,11 +3,24 @@ import type { Root } from 'react-dom/client';
 import { MdEdit, MdInfoOutline, MdLocationOn } from 'react-icons/md';
 import { Link } from 'react-router';
 import { CragContext, CragContextType, useCrag } from '../../context/CragContext';
-import type { Sector } from '../../types';
-import { formatSectorCoordinatePair } from '../../utils/map/sectorCoordinates';
-import type { SectorGeoEditor, SectorGeoEditorSnapshot } from '../../utils/map/sectorGeoEditor';
+import type { LatLng, Sector } from '../../types';
 import { getCragImageUrl } from '../../utils/firebaseStorage';
+import {
+  getEmptyDraftTopoSnapshot,
+  type DraftTopo,
+  type DraftTopoSnapshot,
+} from '../../utils/map/draftTopo';
+import {
+  formatSectorCoordinate,
+  formatSectorCoordinatePair,
+  parseLatitude,
+  parseLongitude,
+  sameSectorGeo,
+} from '../../utils/map/sectorCoordinates';
+import type { SectorGeoEditor, SectorGeoEditorSnapshot } from '../../utils/map/sectorGeoEditor';
+import { TOPO_TYPE_ERROR, readTopoGps, validateTopoFile } from '../../utils/topoImage';
 import Button from '../Button';
+import Modal from '../Modal';
 import SectorTopoInput from './SectorTopoInput';
 import './SectorMapInfo.scss';
 
@@ -42,6 +55,72 @@ function useGeoEditorSnapshot(geoEditor?: SectorGeoEditor | null): SectorGeoEdit
   );
 }
 
+function useDraftTopo(topo?: DraftTopo | null): DraftTopoSnapshot {
+  return useSyncExternalStore(
+    topo ? topo.subscribe : subscribeToNothing,
+    topo ? topo.getSnapshot : getEmptyDraftTopoSnapshot,
+    topo ? topo.getSnapshot : getEmptyDraftTopoSnapshot,
+  );
+}
+
+function editedGeo(snapshot: SectorGeoEditorSnapshot): LatLng | null {
+  const lat = parseLatitude(snapshot.latText);
+  const lon = parseLongitude(snapshot.lonText);
+  if (!lat.ok || !lon.ok) return null;
+  return { lat: lat.value, lon: lon.value };
+}
+
+async function acceptTopoFile(
+  file: File,
+  topo: DraftTopo,
+  geoEditor: SectorGeoEditor,
+): Promise<void> {
+  const readId = topo.beginRead();
+  try {
+    const validation = await validateTopoFile(file);
+    if (!topo.isCurrentRead(readId)) return;
+    if (!validation.ok) {
+      topo.reject(readId, validation.error);
+      return;
+    }
+  } catch (error) {
+    console.error('Could not read the selected image:', error);
+    if (!topo.isCurrentRead(readId)) return;
+    topo.reject(readId, TOPO_TYPE_ERROR);
+    return;
+  }
+  topo.accept(file);
+  let gps: LatLng | null;
+  try {
+    gps = await readTopoGps(file);
+  } catch (error) {
+    console.warn('Could not read photo location:', error);
+    if (topo.isCurrentRead(readId)) topo.finishRead(readId);
+    return;
+  }
+  if (!topo.isCurrentRead(readId)) return;
+  topo.finishRead(readId);
+  if (!gps) return;
+  const current = editedGeo(geoEditor.getSnapshot());
+  if (current && sameSectorGeo(current, gps)) return;
+  topo.setGpsPrompt(gps);
+}
+
+function applyPhotoLocation(topo: DraftTopo, geoEditor: SectorGeoEditor): void {
+  const gps = topo.getSnapshot().gpsPrompt;
+  if (!gps) return;
+  const before = geoEditor.getSnapshot();
+  if (!before.editing || before.saving) return;
+  const latText = formatSectorCoordinate(gps.lat);
+  const lonText = formatSectorCoordinate(gps.lon);
+  geoEditor.setLatText(latText);
+  geoEditor.setLonText(lonText);
+  geoEditor.commitDraft();
+  const after = geoEditor.getSnapshot();
+  if (after.latText !== latText || after.lonText !== lonText) return;
+  topo.dismissGpsPrompt();
+}
+
 function keepCoordinateFocus(event: React.MouseEvent<HTMLElement>): void {
   // Blur would commit the draft and re-render before click, so the button can move
   // out from under the pointer. Keeping focus lets Apply and Cancel receive the click.
@@ -54,11 +133,12 @@ function keepCoordinateFocus(event: React.MouseEvent<HTMLElement>): void {
 function onEditKeyDown(
   event: React.KeyboardEvent<HTMLDivElement>,
   editor: SectorGeoEditor,
+  blockApply = false,
 ): void {
   event.stopPropagation();
   if (event.key === 'Enter') {
     event.preventDefault();
-    editor.apply();
+    if (!blockApply) editor.apply();
   } else if (event.key === 'Escape') {
     event.preventDefault();
     editor.cancel();
@@ -117,9 +197,11 @@ function SectorNavLink({
 function SectorCoordinates({
   sector,
   geoEditor,
+  blockApply = false,
 }: {
   sector: Sector;
   geoEditor?: SectorGeoEditor | null;
+  blockApply?: boolean;
 }) {
   const snapshot = useGeoEditorSnapshot(geoEditor);
 
@@ -129,7 +211,7 @@ function SectorCoordinates({
       <div
         className="sector-map-info__coords sector-map-info__coords--editing"
         aria-busy={disabled || undefined}
-        onKeyDown={(event) => onEditKeyDown(event, geoEditor)}
+        onKeyDown={(event) => onEditKeyDown(event, geoEditor, blockApply)}
       >
         <MdLocationOn className="sector-map-info__coords-pin" aria-hidden="true" />
         <div className="sector-map-info__coords-fields">
@@ -214,6 +296,8 @@ export interface SectorMapInfoProps {
   navigate?: (to: string) => void;
   /** Present when this sector's pin can be moved. */
   geoEditor?: SectorGeoEditor | null;
+  /** Chosen topo for a draft sector. Shared with the save path. */
+  topo?: DraftTopo | null;
   /** The sector is a draft placed on the map and has not been saved yet. */
   isNew?: boolean;
 }
@@ -223,10 +307,12 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
   maxRoutes = SECTOR_MAP_INFO_MAX_ROUTES,
   navigate,
   geoEditor,
+  topo,
   isNew = false,
 }) => {
   const { crag, getUrl } = useCrag();
   const snapshot = useGeoEditorSnapshot(geoEditor);
+  const topoSnapshot = useDraftTopo(topo);
   const editing = snapshot.editing;
   const displayName = geoEditor ? snapshot.nameText : sector.name;
   const sectorPath = getUrl(
@@ -239,13 +325,25 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
   const routes = sector.routes ?? [];
   const visible = routes.slice(0, maxRoutes);
   const remaining = routes.length - visible.length;
+  const gpsPrompt = topoSnapshot.gpsPrompt;
+  const waitForPhotoLocation = topoSnapshot.pending || gpsPrompt != null;
+
+  const handleTopoFile = (file: File) => {
+    if (!topo || !geoEditor) return;
+    void acceptTopoFile(file, topo, geoEditor);
+  };
+
+  const confirmPhotoLocation = () => {
+    if (!topo || !geoEditor) return;
+    applyPhotoLocation(topo, geoEditor);
+  };
 
   return (
     <div className="sector-map-info">
       {editing && geoEditor ? (
         <div
           className="sector-map-info__name-edit"
-          onKeyDown={(event) => onEditKeyDown(event, geoEditor)}
+          onKeyDown={(event) => onEditKeyDown(event, geoEditor, waitForPhotoLocation)}
         >
           <label className="sector-map-info__name-field">
             <span className="sector-map-info__name-label">Name</span>
@@ -274,7 +372,18 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
       )}
       <div className="sector-map-info__body">
         {isNew && editing ? (
-          <SectorTopoInput disabled={snapshot.saving} />
+          <div className="sector-map-info__topo">
+            <SectorTopoInput
+              disabled={snapshot.saving}
+              previewUrl={topoSnapshot.previewUrl}
+              onFile={handleTopoFile}
+            />
+            {topoSnapshot.pending ? (
+              <p className="sector-map-info__topo-status" role="status">Checking photo...</p>
+            ) : topoSnapshot.error ? (
+              <p className="sector-map-info__topo-error" role="alert">{topoSnapshot.error}</p>
+            ) : null}
+          </div>
         ) : imageUrl ? (
           editing ? (
             <span className="sector-map-info__image-frame">
@@ -291,7 +400,11 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
           )
         ) : null}
         <div className="sector-map-info__details">
-          <SectorCoordinates sector={sector} geoEditor={geoEditor} />
+          <SectorCoordinates
+            sector={sector}
+            geoEditor={geoEditor}
+            blockApply={waitForPhotoLocation}
+          />
           {editing && geoEditor ? (
             <>
               <p className="sector-map-info__hint">
@@ -304,10 +417,11 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
                   size="sm"
                   variant="primary"
                   aria-label={isNew ? 'Create sector' : `Save sector ${displayName}`}
-                  disabled={snapshot.saving}
+                  disabled={snapshot.saving || waitForPhotoLocation}
                   onMouseDown={keepCoordinateFocus}
                   onClick={(event) => {
                     keepCoordinateFocus(event);
+                    if (waitForPhotoLocation) return;
                     geoEditor.apply();
                   }}
                 >
@@ -349,6 +463,32 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
           )}
         </div>
       </div>
+      {topo && gpsPrompt ? (
+        <Modal
+          open
+          title="Use photo location?"
+          onClose={() => topo.dismissGpsPrompt()}
+          footer={
+            <>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => topo.dismissGpsPrompt()}
+              >
+                Keep map location
+              </Button>
+              <Button type="button" size="sm" variant="primary" onClick={confirmPhotoLocation}>
+                Use photo location
+              </Button>
+            </>
+          }
+        >
+          <p className="sector-map-info__location-prompt">
+            This photo was taken at {formatSectorCoordinatePair(gpsPrompt)}. Use that location for the new sector?
+          </p>
+        </Modal>
+      ) : null}
     </div>
   );
 };

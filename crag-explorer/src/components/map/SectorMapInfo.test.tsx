@@ -1,14 +1,24 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CragContext } from '../../context/CragContext';
-import type { Sector } from '../../types';
+import type { LatLng, Sector } from '../../types';
+import { createDraftTopo, type DraftTopo } from '../../utils/map/draftTopo';
 import {
   createSectorGeoEditor,
   type SectorEditPatch,
   type SectorGeoEditHost,
   type SectorGeoEditor,
 } from '../../utils/map/sectorGeoEditor';
+import { TOPO_TYPE_ERROR, readTopoGps } from '../../utils/topoImage';
 import SectorMapInfo from './SectorMapInfo';
+
+vi.mock('../../utils/topoImage', async () => {
+  const actual = await vi.importActual<typeof import('../../utils/topoImage')>('../../utils/topoImage');
+  return {
+    ...actual,
+    readTopoGps: vi.fn(async () => null),
+  };
+});
 
 const cragValue = {
   crag: { cragId: 'shulaveri', cragName: 'Shulaveri', source: 'explorer' as const },
@@ -293,23 +303,46 @@ describe('SectorMapInfo coordinates', () => {
 describe('SectorMapInfo new sector', () => {
   const draft: Sector = { name: '', geo: { lat: 42.5, lon: 45.25 }, routes: [], images: [] };
   const editors: SectorGeoEditor[] = [];
+  const topos: DraftTopo[] = [];
+
+  beforeEach(() => {
+    vi.mocked(readTopoGps).mockReset();
+    vi.mocked(readTopoGps).mockResolvedValue(null);
+  });
 
   afterEach(() => {
     for (const editor of editors) editor.dispose();
     editors.length = 0;
+    for (const topo of topos) topo.dispose();
+    topos.length = 0;
+    vi.restoreAllMocks();
   });
+
+  function jpegFile(): File {
+    const bytes = new Uint8Array(12);
+    bytes[0] = 0xff;
+    bytes[1] = 0xd8;
+    bytes[2] = 0xff;
+    return new File([bytes], 'topo.jpg', { type: 'image/jpeg' });
+  }
 
   function renderDraft() {
     const host = createHost();
     const editor = createSectorGeoEditor({ geo: draft.geo!, name: '', isNew: true, host });
+    const topo = createDraftTopo();
     editors.push(editor);
+    topos.push(topo);
     editor.startEdit();
     render(
       <CragContext.Provider value={cragValue}>
-        <SectorMapInfo sector={draft} navigate={() => {}} geoEditor={editor} isNew />
+        <SectorMapInfo sector={draft} navigate={() => {}} geoEditor={editor} topo={topo} isNew />
       </CragContext.Provider>,
     );
-    return host;
+    return { host, topo };
+  }
+
+  function chooseFile(file: File): void {
+    fireEvent.change(screen.getByLabelText('Topo image'), { target: { files: [file] } });
   }
 
   it('opens in edit mode with an empty name and a topo file input', () => {
@@ -323,7 +356,7 @@ describe('SectorMapInfo new sector', () => {
   });
 
   it('creates the sector with its name and location on save', async () => {
-    const host = renderDraft();
+    const { host } = renderDraft();
     fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), {
       target: { value: 'North Wall' },
     });
@@ -339,10 +372,177 @@ describe('SectorMapInfo new sector', () => {
   });
 
   it('ends the draft on cancel without saving', () => {
-    const host = renderDraft();
+    const { host } = renderDraft();
     fireEvent.click(screen.getByRole('button', { name: 'Discard new sector' }));
 
     expect(host.save).not.toHaveBeenCalled();
     expect(host.setEditing).toHaveBeenLastCalledWith(false);
+  });
+
+  it('shows an error for an invalid image and does not ask about a location', async () => {
+    renderDraft();
+    chooseFile(new File(['not-an-image!'], 'notes.txt', { type: 'text/plain' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(TOPO_TYPE_ERROR);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(readTopoGps).not.toHaveBeenCalled();
+    expect(document.querySelector('.sector-map-info__topo-preview')).toBeNull();
+  });
+
+  it('keeps an accepted photo when a later file is rejected', async () => {
+    renderDraft();
+    chooseFile(jpegFile());
+    await waitFor(() => {
+      expect(document.querySelector('.sector-map-info__topo-preview')).toBeTruthy();
+    });
+
+    chooseFile(new File(['not-an-image!'], 'notes.txt', { type: 'text/plain' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(TOPO_TYPE_ERROR);
+    expect(document.querySelector('.sector-map-info__topo-preview')).toHaveAttribute('src', 'blob:preview');
+  });
+
+  it('moves the pin when the photo location is used', async () => {
+    const photo: LatLng = { lat: 41.1, lon: 44.2 };
+    vi.mocked(readTopoGps).mockResolvedValue(photo);
+    const { host } = renderDraft();
+    chooseFile(jpegFile());
+
+    expect(await screen.findByRole('dialog', { name: 'Use photo location?' })).toBeInTheDocument();
+    expect(screen.getByText(/41\.100000, 44\.200000/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use photo location' }));
+
+    expect(screen.getByRole('textbox', { name: 'Latitude' })).toHaveValue('41.100000');
+    expect(screen.getByRole('textbox', { name: 'Longitude' })).toHaveValue('44.200000');
+    expect(host.setLatLng).toHaveBeenCalledWith(photo);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create sector' })).toBeEnabled();
+  });
+
+  it('leaves the clicked location when the photo location is declined', async () => {
+    vi.mocked(readTopoGps).mockResolvedValue({ lat: 41.1, lon: 44.2 });
+    const { host } = renderDraft();
+    chooseFile(jpegFile());
+    expect(await screen.findByRole('dialog', { name: 'Use photo location?' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Keep map location' }));
+
+    expect(screen.getByRole('textbox', { name: 'Latitude' })).toHaveValue('42.500000');
+    expect(screen.getByRole('textbox', { name: 'Longitude' })).toHaveValue('45.250000');
+    expect(host.setLatLng).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument();
+  });
+
+  it('keeps the clicked location when the location dialog is dismissed', async () => {
+    vi.mocked(readTopoGps).mockResolvedValue({ lat: 41.1, lon: 44.2 });
+    renderDraft();
+    chooseFile(jpegFile());
+    expect(await screen.findByRole('dialog', { name: 'Use photo location?' })).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Latitude' })).toHaveValue('42.500000');
+    expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument();
+  });
+
+  it('does not ask when the photo location matches the pin', async () => {
+    vi.mocked(readTopoGps).mockResolvedValue({ lat: 42.5, lon: 45.25 });
+    renderDraft();
+    chooseFile(jpegFile());
+
+    await waitFor(() => {
+      expect(readTopoGps).toHaveBeenCalled();
+    });
+    await vi.mocked(readTopoGps).mock.results[0]?.value;
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(document.querySelector('.sector-map-info__topo-preview')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Create sector' })).toBeEnabled();
+  });
+
+  it('keeps the photo when its location cannot be read', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.mocked(readTopoGps).mockRejectedValue(new Error('bad exif'));
+    renderDraft();
+    chooseFile(jpegFile());
+
+    await waitFor(() => {
+      expect(warn).toHaveBeenCalled();
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(document.querySelector('.sector-map-info__topo-preview')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Create sector' })).toBeEnabled();
+    warn.mockRestore();
+  });
+
+  it('does not save until the photo location has been read and chosen', async () => {
+    let resolveGps: (geo: LatLng | null) => void = () => {};
+    vi.mocked(readTopoGps).mockReturnValue(new Promise((resolve) => {
+      resolveGps = resolve;
+    }));
+    const { host } = renderDraft();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), {
+      target: { value: 'North Wall' },
+    });
+    chooseFile(jpegFile());
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Checking photo...');
+    await waitFor(() => {
+      expect(document.querySelector('.sector-map-info__topo-preview')).toBeTruthy();
+    });
+    const save = screen.getByRole('button', { name: 'Create sector' });
+    expect(save).toBeDisabled();
+    fireEvent.click(save);
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Name' }), { key: 'Enter' });
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Latitude' }), { key: 'Enter' });
+    expect(host.save).not.toHaveBeenCalled();
+
+    resolveGps({ lat: 41.1, lon: 44.2 });
+
+    expect(await screen.findByRole('dialog', { name: 'Use photo location?' })).toBeInTheDocument();
+    expect(save).toBeDisabled();
+    expect(host.save).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Keep map location' }));
+
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+    await waitFor(() => {
+      expect(host.save).toHaveBeenCalledWith({
+        name: 'North Wall',
+        geo: { lat: 42.5, lon: 45.25 },
+      });
+    });
+  });
+
+  it('does not apply the photo location while the sector is already saving', async () => {
+    let releaseSave: (() => void) | undefined;
+    const { host, topo } = renderDraft();
+    host.save.mockReturnValue(new Promise((resolve) => {
+      releaseSave = () => resolve({
+        ...sector,
+        name: 'North Wall',
+        version: 4,
+      });
+    }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), {
+      target: { value: 'North Wall' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create sector' }));
+    await waitFor(() => expect(host.save).toHaveBeenCalled());
+
+    topo.setGpsPrompt({ lat: 41.1, lon: 44.2 });
+
+    expect(await screen.findByRole('dialog', { name: 'Use photo location?' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Use photo location' }));
+
+    expect(screen.getByRole('dialog', { name: 'Use photo location?' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Latitude' })).toHaveValue('42.500000');
+    expect(host.setLatLng).not.toHaveBeenCalled();
+
+    releaseSave?.();
+    await waitFor(() => expect(host.setEditing).toHaveBeenLastCalledWith(false));
   });
 });

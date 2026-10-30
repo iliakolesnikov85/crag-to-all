@@ -1,6 +1,7 @@
 import * as L from 'leaflet';
 import type { CragContextType } from '../../context/CragContext';
 import type { LatLng, Sector } from '../../types';
+import { createDraftTopo, type DraftTopo } from './draftTopo';
 import {
   bindSectorDrag,
   bindSectorPopup,
@@ -16,6 +17,7 @@ const DRAFT_SECTOR_LABEL = 'New sector';
 export interface NewSectorInput {
   name: string;
   geo: LatLng;
+  images?: Array<{ imageFile: string }>;
 }
 
 export interface DraftSectorMarkerOptions {
@@ -26,6 +28,7 @@ export interface DraftSectorMarkerOptions {
   cragContext: CragContextType;
   navigate: (to: string) => void;
   createSector: (sector: NewSectorInput) => Promise<Sector>;
+  uploadImage: (file: File) => Promise<{ imageFile: string }>;
   onCreated?: (sector: Sector) => void;
   /** Called once the draft is gone: after Cancel, a closed popup, a successful save, or `remove()`. */
   onClose?: () => void;
@@ -35,6 +38,7 @@ export interface DraftSectorMarkerOptions {
 export interface DraftSectorMarker {
   sector: Sector;
   editor: SectorGeoEditor;
+  topo: DraftTopo;
   remove(): void;
 }
 
@@ -42,6 +46,7 @@ export interface DraftSectorMarker {
 export function addDraftSectorMarker(options: DraftSectorMarkerOptions): DraftSectorMarker {
   const { map, geo, mode } = options;
   const sector: Sector = { name: '', geo, routes: [], images: [] };
+  const topo = createDraftTopo();
   const marker = L.marker([geo.lat, geo.lon], {
     icon: createSectorMarkerIcon({ ...sector, name: DRAFT_SECTOR_LABEL }),
     autoPan: true,
@@ -52,7 +57,12 @@ export function addDraftSectorMarker(options: DraftSectorMarkerOptions): DraftSe
       if (!patch.name || !patch.geo) {
         throw new Error('A new sector needs a name and a location.');
       }
-      const created = await options.createSector({ name: patch.name, geo: patch.geo });
+      const file = topo.getSnapshot().file;
+      const created = await options.createSector({
+        name: patch.name,
+        geo: patch.geo,
+        ...(file ? { images: [await options.uploadImage(file)] } : {}),
+      });
       options.onCreated?.(created);
       return created;
     },
@@ -76,6 +86,7 @@ export function addDraftSectorMarker(options: DraftSectorMarkerOptions): DraftSe
 
   marker.on('remove', () => {
     editor.dispose();
+    topo.dispose();
     options.onClose?.();
   });
   bindSectorDrag(marker, editor);
@@ -91,7 +102,7 @@ export function addDraftSectorMarker(options: DraftSectorMarkerOptions): DraftSe
   } else {
     bindSectorPopup(
       marker,
-      { sector, navigate: options.navigate, geoEditor: editor, isNew: true },
+      { sector, navigate: options.navigate, geoEditor: editor, topo, isNew: true },
       options.cragContext,
       popupMoveGuard,
     );
@@ -104,6 +115,7 @@ export function addDraftSectorMarker(options: DraftSectorMarkerOptions): DraftSe
   return {
     sector,
     editor,
+    topo,
     remove() {
       marker.remove();
     },

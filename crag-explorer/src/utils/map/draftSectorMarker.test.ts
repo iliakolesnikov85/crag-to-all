@@ -34,6 +34,7 @@ describe('addDraftSectorMarker', () => {
       cragContext: { crag: { cragId: 'test', cragName: 'Test' }, getUrl: (url: string) => url },
       navigate: vi.fn(),
       createSector: vi.fn(async (input: NewSectorInput) => createdSector(input)),
+      uploadImage: vi.fn(async () => ({ imageFile: 'uploaded.jpg' })),
       onCreated: vi.fn(),
       onClose: vi.fn(),
       ...overrides,
@@ -91,11 +92,60 @@ describe('addDraftSectorMarker', () => {
     await Promise.resolve();
 
     expect(createSector).toHaveBeenCalledWith({ name: 'North Wall', geo: GEO });
+    expect(options.uploadImage).not.toHaveBeenCalled();
     expect(options.onCreated).toHaveBeenCalledWith(
       createdSector({ name: 'North Wall', geo: GEO }),
     );
     expect(markersOnMap()).toHaveLength(0);
     expect(options.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('uploads the selected topo before creating the sector', async () => {
+    const file = new File(['topo'], 'topo.jpg', { type: 'image/jpeg' });
+    const uploadImage = vi.fn(async () => ({ imageFile: 'abc.jpg' }));
+    const createSector = vi.fn(async (input: NewSectorInput) => createdSector(input));
+    const { draft } = addDraft({ createSector, uploadImage });
+    draft.topo.accept(file);
+    draft.editor.setNameText('North Wall');
+    draft.editor.apply();
+    await uploadImage.mock.results[0]?.value;
+    await createSector.mock.results[0]?.value;
+    await Promise.resolve();
+
+    expect(uploadImage).toHaveBeenCalledWith(file);
+    expect(uploadImage.mock.invocationCallOrder[0]).toBeLessThan(
+      createSector.mock.invocationCallOrder[0],
+    );
+    expect(createSector).toHaveBeenCalledWith({
+      name: 'North Wall',
+      geo: GEO,
+      images: [{ imageFile: 'abc.jpg' }],
+    });
+  });
+
+  it('keeps the draft and the photo when the upload fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const file = new File(['topo'], 'topo.jpg', { type: 'image/jpeg' });
+    const uploadImage = vi.fn(async () => {
+      throw new Error('Could not upload image');
+    });
+    const createSector = vi.fn();
+    const { draft } = addDraft({ createSector, uploadImage });
+    draft.topo.accept(file);
+    draft.editor.setNameText('North Wall');
+    draft.editor.apply();
+    await expect(uploadImage.mock.results[0]?.value).rejects.toThrow('Could not upload image');
+    await Promise.resolve();
+
+    expect(createSector).not.toHaveBeenCalled();
+    expect(draft.topo.getSnapshot().file).toBe(file);
+    expect(draft.editor.getSnapshot()).toMatchObject({
+      editing: true,
+      saving: false,
+      saveError: 'Could not upload image',
+    });
+    expect(markersOnMap()).toHaveLength(1);
+    errorSpy.mockRestore();
   });
 
   it('keeps the draft and shows the error when the save fails', async () => {

@@ -1,6 +1,7 @@
 import React, { useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import * as L from 'leaflet';
+import { uploadCragImage } from '../../api/client';
 import { useCreateSector } from '../../api/useCragMutations';
 import { useCrag } from '../../context/CragContext';
 import { useIsMobileLayout } from '../../hooks/useIsMobileLayout';
@@ -15,7 +16,7 @@ import SectorMapInfo from './SectorMapInfo';
 
 const PLACING_CLASS = 'leaflet-placing-sector';
 
-interface PlaceSectorMapButtonProps {
+interface PlaceDraftSectorMapProps {
   map: L.Map | null;
   /** Names already used by sectors on this crag, so the draft can reject duplicates. */
   takenNames: readonly string[];
@@ -25,14 +26,14 @@ interface PlaceSectorMapButtonProps {
   onCreated?: (sector: Sector) => void;
 }
 
-interface PlaceSectorMapButtonHandle {
+interface PlaceDraftSectorMapHandle {
   /** Drop the unsaved marker, e.g. when another sector is selected. */
   dismiss(): void;
 }
 
 /** Add-sector map button. The next map click drops a draft sector marker for editing. */
-const PlaceSectorMapButton = React.forwardRef<PlaceSectorMapButtonHandle, PlaceSectorMapButtonProps>(
-  function PlaceSectorMapButton({ map, takenNames, onStart, onCreated }, ref) {
+const PlaceDraftSectorMap = React.forwardRef<PlaceDraftSectorMapHandle, PlaceDraftSectorMapProps>(
+  function PlaceDraftSectorMap({ map, takenNames, onStart, onCreated }, ref) {
     const { crag, getUrl } = useCrag();
     const createSectorMutation = useCreateSector(crag.cragId);
     const navigate = useNavigate();
@@ -67,6 +68,7 @@ const PlaceSectorMapButton = React.forwardRef<PlaceSectorMapButtonHandle, PlaceS
         cragContext: { crag, getUrl },
         navigate,
         createSector: (sector) => createSectorMutation.mutateAsync(sector),
+        uploadImage: (file) => uploadCragImage(crag.cragId, file),
         onCreated: (sector) => onCreatedRef.current?.(sector),
         onClose: () => {
           if (draftRef.current !== placed) return;
@@ -163,7 +165,12 @@ const PlaceSectorMapButton = React.forwardRef<PlaceSectorMapButtonHandle, PlaceS
         )}
         {isMobile && draft && !draftDragging && (
           <div className="sector-map-info-panel">
-            <SectorMapInfo sector={draft.sector} geoEditor={draft.editor} isNew />
+            <SectorMapInfo
+              sector={draft.sector}
+              geoEditor={draft.editor}
+              topo={draft.topo}
+              isNew
+            />
           </div>
         )}
       </>
@@ -171,6 +178,6 @@ const PlaceSectorMapButton = React.forwardRef<PlaceSectorMapButtonHandle, PlaceS
   },
 );
 
-export type { PlaceSectorMapButtonHandle };
+export type { PlaceDraftSectorMapHandle };
 
-export default PlaceSectorMapButton;
+export default PlaceDraftSectorMap;

@@ -9,7 +9,7 @@ import { useCrag } from '../context/CragContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useIsMobileLayout } from '../hooks/useIsMobileLayout';
 import { useMapFullscreen } from '../hooks/useMapFullscreen';
-import PlaceSectorMapButton, { type PlaceSectorMapButtonHandle } from './map/PlaceSectorMapButton';
+import PlaceDraftSectorMap, { type PlaceDraftSectorMapHandle } from './map/PlaceDraftSectorMap';
 import SectorMapInfo from './map/SectorMapInfo';
 import {
   applyInitialMapView,
@@ -43,7 +43,7 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSec
   const mapSeenRef = useRef<L.Map | null>(null);
   const reopenSectorIdRef = useRef<string | null>(null);
   const createdSectorIdRef = useRef<string | null>(null);
-  const placeSectorRef = useRef<PlaceSectorMapButtonHandle>(null);
+  const placeSectorRef = useRef<PlaceDraftSectorMapHandle>(null);
   const getUrlRef = useRef(getUrl);
   const navigateRef = useRef(navigate);
   const onSectorGeoSavedRef = useRef(onSectorGeoSaved);
@@ -276,7 +276,7 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSec
     <div className={`map-widget${fullscreen ? ' map-widget--fullscreen' : ''}`}>
       <div ref={mapRef} className="map-container" />
       {canEditSectorGeo && (
-        <PlaceSectorMapButton
+        <PlaceDraftSectorMap
           ref={placeSectorRef}
           map={mapReady ? mapInstanceRef.current : null}
           takenNames={cragData.sectors.map((sector) => sector.name)}

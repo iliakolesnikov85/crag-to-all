@@ -5,6 +5,7 @@ import {
   deleteSector,
   patchCragDescription,
   patchSectorGeo,
+  type CreateSectorInput,
 } from './client';
 import { queryKeys } from './queryClient';
 
@@ -89,7 +90,7 @@ export function usePatchSectorGeo(cragId: string) {
 export function useCreateSector(cragId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (sector: { name: string; geo: LatLng }) => createSector(cragId, sector),
+    mutationFn: (sector: CreateSectorInput) => createSector(cragId, sector),
     onMutate: () => cancelInFlightCragFetch(queryClient, cragId),
     onSuccess: (sector) => {
       appendSector(queryClient, cragId, sector);

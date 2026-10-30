@@ -246,6 +246,46 @@
   cursor: default;
 }
 
+.sector-map-info__topo {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 120px;
+}
+
+.sector-map-info__topo-input--filled {
+  overflow: hidden;
+  border-style: solid;
+}
+
+.sector-map-info__topo-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.sector-map-info p.sector-map-info__topo-error,
+.sector-map-info p.sector-map-info__topo-status {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+.sector-map-info p.sector-map-info__topo-error {
+  color: #c62828;
+}
+
+.sector-map-info p.sector-map-info__topo-status {
+  color: #555;
+}
+
+.sector-map-info__location-prompt {
+  margin: 0;
+}
+
 .sector-map-info p.sector-map-info__hint {
   display: flex;
   align-items: flex-start;
