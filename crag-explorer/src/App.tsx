@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router';
 import './App.scss';
-import { listCrags } from './api/client';
-import { CragData, Crag, Sector } from './types';
+import { useCragQuery } from './api/useCragQuery';
+import { useCragsQuery } from './api/useCragsQuery';
+import { Crag } from './types';
 import { getDefaultCragForHost } from './utils/defaultCrag';
 import {
   OverviewPage,
@@ -19,91 +20,41 @@ import {
 } from './pages';
 import { SeoDynamic, Footer, LoadingScreen, Header } from './components';
 import Navigation from './components/Navigation';
-import { AppOnlineProvider, useAppOnline } from './context/AppOnlineContext';
+import { AppOnlineProvider } from './context/AppOnlineContext';
 import { CragContext } from './context/CragContext';
 import { FilterContext, useFilterState } from './context/FilterContext';
-import { useOnlineStatus } from './hooks/useOnlineStatus';
-import {
-  getOfflineCragIndex,
-  isCragOffline,
-  loadCragDataJson,
-  putOfflineCragIndex,
-} from './utils/offline';
 
 const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags, defaultCragId }) => {
-  const online = useOnlineStatus();
   const cragId = crags.find(c => c.cragId === location.pathname.split('/')[1])?.cragId;
 
-  const [cragData, setCragData] = useState<CragData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [currentSector, setCurrentSector] = useState<string | undefined>();
   const [currentRoute, setCurrentRoute] = useState<string | undefined>();
 
   const effectiveCragId = cragId || defaultCragId || (crags.length > 0 ? crags[0].cragId : null);
   const crag = crags.find(c => c.cragId === effectiveCragId) || null;
+  const cragQuery = useCragQuery(effectiveCragId);
 
   const filterContext = useFilterState();
 
-  useEffect(() => {
-    if (!effectiveCragId) return;
-    setLoading(true);
-    setError(null);
-
-    loadCragDataJson(effectiveCragId)
-      .then((data) => {
-        setCragData(data);
-        setLoading(false);
-      })
-      .catch(async (err) => {
-        const hasOfflinePack = await isCragOffline(effectiveCragId);
-        if (hasOfflinePack && !online) {
-          setError('You are offline. Download this crag from the Download tab while you have internet.');
-        } else {
-          setError(err instanceof Error ? err.message : 'Failed to load crag data');
-        }
-        setLoading(false);
-      });
-  }, [effectiveCragId, online]);
-
-  const handleSectorChange = React.useCallback((sectorName: string | undefined) => {
+  const handleSectorChange = useCallback((sectorName: string | undefined) => {
     setCurrentSector(sectorName);
   }, []);
 
-  const handleRouteChange = React.useCallback((routeName: string | undefined) => {
+  const handleRouteChange = useCallback((routeName: string | undefined) => {
     setCurrentRoute(routeName);
   }, []);
 
-  const handleSectorGeoSaved = useCallback((sector: Sector) => {
-    setCragData((current) => {
-      if (!current || sector.id == null) return current;
-      return {
-        ...current,
-        sectors: current.sectors.map((item) => (item.id === sector.id ? sector : item)),
-      };
-    });
-  }, []);
-
-  const handleSectorCreated = useCallback((sector: Sector) => {
-    setCragData((current) =>
-      current ? { ...current, sectors: [...current.sectors, sector] } : current,
-    );
-  }, []);
-
-  const handleSectorDeleted = useCallback((sectorId: string) => {
-    setCragData((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        sectors: current.sectors.filter((sector) => sector.id !== sectorId),
-      };
-    });
-  }, []);
-
   if (!crag) return <div className="page">Crag not found.</div>;
-  if (loading) return <LoadingScreen message="Loading crag data..." />;
-  if (error) return <div className="page">Error: {error}</div>;
-  if (!cragData) return <div className="page">No data for this crag.</div>;
+  if (cragQuery.isPending) return <LoadingScreen message="Loading crag data..." />;
+  if (cragQuery.isError) {
+    const message = cragQuery.error instanceof Error
+      ? cragQuery.error.message
+      : 'Failed to load crag data';
+    return <div className="page">Error: {message}</div>;
+  }
+  if (!cragQuery.data) return <div className="page">No data for this crag.</div>;
+
+  const cragData = cragQuery.data;
 
   return (
     <CragContext.Provider value={
@@ -127,27 +78,13 @@ const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags
               <Routes>
                 <Route path={`/overview`} element={<OverviewPage description={cragData.description} sectors={cragData.sectors} />} />
                 <Route path={`/routes`} element={<RoutesPage sectors={cragData.sectors} />} />
-                <Route
-                  path={`/map`}
-                  element={
-                    <MapPage
-                      cragData={cragData}
-                      onSectorGeoSaved={handleSectorGeoSaved}
-                      onSectorCreated={handleSectorCreated}
-                    />
-                  }
-                />
+                <Route path={`/map`} element={<MapPage cragData={cragData} />} />
                 <Route
                   path={`/description`}
                   element={
                     <DescriptionPage
                       description={cragData.description}
                       version={cragData.version}
-                      onDescriptionChange={({ description, version }) => {
-                        setCragData((current) =>
-                          current ? { ...current, description, version } : current,
-                        );
-                      }}
                     />
                   }
                 />
@@ -162,7 +99,6 @@ const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags
                     <SectorPage
                       sectors={cragData.sectors}
                       onSectorChange={handleSectorChange}
-                      onSectorDeleted={handleSectorDeleted}
                     />
                   }
                 />
@@ -180,42 +116,11 @@ const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags
 };
 
 export const AppRoutes: React.FC = () => {
-  const { markNetworkLimited, markNetworkOk } = useAppOnline();
-  const [crags, setCrags] = useState<Crag[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cragsQuery = useCragsQuery();
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const { signal } = controller;
+  if (cragsQuery.isPending) return <LoadingScreen message="Loading crags list..." />;
 
-    const loadIndex = async () => {
-      try {
-        const data = await listCrags({
-          cache: navigator.onLine ? 'no-store' : 'default',
-          signal,
-        });
-        if (signal.aborted) return;
-        await putOfflineCragIndex(data);
-        setCrags(data);
-        markNetworkOk();
-      } catch (error) {
-        console.warn('Failed to fetch crag index, using offline fallback:', error);
-        if (signal.aborted) return;
-        markNetworkLimited();
-        const cachedIndex = await getOfflineCragIndex();
-        if (!signal.aborted && cachedIndex?.length) {
-          setCrags(cachedIndex);
-        }
-      } finally {
-        if (!signal.aborted) setLoading(false);
-      }
-    };
-
-    loadIndex();
-    return () => controller.abort();
-  }, [markNetworkLimited, markNetworkOk]);
-
-  if (loading) return <LoadingScreen message="Loading crags list..." />;
+  const crags = cragsQuery.data ?? [];
 
   if (crags.length === 0) {
     return (

@@ -3,9 +3,11 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { deleteSector } from '../api/client';
 import { canEditCrag } from '../api/permissions';
+import { createAppQueryClient, queryKeys } from '../api/queryClient';
 import { CragContext } from '../context/CragContext';
+import { withQueryClient } from '../test/helpers';
 import { SAMPLE_CRAG_ID, sampleCragData } from '../test/fixtures/cragData';
-import type { Sector } from '../types';
+import type { CragData, Sector } from '../types';
 import SectorPage from './SectorPage';
 
 vi.mock('../api/permissions', () => ({
@@ -26,42 +28,51 @@ const deletableSector: Sector = {
   id: 'sector-1',
 };
 
+const keptSector: Sector = {
+  ...sampleCragData.sectors[1],
+  id: 'sector-2',
+};
+
 function renderSector(path: string) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <CragContext.Provider value={cragValue}>
-        <Routes>
-          <Route
-            path="/sector/:sectorName"
-            element={<SectorPage sectors={sampleCragData.sectors} />}
-          />
-        </Routes>
-      </CragContext.Provider>
-    </MemoryRouter>,
+    withQueryClient(
+      <MemoryRouter initialEntries={[path]}>
+        <CragContext.Provider value={cragValue}>
+          <Routes>
+            <Route
+              path="/sector/:sectorName"
+              element={<SectorPage sectors={sampleCragData.sectors} />}
+            />
+          </Routes>
+        </CragContext.Provider>
+      </MemoryRouter>,
+    ),
   );
 }
 
 function renderDeletable(sector: Sector = deletableSector) {
-  const onSectorDeleted = vi.fn();
+  const client = createAppQueryClient();
+  client.setQueryData<CragData>(queryKeys.crag(SAMPLE_CRAG_ID), {
+    ...sampleCragData,
+    sectors: [sector, keptSector],
+  });
   render(
-    <MemoryRouter initialEntries={[`/sector/${encodeURIComponent(sector.name)}`]}>
-      <CragContext.Provider value={cragValue}>
-        <Routes>
-          <Route
-            path="/sector/:sectorName"
-            element={
-              <SectorPage
-                sectors={[sector]}
-                onSectorDeleted={onSectorDeleted}
-              />
-            }
-          />
-          <Route path="/routes" element={<div>Routes list</div>} />
-        </Routes>
-      </CragContext.Provider>
-    </MemoryRouter>,
+    withQueryClient(
+      <MemoryRouter initialEntries={[`/sector/${encodeURIComponent(sector.name)}`]}>
+        <CragContext.Provider value={cragValue}>
+          <Routes>
+            <Route
+              path="/sector/:sectorName"
+              element={<SectorPage sectors={[sector]} />}
+            />
+            <Route path="/routes" element={<div>Routes list</div>} />
+          </Routes>
+        </CragContext.Provider>
+      </MemoryRouter>,
+      client,
+    ),
   );
-  return { onSectorDeleted };
+  return client;
 }
 
 function openDeleteItem() {
@@ -126,7 +137,7 @@ describe('SectorPage delete', () => {
   it('deletes the sector after confirmation and leaves the page', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.mocked(deleteSector).mockResolvedValue(undefined);
-    const { onSectorDeleted } = renderDeletable();
+    const client = renderDeletable();
 
     openDeleteItem();
 
@@ -134,7 +145,9 @@ describe('SectorPage delete', () => {
       expect(screen.getByText('Routes list')).toBeInTheDocument();
     });
     expect(deleteSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1');
-    expect(onSectorDeleted).toHaveBeenCalledWith('sector-1');
+    expect(client.getQueryData<CragData>(queryKeys.crag(SAMPLE_CRAG_ID))?.sectors).toEqual([
+      keptSector,
+    ]);
     vi.mocked(window.confirm).mockRestore();
   });
 
@@ -156,12 +169,16 @@ describe('SectorPage delete', () => {
   it('shows an error when deletion fails', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.mocked(deleteSector).mockRejectedValue(new Error('Failed to delete sector (500)'));
-    renderDeletable();
+    const client = renderDeletable();
 
     openDeleteItem();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Failed to delete sector (500)');
     expect(screen.getByRole('heading', { name: 'Main Wall' })).toBeInTheDocument();
+    expect(client.getQueryData<CragData>(queryKeys.crag(SAMPLE_CRAG_ID))?.sectors).toEqual([
+      deletableSector,
+      keptSector,
+    ]);
     vi.mocked(window.confirm).mockRestore();
   });
 });

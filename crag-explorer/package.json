@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@crag-to-all/shared-crag": "file:../packages/shared-crag",
+    "@tanstack/react-query": "^5.105.0",
     "fast-json-stable-stringify": "^2.1.0",
     "fflate": "^0.8.3",
     "leaflet": "^1.9.4",

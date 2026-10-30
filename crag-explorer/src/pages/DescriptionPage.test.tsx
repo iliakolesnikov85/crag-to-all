@@ -2,8 +2,11 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { patchCragDescription } from '../api/client';
 import { canEditCrag } from '../api/permissions';
+import { createAppQueryClient, queryKeys } from '../api/queryClient';
 import { CragContext } from '../context/CragContext';
-import type { DescriptionSection } from '../types';
+import { sampleCragData } from '../test/fixtures/cragData';
+import { withQueryClient } from '../test/helpers';
+import type { CragData, DescriptionSection } from '../types';
 import { paragraphsToHtml } from '../utils/descriptionHtml';
 import DescriptionPage from './DescriptionPage';
 
@@ -29,8 +32,10 @@ vi.mock('../components/RichTextInput', () => ({
   ),
 }));
 
+const CRAG_ID = 'shulaveri';
+
 const cragValue = {
-  crag: { cragId: 'shulaveri', cragName: 'Shulaveri' },
+  crag: { cragId: CRAG_ID, cragName: 'Shulaveri' },
   getUrl: (url: string) => url,
 };
 
@@ -46,17 +51,23 @@ const sections: DescriptionSection[] = [
 ];
 
 function renderPage(description: DescriptionSection[] = sections, version?: number) {
-  const onDescriptionChange = vi.fn();
+  const client = createAppQueryClient();
+  if (version != null) {
+    client.setQueryData<CragData>(queryKeys.crag(CRAG_ID), {
+      ...sampleCragData,
+      description,
+      version,
+    });
+  }
   render(
-    <CragContext.Provider value={cragValue}>
-      <DescriptionPage
-        description={description}
-        version={version}
-        onDescriptionChange={onDescriptionChange}
-      />
-    </CragContext.Provider>,
+    withQueryClient(
+      <CragContext.Provider value={cragValue}>
+        <DescriptionPage description={description} version={version} />
+      </CragContext.Provider>,
+      client,
+    ),
   );
-  return { onDescriptionChange };
+  return client;
 }
 
 describe('DescriptionPage', () => {
@@ -111,7 +122,7 @@ describe('DescriptionPage', () => {
       description,
       version: 4,
     }));
-    const { onDescriptionChange } = renderPage(sections, 3);
+    const client = renderPage(sections, 3);
     fireEvent.click(screen.getByRole('button', { name: 'Edit Access' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Edit section' });
@@ -119,24 +130,23 @@ describe('DescriptionPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     const paragraphs = [paragraphsToHtml(sections[0].paragraphs)];
+    const saved = [
+      { subheader: 'Approach', paragraphs },
+      sections[1],
+    ];
     await waitFor(() => {
-      expect(patchCragDescription).toHaveBeenCalledWith('shulaveri', 3, [
-        { subheader: 'Approach', paragraphs },
-        sections[1],
-      ]);
-    });
-    expect(onDescriptionChange).toHaveBeenCalledWith({
-      description: [
-        { subheader: 'Approach', paragraphs },
-        sections[1],
-      ],
-      version: 4,
+      expect(patchCragDescription).toHaveBeenCalledWith(CRAG_ID, 3, saved);
     });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(client.getQueryData<CragData>(queryKeys.crag(CRAG_ID))).toMatchObject({
+      version: 4,
+      description: saved,
+      sectors: sampleCragData.sectors,
+    });
   });
 
   it('adds a section and keeps the dialog open when saving fails', async () => {
-    const { onDescriptionChange } = renderPage(sections, 3);
+    const client = renderPage(sections, 3);
     fireEvent.click(screen.getByRole('button', { name: 'Add section' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Add section' });
@@ -151,8 +161,11 @@ describe('DescriptionPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('version conflict');
-    expect(onDescriptionChange).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(client.getQueryData<CragData>(queryKeys.crag(CRAG_ID))).toMatchObject({
+      version: 3,
+      description: sections,
+    });
   });
 
   it('does not save a block that exceeds the API limit', () => {
@@ -193,16 +206,17 @@ describe('DescriptionPage', () => {
       description,
       version: 4,
     }));
-    const { onDescriptionChange } = renderPage(sections, 3);
+    const client = renderPage(sections, 3);
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove Access' }));
 
     await waitFor(() => {
-      expect(patchCragDescription).toHaveBeenCalledWith('shulaveri', 3, [sections[1]]);
+      expect(patchCragDescription).toHaveBeenCalledWith(CRAG_ID, 3, [sections[1]]);
     });
-    expect(onDescriptionChange).toHaveBeenCalledWith({
-      description: [sections[1]],
+    expect(client.getQueryData<CragData>(queryKeys.crag(CRAG_ID))).toMatchObject({
       version: 4,
+      description: [sections[1]],
+      sectors: sampleCragData.sectors,
     });
     vi.mocked(window.confirm).mockRestore();
   });

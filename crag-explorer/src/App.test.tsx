@@ -5,7 +5,7 @@ import { getCragApiUrl, getCragsApiUrl } from './api/client';
 import { AppRoutes } from './App';
 import { AppOnlineProvider } from './context/AppOnlineContext';
 import { SAMPLE_CRAG_ID, sampleCrags } from './test/fixtures/cragData';
-import { jsonResponse, requestUrl } from './test/helpers';
+import { jsonResponse, requestUrl, withQueryClient } from './test/helpers';
 import { getOfflineCragIndex, putOfflineCragIndex } from './utils/offline';
 
 vi.mock('./components/MapWidget', () => ({
@@ -14,11 +14,13 @@ vi.mock('./components/MapWidget', () => ({
 
 function renderApp(path = '/') {
   return render(
-    <AppOnlineProvider>
-      <MemoryRouter initialEntries={[path]}>
-        <AppRoutes />
-      </MemoryRouter>
-    </AppOnlineProvider>,
+    withQueryClient(
+      <AppOnlineProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AppOnlineProvider>,
+    ),
   );
 }
 

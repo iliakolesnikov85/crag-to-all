@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MdDelete, MdEdit } from 'react-icons/md';
-import { patchCragDescription, type DescriptionPatchResult } from '../api/client';
+import { usePatchCragDescription } from '../api/useCragMutations';
 import { canEditCrag } from '../api/permissions';
 import Button from '../components/Button';
 import DescriptionSectionModal from '../components/DescriptionSectionModal';
@@ -9,18 +9,17 @@ import type { DescriptionSection } from '../types';
 import { paragraphsToHtml } from '../utils/descriptionHtml';
 import './DescriptionPage.scss';
 
+const MISSING_VERSION_MESSAGE = 'This crag cannot be saved because it has no version.';
+const PERMISSION_MESSAGE = 'You do not have permission to edit this crag.';
+
 interface DescriptionPageProps {
   description: DescriptionSection[];
   version?: number;
-  onDescriptionChange: (next: DescriptionPatchResult) => void;
 }
 
 type SectionEditor =
   | { mode: 'add' }
   | { mode: 'edit'; index: number };
-
-const MISSING_VERSION_MESSAGE = 'This crag cannot be saved because it has no version.';
-const PERMISSION_MESSAGE = 'You do not have permission to edit this crag.';
 
 function editorKey(editor: SectionEditor | null): string {
   if (editor?.mode === 'edit') return `edit-${editor.index}`;
@@ -31,34 +30,32 @@ function editorKey(editor: SectionEditor | null): string {
 const DescriptionPage: React.FC<DescriptionPageProps> = ({
   description,
   version,
-  onDescriptionChange,
 }) => {
   const { crag } = useCrag();
+  const patchDescription = usePatchCragDescription(crag.cragId);
   const [editor, setEditor] = useState<SectionEditor | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [removing, setRemoving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const canEdit = canEditCrag(crag);
-  const busy = saving || removing;
+  const pending = patchDescription.isPending;
   const editingSection = editor?.mode === 'edit' ? description[editor.index] : undefined;
 
   const closeEditor = () => {
-    if (saving) return;
+    if (pending) return;
     setEditor(null);
     setSaveError(null);
   };
 
   const openAdd = () => {
-    if (!canEdit || busy) return;
+    if (!canEdit || pending) return;
     setActionError(null);
     setSaveError(null);
     setEditor({ mode: 'add' });
   };
 
   const openEdit = (index: number) => {
-    if (!canEdit || busy) return;
+    if (!canEdit || pending) return;
     setActionError(null);
     setSaveError(null);
     setEditor({ mode: 'edit', index });
@@ -73,30 +70,26 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
       setSaveError(MISSING_VERSION_MESSAGE);
       return;
     }
-    if (editor == null) return;
+    if (editor == null || pending) return;
 
     const next =
       editor.mode === 'add'
         ? [...description, section]
         : description.map((item, index) => (index === editor.index ? section : item));
 
-    setSaving(true);
     setSaveError(null);
     try {
-      const saved = await patchCragDescription(crag.cragId, version, next);
-      onDescriptionChange(saved);
+      await patchDescription.mutateAsync({ version, description: next });
       setEditor(null);
     } catch (error) {
       console.error('Failed to save description:', error);
       setSaveError(error instanceof Error ? error.message : 'Failed to save description');
-    } finally {
-      setSaving(false);
     }
   };
 
   const handleRemove = async (index: number) => {
     const section = description[index];
-    if (!section || busy) return;
+    if (!section || pending) return;
     if (!canEditCrag(crag)) {
       setActionError(PERMISSION_MESSAGE);
       return;
@@ -108,19 +101,15 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
       return;
     }
 
-    setRemoving(true);
     setActionError(null);
     try {
       const next = description.filter((_, itemIndex) => itemIndex !== index);
-      const saved = await patchCragDescription(crag.cragId, version, next);
-      onDescriptionChange(saved);
+      await patchDescription.mutateAsync({ version, description: next });
     } catch (error) {
       console.error('Failed to remove description section:', error);
       setActionError(
         error instanceof Error ? error.message : 'Failed to remove description section',
       );
-    } finally {
-      setRemoving(false);
     }
   };
 
@@ -145,7 +134,7 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
                       size="sm"
                       variant="ghost"
                       aria-label={`Edit ${section.subheader}`}
-                      disabled={busy}
+                      disabled={pending}
                       onClick={() => openEdit(index)}
                     >
                       <MdEdit />
@@ -156,7 +145,7 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
                       size="sm"
                       variant="ghost"
                       aria-label={`Remove ${section.subheader}`}
-                      disabled={busy}
+                      disabled={pending}
                       onClick={() => void handleRemove(index)}
                     >
                       <MdDelete />
@@ -179,7 +168,7 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
             variant="ghost"
             size="sm"
             className="description-add"
-            disabled={busy}
+            disabled={pending}
             onClick={openAdd}
           >
             Add section
@@ -192,7 +181,7 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
         mode={editor?.mode ?? 'add'}
         initialName={editingSection?.subheader ?? ''}
         initialHtml={editingSection ? paragraphsToHtml(editingSection.paragraphs) : ''}
-        saving={saving}
+        saving={pending}
         error={saveError}
         onClose={closeEditor}
         onSave={(section) => void handleSave(section)}

@@ -1,7 +1,7 @@
 import React, { useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import * as L from 'leaflet';
-import { createSector } from '../../api/client';
+import { useCreateSector } from '../../api/useCragMutations';
 import { useCrag } from '../../context/CragContext';
 import { useIsMobileLayout } from '../../hooks/useIsMobileLayout';
 import type { LatLng, Sector } from '../../types';
@@ -34,6 +34,7 @@ interface PlaceSectorMapButtonHandle {
 const PlaceSectorMapButton = React.forwardRef<PlaceSectorMapButtonHandle, PlaceSectorMapButtonProps>(
   function PlaceSectorMapButton({ map, takenNames, onStart, onCreated }, ref) {
     const { crag, getUrl } = useCrag();
+    const createSectorMutation = useCreateSector(crag.cragId);
     const navigate = useNavigate();
     const isMobile = useIsMobileLayout();
     const [placing, setPlacing] = useState(false);
@@ -65,7 +66,7 @@ const PlaceSectorMapButton = React.forwardRef<PlaceSectorMapButtonHandle, PlaceS
         takenNames,
         cragContext: { crag, getUrl },
         navigate,
-        createSector: (sector) => createSector(crag.cragId, sector),
+        createSector: (sector) => createSectorMutation.mutateAsync(sector),
         onCreated: (sector) => onCreatedRef.current?.(sector),
         onClose: () => {
           if (draftRef.current !== placed) return;

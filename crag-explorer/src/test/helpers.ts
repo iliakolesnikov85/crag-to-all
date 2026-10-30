@@ -1,3 +1,11 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createElement, type ReactNode } from 'react';
+import { createAppQueryClient } from '../api/queryClient';
+
+export function withQueryClient(children: ReactNode, client: QueryClient = createAppQueryClient()): ReactNode {
+  return createElement(QueryClientProvider, { client }, children);
+}
+
 export function requestUrl(input: RequestInfo | URL): string {
   if (typeof input === 'string') return input;
   if (input instanceof URL) return input.href;

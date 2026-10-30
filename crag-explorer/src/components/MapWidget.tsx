@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { patchSectorGeo } from '../api/client';
+import { usePatchSectorGeo } from '../api/useCragMutations';
 import { canEditCrag } from '../api/permissions';
 import { CragData, Sector } from '../types';
 import { useCrag } from '../context/CragContext';
@@ -32,6 +32,7 @@ interface MapWidgetProps {
 
 const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSectorCreated }) => {
   const { crag, getUrl } = useCrag();
+  const patchSectorGeo = usePatchSectorGeo(crag.cragId);
   const navigate = useNavigate();
   const online = useOnlineStatus();
   const isMobile = useIsMobileLayout();
@@ -101,8 +102,12 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSec
     if (!sector.id || typeof sector.version !== 'number') {
       return Promise.reject(new Error('This sector cannot be saved because it has no id or version.'));
     }
-    return patchSectorGeo(crag.cragId, sector.id, sector.version, patch);
-  }, [crag.cragId]);
+    return patchSectorGeo.mutateAsync({
+      sectorId: sector.id,
+      version: sector.version,
+      patch,
+    });
+  }, [patchSectorGeo.mutateAsync]);
 
   const handleSectorCreated = useCallback((sector: Sector) => {
     if (isMobile) {

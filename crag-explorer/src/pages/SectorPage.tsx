@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { deleteSector } from '../api/client';
+import { useDeleteSector } from '../api/useCragMutations';
 import { canEditCrag } from '../api/permissions';
 import SectorOptionsMenu from '../components/SectorOptionsMenu';
 import SectorView from '../components/SectorView';
@@ -15,14 +15,13 @@ const PERMISSION_MESSAGE = 'You do not have permission to edit this crag.';
 interface SectorPageProps {
   sectors: Sector[];
   onSectorChange?: (sectorName: string | undefined) => void;
-  onSectorDeleted?: (sectorId: string) => void;
 }
 
-const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange, onSectorDeleted }) => {
+const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
   const { sectorName } = useParams<{ sectorName: string }>();
   const { crag, getUrl } = useCrag();
   const navigate = useNavigate();
-  const [deleting, setDeleting] = useState(false);
+  const deleteSectorMutation = useDeleteSector(crag.cragId);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,7 +34,7 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange, onSect
   const canEdit = canEditCrag(crag);
 
   const handleDelete = async () => {
-    if (!sector || deleting) return;
+    if (!sector || deleteSectorMutation.isPending) return;
     if (!canEditCrag(crag)) {
       setDeleteError(PERMISSION_MESSAGE);
       return;
@@ -49,17 +48,13 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange, onSect
     );
     if (!confirmed) return;
 
-    setDeleting(true);
     setDeleteError(null);
     try {
-      await deleteSector(crag.cragId, sector.id);
-      onSectorDeleted?.(sector.id);
+      await deleteSectorMutation.mutateAsync(sector.id);
       navigate(getUrl('/routes'));
     } catch (error) {
       console.error('Failed to delete sector:', error);
       setDeleteError(error instanceof Error ? error.message : 'Failed to delete sector');
-    } finally {
-      setDeleting(false);
     }
   };
 
@@ -73,7 +68,10 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange, onSect
         getImageUrl={getCragImageUrl}
         headerActions={
           canEdit ? (
-            <SectorOptionsMenu disabled={deleting} onDelete={() => void handleDelete()} />
+            <SectorOptionsMenu
+              disabled={deleteSectorMutation.isPending}
+              onDelete={() => void handleDelete()}
+            />
           ) : undefined
         }
         headerAlert={deleteError}
