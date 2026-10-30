@@ -4,16 +4,16 @@ import './App.scss';
 import { listCrags } from './api/client';
 import { CragData, Crag, Sector } from './types';
 import { getDefaultCragForHost } from './utils/defaultCrag';
-import { 
-  OverviewPage, 
-  RoutesPage, 
-  MapPage, 
-  DescriptionPage, 
-  SectorPage, 
-  RoutePage, 
-  DownloadPage, 
+import {
+  OverviewPage,
+  RoutesPage,
+  MapPage,
+  DescriptionPage,
+  SectorPage,
+  RoutePage,
+  DownloadPage,
   TeamPage,
-  NotFound, 
+  NotFound,
   CragSelector,
   BetaVideos,
 } from './pages';
@@ -39,7 +39,7 @@ const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags
   const [error, setError] = useState<string | null>(null);
   const [currentSector, setCurrentSector] = useState<string | undefined>();
   const [currentRoute, setCurrentRoute] = useState<string | undefined>();
-  
+
   const effectiveCragId = cragId || defaultCragId || (crags.length > 0 ? crags[0].cragId : null);
   const crag = crags.find(c => c.cragId === effectiveCragId) || null;
 
@@ -84,6 +84,12 @@ const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags
     });
   }, []);
 
+  const handleSectorCreated = useCallback((sector: Sector) => {
+    setCragData((current) =>
+      current ? { ...current, sectors: [...current.sectors, sector] } : current,
+    );
+  }, []);
+
   if (!crag) return <div className="page">Crag not found.</div>;
   if (loading) return <LoadingScreen message="Loading crag data..." />;
   if (error) return <div className="page">Error: {error}</div>;
@@ -91,8 +97,8 @@ const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags
 
   return (
     <CragContext.Provider value={
-      { 
-        crag: crag, 
+      {
+        crag: crag,
         getUrl: (url: string) => {
           url = url.startsWith('/') ? url : `/${url}`;
           if (crag.cragId === defaultCragId) {
@@ -113,7 +119,13 @@ const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags
                 <Route path={`/routes`} element={<RoutesPage sectors={cragData.sectors} />} />
                 <Route
                   path={`/map`}
-                  element={<MapPage cragData={cragData} onSectorGeoSaved={handleSectorGeoSaved} />}
+                  element={
+                    <MapPage
+                      cragData={cragData}
+                      onSectorGeoSaved={handleSectorGeoSaved}
+                      onSectorCreated={handleSectorCreated}
+                    />
+                  }
                 />
                 <Route
                   path={`/description`}

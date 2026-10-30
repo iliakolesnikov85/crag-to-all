@@ -327,4 +327,54 @@ describe('createSectorGeoEditor', () => {
       latText: '43.000000',
     });
   });
+
+  describe('new sector', () => {
+    function newEditorFor(host: SectorGeoEditHost, takenNames: readonly string[] = []) {
+      const editor = createSectorGeoEditor({ geo: ORIGIN, name: '', takenNames, isNew: true, host });
+      editors.push(editor);
+      editor.startEdit();
+      return editor;
+    }
+
+    it('sends the name and the unchanged point on save', async () => {
+      const host = createHost();
+      const editor = newEditorFor(host);
+      editor.setNameText('North Wall');
+      editor.apply();
+
+      expect(host.save).toHaveBeenCalledWith({ name: 'North Wall', geo: ORIGIN });
+      await host.save.mock.results[0]?.value;
+      expect(editor.getSnapshot().editing).toBe(false);
+    });
+
+    it('requires a name before saving', () => {
+      const host = createHost();
+      const editor = newEditorFor(host);
+      editor.apply();
+
+      expect(host.save).not.toHaveBeenCalled();
+      expect(editor.getSnapshot().nameError).toBe('Enter a sector name.');
+      expect(editor.getSnapshot().editing).toBe(true);
+    });
+
+    it('rejects a name that another sector already uses', () => {
+      const host = createHost();
+      const editor = newEditorFor(host, ['Shaumian']);
+      editor.setNameText('Shaumian');
+      editor.apply();
+
+      expect(host.save).not.toHaveBeenCalled();
+      expect(editor.getSnapshot().nameError).not.toBeNull();
+    });
+
+    it('leaves edit mode on cancel without saving', () => {
+      const host = createHost();
+      const editor = newEditorFor(host);
+      editor.cancel();
+
+      expect(host.save).not.toHaveBeenCalled();
+      expect(host.setEditing).toHaveBeenLastCalledWith(false);
+      expect(editor.getSnapshot().editing).toBe(false);
+    });
+  });
 });

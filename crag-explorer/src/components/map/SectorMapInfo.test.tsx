@@ -289,3 +289,60 @@ describe('SectorMapInfo coordinates', () => {
     expect(screen.queryByRole('textbox', { name: 'Name' })).not.toBeInTheDocument();
   });
 });
+
+describe('SectorMapInfo new sector', () => {
+  const draft: Sector = { name: '', geo: { lat: 42.5, lon: 45.25 }, routes: [], images: [] };
+  const editors: SectorGeoEditor[] = [];
+
+  afterEach(() => {
+    for (const editor of editors) editor.dispose();
+    editors.length = 0;
+  });
+
+  function renderDraft() {
+    const host = createHost();
+    const editor = createSectorGeoEditor({ geo: draft.geo!, name: '', isNew: true, host });
+    editors.push(editor);
+    editor.startEdit();
+    render(
+      <CragContext.Provider value={cragValue}>
+        <SectorMapInfo sector={draft} navigate={() => {}} geoEditor={editor} isNew />
+      </CragContext.Provider>,
+    );
+    return host;
+  }
+
+  it('opens in edit mode with an empty name and a topo file input', () => {
+    renderDraft();
+
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('');
+    expect(screen.getByRole('textbox', { name: 'Latitude' })).toHaveValue('42.500000');
+    expect(screen.getByLabelText('Topo image')).toHaveAttribute('type', 'file');
+    expect(screen.getByRole('button', { name: 'Create sector' })).toHaveTextContent('Save');
+    expect(screen.getByRole('button', { name: 'Discard new sector' })).toHaveTextContent('Cancel');
+  });
+
+  it('creates the sector with its name and location on save', async () => {
+    const host = renderDraft();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), {
+      target: { value: 'North Wall' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create sector' }));
+
+    await waitFor(() => {
+      expect(host.setEditing).toHaveBeenLastCalledWith(false);
+    });
+    expect(host.save).toHaveBeenCalledWith({
+      name: 'North Wall',
+      geo: { lat: 42.5, lon: 45.25 },
+    });
+  });
+
+  it('ends the draft on cancel without saving', () => {
+    const host = renderDraft();
+    fireEvent.click(screen.getByRole('button', { name: 'Discard new sector' }));
+
+    expect(host.save).not.toHaveBeenCalled();
+    expect(host.setEditing).toHaveBeenLastCalledWith(false);
+  });
+});

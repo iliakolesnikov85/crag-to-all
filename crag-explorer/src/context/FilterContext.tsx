@@ -1,4 +1,6 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useCallback, useContext, useState } from 'react';
+import type { Sector } from '../types';
+import { fullGradeRange } from '../utils/routesFilter';
 
 export interface FilterContextType {
   gradeRange: [number, number];
@@ -15,6 +17,8 @@ export interface FilterContextType {
   setSortField: (field: 'name' | 'grade' | 'rating' | 'sectorName') => void;
   sortDirection: 'asc' | 'desc';
   setSortDirection: (direction: 'asc' | 'desc') => void;
+  /** Clear search and the hide flags, and open the grade slider across `sectors`. */
+  resetFilters(sectors: readonly Sector[]): void;
 }
 
 export const FilterContext = createContext<FilterContextType>({
@@ -32,6 +36,7 @@ export const FilterContext = createContext<FilterContextType>({
   setSortField: () => { },
   sortDirection: 'desc',
   setSortDirection: () => { },
+  resetFilters: () => { },
 });
 
 export const useFilter = () => useContext(FilterContext);
@@ -44,6 +49,13 @@ export const useFilterState = (): FilterContextType => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [sortField, setSortField] = useState<'name' | 'grade' | 'rating' | 'sectorName'>('grade');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const resetFilters = useCallback((sectors: readonly Sector[]) => {
+    setTextFilter('');
+    setHideUnknownGrades(false);
+    setHideSectorsWithoutRoutes(false);
+    setGradeRange(fullGradeRange(sectors));
+  }, []);
 
   return {
     gradeRange,
@@ -60,5 +72,6 @@ export const useFilterState = (): FilterContextType => {
     setSortField,
     sortDirection,
     setSortDirection,
+    resetFilters,
   };
 };

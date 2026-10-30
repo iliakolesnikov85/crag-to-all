@@ -76,9 +76,11 @@ export function createSectorGeoEditor(options: {
   geo: LatLng;
   name: string;
   takenNames?: readonly string[];
+  /** The sector does not exist yet, so Save always sends both name and geo. */
+  isNew?: boolean;
   host: SectorGeoEditHost;
 }): SectorGeoEditor {
-  const { host } = options;
+  const { host, isNew = false } = options;
   const takenNames = options.takenNames ?? [];
   let disposed = false;
   let dragging = false;
@@ -216,8 +218,8 @@ export function createSectorGeoEditor(options: {
       if (!next) return;
       placeMarker(next.geo);
       const patch: SectorEditPatch = {};
-      if (next.name !== originalName) patch.name = next.name;
-      if (!sameSectorGeo(next.geo, original)) patch.geo = next.geo;
+      if (isNew || next.name !== originalName) patch.name = next.name;
+      if (isNew || !sameSectorGeo(next.geo, original)) patch.geo = next.geo;
       if (patch.name === undefined && patch.geo === undefined) {
         exitEdit();
         return;

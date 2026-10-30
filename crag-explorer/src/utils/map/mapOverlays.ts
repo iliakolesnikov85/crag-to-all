@@ -1,6 +1,6 @@
 import * as L from 'leaflet';
 import { createRoot, type Root } from 'react-dom/client';
-import { renderSectorMapInfo } from '../../components/map/SectorMapInfo';
+import { renderSectorMapInfo, type SectorMapInfoProps } from '../../components/map/SectorMapInfo';
 import { CragContextType } from '../../context/CragContext';
 import { CragData, CragMapMarker, CragMapTrail, LatLng, Sector } from '../../types';
 import { createPieChartSVG, getSectorGradeCounts } from '../grades';
@@ -16,11 +16,6 @@ import {
 const POPUP_VIEW_PADDING_PX = 12;
 // Long enough for the click that left the coordinate field to arrive after blur.
 const POPUP_MOVE_CLICK_MS = 400;
-
-interface SectorPopupMoveGuard {
-  /** True while a typed coordinate move must not be treated as the user closing the popup. */
-  moving: boolean;
-}
 
 function createParkingMarkerIconHtml(): string {
   return `<div class="map-marker map-marker--parking" aria-hidden="true">
@@ -110,23 +105,172 @@ function setSectorMarkerLabel(marker: L.Marker, name: string): void {
   label.textContent = name;
 }
 
-function createSectorMarkerHost(
+function addSectorMarker(
+  overlay: L.LayerGroup,
+  sector: Sector,
+  navigate: (to: string) => void,
+  options: RenderMapOverlaysOptions,
+  takenNames: readonly string[],
+): void {
+  if (!sector.geo) return;
+
+  const sectorId = sector.id;
+  const saveSectorGeo = options.saveSectorGeo;
+  const editable = Boolean(
+    options.canEditSectorGeo
+    && saveSectorGeo
+    && sectorId
+    && typeof sector.version === 'number',
+  );
+
+  const marker = L.marker([sector.geo.lat, sector.geo.lon], {
+    icon: createSectorMarkerIcon(sector),
+    autoPan: editable,
+  }).addTo(overlay);
+
+  let editor: SectorGeoEditor | null = null;
+  const popupMoveGuard: SectorPopupMoveGuard | null = editable ? { moving: false } : null;
+  if (editable && saveSectorGeo && sectorId && popupMoveGuard) {
+    // The marker stays on the map after a save, so the next save must send the
+    // version returned by the previous one.
+    let savedSector = sector;
+    editor = createSectorGeoEditor({
+      geo: sector.geo,
+      name: sector.name,
+      takenNames,
+      host: createSectorMarkerHost(marker, options.map, popupMoveGuard, {
+        async save(patch) {
+          const previousName = savedSector.name;
+          const saved = await saveSectorGeo(savedSector, patch);
+          savedSector = saved;
+          if (saved.name !== previousName) setSectorMarkerLabel(marker, saved.name);
+          options.onSectorGeoSaved?.(saved);
+          return saved;
+        },
+        onDragChange(dragging) {
+          options.onSectorDragChange?.(sectorId, dragging);
+        },
+      }),
+    });
+    options.editors?.set(sectorId, editor);
+    bindSectorDrag(marker, editor);
+  }
+
+  marker.on('remove', () => {
+    editor?.dispose();
+  });
+
+  if (options.mode === 'bottom-panel') {
+    marker.on('click', (event: L.LeafletMouseEvent) => {
+      L.DomEvent.stopPropagation(event);
+      if (event.originalEvent) {
+        L.DomEvent.stopPropagation(event.originalEvent);
+      }
+      options.onSectorSelect?.(sector);
+    });
+    return;
+  }
+
+  bindSectorPopup(
+    marker,
+    { sector, navigate, geoEditor: editor },
+    options.cragContext,
+    popupMoveGuard,
+  );
+  if (sectorId && options.openPopupForSectorId === sectorId) {
+    marker.openPopup();
+  }
+}
+
+function addMapMarker(overlay: L.LayerGroup, markerData: CragMapMarker): void {
+  const parking = markerData.type === 'parking_space';
+  const label = markerLabelFromType(markerData.type);
+  const html = parking
+    ? createParkingMarkerIconHtml()
+    : createDefaultMapMarkerIconHtml(label);
+  const icon = L.divIcon({
+    className: parking
+      ? 'custom-marker map-marker-host map-marker-host--parking'
+      : 'custom-marker map-marker-host',
+    html,
+    iconSize: parking ? [34, 34] : [32, 32],
+    iconAnchor: parking ? [17, 34] : [16, 32],
+    popupAnchor: [0, -28],
+  });
+
+  const body = markerData.info.trim()
+    ? escapeHtml(markerData.info.trim()).replace(/\n/g, '<br/>')
+    : `<span class="map-popup-muted">${escapeHtml(label)}</span>`;
+  const popupHtml = `<div class="map-popup map-popup--marker"><strong>${escapeHtml(label)}</strong><div class="map-popup-body">${body}</div></div>`;
+
+  L.marker([markerData.geo.lat, markerData.geo.lon], { icon }).addTo(overlay).bindPopup(popupHtml, { maxWidth: 280 });
+}
+
+function addTrail(overlay: L.LayerGroup, trail: CragMapTrail): void {
+  if (trail.points.length < 2) return;
+
+  const color = resolveTrailColor(trail.color);
+  const line = L.polyline(
+    trail.points.map((point): L.LatLngTuple => [point.lat, point.lon]),
+    { color, weight: 4, opacity: 0.88 },
+  ).addTo(overlay);
+  const title = escapeHtml(trail.name.trim()) || 'Trail';
+  line.bindPopup(`<div class="map-popup map-popup--trail"><strong>${title}</strong></div>`);
+}
+
+export type SectorMarkerMode = 'popup' | 'bottom-panel';
+
+export interface RenderMapOverlaysOptions {
+  mode: SectorMarkerMode;
+  onSectorSelect?: (sector: Sector) => void;
+  cragContext: CragContextType;
+  map: L.Map;
+  canEditSectorGeo: boolean;
+  editors?: Map<string, SectorGeoEditor>;
+  /** Open this sector's popup when the layers are drawn, e.g. after a save or create. */
+  openPopupForSectorId?: string | null;
+  onSectorGeoSaved?: (sector: Sector) => void;
+  onSectorDragChange?: (sectorId: string, dragging: boolean) => void;
+  saveSectorGeo?: (sector: Sector, patch: SectorEditPatch) => Promise<Sector>;
+}
+
+export interface SectorPopupMoveGuard {
+  /** True while a typed coordinate move must not be treated as the user closing the popup. */
+  moving: boolean;
+}
+
+export interface SectorMarkerHostCallbacks {
+  save(patch: SectorEditPatch): Promise<Sector>;
+  onDragChange?(dragging: boolean): void;
+}
+
+export function createSectorMarkerIcon(sector: Sector): L.DivIcon {
+  const svg = createPieChartSVG(getSectorGradeCounts(sector), 30);
+  return L.divIcon({
+    className: 'custom-marker',
+    html: `
+      <div class="marker-container">
+        <div class="pie-chart">${svg}</div>
+        <div class="label">${escapeHtml(sector.name)}</div>
+      </div>
+    `,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -15],
+  });
+}
+
+export function createSectorMarkerHost(
   marker: L.Marker,
   map: L.Map,
-  sector: Sector,
-  options: RenderMapOverlaysOptions,
-  saveSectorGeo: (sector: Sector, patch: SectorEditPatch) => Promise<Sector>,
   popupMoveGuard: SectorPopupMoveGuard,
+  callbacks: SectorMarkerHostCallbacks,
 ): SectorGeoEditHost {
-  const sectorId = sector.id ?? '';
   let reopenTimer: number | null = null;
   let recenterEnd: (() => void) | null = null;
   let releaseMapClick: (() => void) | null = null;
   let releaseMapClickTimer: number | null = null;
   let popupMoveGeneration = 0;
-  // The marker stays on the map after a save, so the next save must send the
-  // version returned by the previous one.
-  let savedSector = sector;
 
   function endPopupMoveHold(generation: number): void {
     if (generation !== popupMoveGeneration) return;
@@ -229,10 +373,10 @@ function createSectorMarkerHost(
     hidePopup() {
       concealPopup(marker);
       marker.closePopup();
-      options.onSectorDragChange?.(sectorId, true);
+      callbacks.onDragChange?.(true);
     },
     showPopup() {
-      options.onSectorDragChange?.(sectorId, false);
+      callbacks.onDragChange?.(false);
       if (reopenTimer != null) window.clearTimeout(reopenTimer);
       // Leaflet closes the popup when a drag starts. Reopen after dragend so the
       // popup is not created and torn down in the same event turn.
@@ -243,18 +387,13 @@ function createSectorMarkerHost(
         marker.openPopup();
       }, 0);
     },
-    async save(patch) {
-      const previousName = savedSector.name;
-      const saved = await saveSectorGeo(savedSector, patch);
-      savedSector = saved;
-      if (saved.name !== previousName) setSectorMarkerLabel(marker, saved.name);
-      options.onSectorGeoSaved?.(saved);
-      return saved;
+    save(patch) {
+      return callbacks.save(patch);
     },
   };
 }
 
-function bindSectorDrag(marker: L.Marker, editor: SectorGeoEditor): void {
+export function bindSectorDrag(marker: L.Marker, editor: SectorGeoEditor): void {
   marker.on('dragstart', () => {
     marker.getElement()?.classList.add('custom-marker--dragging');
     editor.beginDrag();
@@ -270,14 +409,13 @@ function bindSectorDrag(marker: L.Marker, editor: SectorGeoEditor): void {
   });
 }
 
-function bindSectorPopup(
+export function bindSectorPopup(
   marker: L.Marker,
-  sector: Sector,
-  navigate: (to: string) => void,
-  options: RenderMapOverlaysOptions,
-  geoEditor: SectorGeoEditor | null,
+  info: SectorMapInfoProps,
+  cragContext: CragContextType,
   popupMoveGuard: SectorPopupMoveGuard | null,
 ): void {
+  const geoEditor = info.geoEditor ?? null;
   const container = L.DomUtil.create('div', 'sector-map-info-popup-root');
   let root: Root | null = null;
   let unmountTimer: number | null = null;
@@ -290,11 +428,7 @@ function bindSectorPopup(
     }
     unmounted = false;
     if (!root) root = createRoot(container);
-    renderSectorMapInfo(
-      root,
-      { sector, navigate, geoEditor },
-      options.cragContext,
-    );
+    renderSectorMapInfo(root, info, cragContext);
     keepSectorPopupInView(marker);
   };
 
@@ -350,137 +484,6 @@ function bindSectorPopup(
     }
     scheduleUnmount();
   });
-}
-
-function addSectorMarker(
-  overlay: L.LayerGroup,
-  sector: Sector,
-  navigate: (to: string) => void,
-  options: RenderMapOverlaysOptions,
-  takenNames: readonly string[],
-): void {
-  if (!sector.geo) return;
-
-  const gradeCounts = getSectorGradeCounts(sector);
-  const svg = createPieChartSVG(gradeCounts, 30);
-  const icon = L.divIcon({
-    className: 'custom-marker',
-    html: `
-      <div class="marker-container">
-        <div class="pie-chart">${svg}</div>
-        <div class="label">${escapeHtml(sector.name)}</div>
-      </div>
-    `,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
-    popupAnchor: [0, -15],
-  });
-
-  const sectorId = sector.id;
-  const saveSectorGeo = options.saveSectorGeo;
-  const editable = Boolean(
-    options.canEditSectorGeo
-    && saveSectorGeo
-    && sectorId
-    && typeof sector.version === 'number',
-  );
-
-  const marker = L.marker([sector.geo.lat, sector.geo.lon], {
-    icon,
-    autoPan: editable,
-  }).addTo(overlay);
-
-  let editor: SectorGeoEditor | null = null;
-  const popupMoveGuard: SectorPopupMoveGuard | null = editable ? { moving: false } : null;
-  if (editable && saveSectorGeo && sectorId && popupMoveGuard) {
-    editor = createSectorGeoEditor({
-      geo: sector.geo,
-      name: sector.name,
-      takenNames,
-      host: createSectorMarkerHost(
-        marker,
-        options.map,
-        sector,
-        options,
-        saveSectorGeo,
-        popupMoveGuard,
-      ),
-    });
-    options.editors?.set(sectorId, editor);
-    bindSectorDrag(marker, editor);
-  }
-
-  marker.on('remove', () => {
-    editor?.dispose();
-  });
-
-  if (options.mode === 'bottom-panel') {
-    marker.on('click', (event: L.LeafletMouseEvent) => {
-      L.DomEvent.stopPropagation(event);
-      if (event.originalEvent) {
-        L.DomEvent.stopPropagation(event.originalEvent);
-      }
-      options.onSectorSelect?.(sector);
-    });
-    return;
-  }
-
-  bindSectorPopup(marker, sector, navigate, options, editor, popupMoveGuard);
-  if (sectorId && options.openPopupForSectorId === sectorId) {
-    marker.openPopup();
-  }
-}
-
-function addMapMarker(overlay: L.LayerGroup, markerData: CragMapMarker): void {
-  const parking = markerData.type === 'parking_space';
-  const label = markerLabelFromType(markerData.type);
-  const html = parking
-    ? createParkingMarkerIconHtml()
-    : createDefaultMapMarkerIconHtml(label);
-  const icon = L.divIcon({
-    className: parking
-      ? 'custom-marker map-marker-host map-marker-host--parking'
-      : 'custom-marker map-marker-host',
-    html,
-    iconSize: parking ? [34, 34] : [32, 32],
-    iconAnchor: parking ? [17, 34] : [16, 32],
-    popupAnchor: [0, -28],
-  });
-
-  const body = markerData.info.trim()
-    ? escapeHtml(markerData.info.trim()).replace(/\n/g, '<br/>')
-    : `<span class="map-popup-muted">${escapeHtml(label)}</span>`;
-  const popupHtml = `<div class="map-popup map-popup--marker"><strong>${escapeHtml(label)}</strong><div class="map-popup-body">${body}</div></div>`;
-
-  L.marker([markerData.geo.lat, markerData.geo.lon], { icon }).addTo(overlay).bindPopup(popupHtml, { maxWidth: 280 });
-}
-
-function addTrail(overlay: L.LayerGroup, trail: CragMapTrail): void {
-  if (trail.points.length < 2) return;
-
-  const color = resolveTrailColor(trail.color);
-  const line = L.polyline(
-    trail.points.map((point): L.LatLngTuple => [point.lat, point.lon]),
-    { color, weight: 4, opacity: 0.88 },
-  ).addTo(overlay);
-  const title = escapeHtml(trail.name.trim()) || 'Trail';
-  line.bindPopup(`<div class="map-popup map-popup--trail"><strong>${title}</strong></div>`);
-}
-
-export type SectorMarkerMode = 'popup' | 'bottom-panel';
-
-export interface RenderMapOverlaysOptions {
-  mode: SectorMarkerMode;
-  onSectorSelect?: (sector: Sector) => void;
-  cragContext: CragContextType;
-  map: L.Map;
-  canEditSectorGeo: boolean;
-  editors?: Map<string, SectorGeoEditor>;
-  /** Reopen this sector popup after a coordinate save redraws the layers. */
-  openPopupForSectorId?: string | null;
-  onSectorGeoSaved?: (sector: Sector) => void;
-  onSectorDragChange?: (sectorId: string, dragging: boolean) => void;
-  saveSectorGeo?: (sector: Sector, patch: SectorEditPatch) => Promise<Sector>;
 }
 
 /** Clear and redraw sectors, map markers, and trails on the overlay layer. */

@@ -9,7 +9,7 @@ import { useCrag } from '../context/CragContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useIsMobileLayout } from '../hooks/useIsMobileLayout';
 import { useMapFullscreen } from '../hooks/useMapFullscreen';
-import PlaceSectorMapButton from './map/PlaceSectorMapButton';
+import PlaceSectorMapButton, { type PlaceSectorMapButtonHandle } from './map/PlaceSectorMapButton';
 import SectorMapInfo from './map/SectorMapInfo';
 import {
   applyInitialMapView,
@@ -27,9 +27,10 @@ import {
 interface MapWidgetProps {
   cragData: CragData;
   onSectorGeoSaved?: (sector: Sector) => void;
+  onSectorCreated?: (sector: Sector) => void;
 }
 
-const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved }) => {
+const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSectorCreated }) => {
   const { crag, getUrl } = useCrag();
   const navigate = useNavigate();
   const online = useOnlineStatus();
@@ -40,9 +41,12 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved }) => 
   const overlayKeyRef = useRef('');
   const mapSeenRef = useRef<L.Map | null>(null);
   const reopenSectorIdRef = useRef<string | null>(null);
+  const createdSectorIdRef = useRef<string | null>(null);
+  const placeSectorRef = useRef<PlaceSectorMapButtonHandle>(null);
   const getUrlRef = useRef(getUrl);
   const navigateRef = useRef(navigate);
   const onSectorGeoSavedRef = useRef(onSectorGeoSaved);
+  const onSectorCreatedRef = useRef(onSectorCreated);
   const skipNextMapClickRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
   const [mapEpoch, setMapEpoch] = useState(0);
@@ -58,17 +62,23 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved }) => 
   getUrlRef.current = getUrl;
   navigateRef.current = navigate;
   onSectorGeoSavedRef.current = onSectorGeoSaved;
+  onSectorCreatedRef.current = onSectorCreated;
 
-  const onSectorSelect = useCallback((sector: Sector) => {
-    // Ignore a map click that may fire in the same gesture as the marker click.
+  // Ignore a map click that may fire in the same gesture as a marker click.
+  const skipCurrentMapClick = useCallback(() => {
     skipNextMapClickRef.current = true;
-    setSelectedSector(sector);
     queueMicrotask(() => {
       skipNextMapClickRef.current = false;
     });
   }, []);
 
-  const clearSelectedSector = useCallback(() => {
+  const onSectorSelect = useCallback((sector: Sector) => {
+    skipCurrentMapClick();
+    placeSectorRef.current?.dismiss();
+    setSelectedSector(sector);
+  }, [skipCurrentMapClick]);
+
+  const handlePlacementStart = useCallback(() => {
     setSelectedSector(null);
   }, []);
 
@@ -93,6 +103,15 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved }) => 
     }
     return patchSectorGeo(crag.cragId, sector.id, sector.version, patch);
   }, [crag.cragId]);
+
+  const handleSectorCreated = useCallback((sector: Sector) => {
+    if (isMobile) {
+      setSelectedSector(sector);
+    } else if (sector.id) {
+      createdSectorIdRef.current = sector.id;
+    }
+    onSectorCreatedRef.current?.(sector);
+  }, [isMobile]);
 
   // Create map instance, controls, and base layers.
   useEffect(() => {
@@ -190,6 +209,12 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved }) => 
     }
     const reopenId = reopenSectorIdRef.current;
     reopenSectorIdRef.current = null;
+    // Unlike a coordinate save, a created sector has no marker yet, so it must
+    // not take the "keep the current marker" path below.
+    const createdId = createdSectorIdRef.current;
+    if (createdId && cragData.sectors.some((sector) => sector.id === createdId)) {
+      createdSectorIdRef.current = null;
+    }
     // A coordinate save already moved this pin. Rebuilding the layers would
     // close its popup, so keep the current marker and the open popup.
     if (reopenId && mode === 'popup' && overlayKeyRef.current) {
@@ -208,7 +233,7 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved }) => 
       map,
       canEditSectorGeo,
       editors,
-      openPopupForSectorId: mode === 'popup' ? reopenId : null,
+      openPopupForSectorId: mode === 'popup' ? reopenId ?? createdId : null,
       onSectorGeoSaved: handleSectorGeoSaved,
       onSectorDragChange: handleSectorDragChange,
       saveSectorGeo,
@@ -247,8 +272,11 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved }) => 
       <div ref={mapRef} className="map-container" />
       {canEditSectorGeo && (
         <PlaceSectorMapButton
+          ref={placeSectorRef}
           map={mapReady ? mapInstanceRef.current : null}
-          onStart={clearSelectedSector}
+          takenNames={cragData.sectors.map((sector) => sector.name)}
+          onStart={handlePlacementStart}
+          onCreated={handleSectorCreated}
         />
       )}
       {isMobile && selectedSector && !hideSelectedPanel && (

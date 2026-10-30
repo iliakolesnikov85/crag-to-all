@@ -30,7 +30,8 @@ const RoutesFilter: React.FC<RoutesFilterProps> = ({
     hideSectorsWithoutRoutes,
     setHideSectorsWithoutRoutes,
     isExpanded,
-    setIsExpanded
+    setIsExpanded,
+    resetFilters,
   } = useFilter();
 
   const {
@@ -194,14 +195,7 @@ const RoutesFilter: React.FC<RoutesFilterProps> = ({
             <Button
               variant="danger"
               size="sm"
-              onClick={() => {
-                if (showGradeSlider) {
-                  setGradeRange([0, availableGrades.length - 1]);
-                }
-                setHideUnknownGrades(false);
-                setHideSectorsWithoutRoutes(false);
-                clearTextFilter();
-              }}
+              onClick={() => resetFilters(sectors)}
               disabled={expandableFilterCount === 0 && !textFilter.trim()}
               title="Reset filters"
             >

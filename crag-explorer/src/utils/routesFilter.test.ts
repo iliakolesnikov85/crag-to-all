@@ -3,6 +3,7 @@ import type { Route, Sector } from '../types';
 import { sampleCragData } from '../test/fixtures/cragData';
 import {
   applyRouteFilters,
+  fullGradeRange,
   getAvailableGrades,
   isGradeInRange,
   type RouteFilterState,
@@ -58,6 +59,18 @@ describe('getAvailableGrades', () => {
         makeRoute({ name: 'e', grade: '6B', sectorName: 's' }),
       ]),
     ).toEqual(['6A', '6B', '6C']);
+  });
+});
+
+describe('fullGradeRange', () => {
+  it('spans every known grade and stays unset when the slider is hidden', () => {
+    expect(fullGradeRange(mixedSectors)).toEqual([0, 2]);
+    expect(fullGradeRange([makeSector('Empty Sector', [])])).toEqual([0, 0]);
+    expect(fullGradeRange([
+      makeSector('Main Wall', [
+        makeRoute({ name: 'Classic', grade: '6A+', sectorName: 'Main Wall' }),
+      ]),
+    ])).toEqual([0, 0]);
   });
 });
 

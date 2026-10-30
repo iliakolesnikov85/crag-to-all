@@ -30,6 +30,21 @@ async function readErrorMessage(
   return fallback;
 }
 
+async function readSectorResponse(response: Response): Promise<Sector> {
+  const body = (await response.json()) as Partial<Sector>;
+  if (
+    typeof body.id !== 'string'
+    || typeof body.name !== 'string'
+    || typeof body.version !== 'number'
+    || !body.geo
+    || typeof body.geo.lat !== 'number'
+    || typeof body.geo.lon !== 'number'
+  ) {
+    throw new Error('Sector save returned an unexpected response');
+  }
+  return body as Sector;
+}
+
 /** Resolve an API path. An empty VITE_API_BASE_URL keeps the path relative so the dev proxy can forward it. */
 export function apiUrl(path: string): string {
   const normalized = path.startsWith('/') ? path : `/${path}`;
@@ -125,16 +140,22 @@ export async function patchSectorGeo(
       ),
     );
   }
-  const body = (await response.json()) as Partial<Sector>;
-  if (
-    typeof body.id !== 'string'
-    || typeof body.name !== 'string'
-    || typeof body.version !== 'number'
-    || !body.geo
-    || typeof body.geo.lat !== 'number'
-    || typeof body.geo.lon !== 'number'
-  ) {
-    throw new Error('Sector save returned an unexpected response');
+  return readSectorResponse(response);
+}
+
+export async function createSector(
+  cragId: string,
+  sector: { name: string; geo: LatLng },
+): Promise<Sector> {
+  const response = await apiFetch(`${cragDocumentPath(cragId)}/sectors`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(sector),
+  });
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, `Failed to create sector (${response.status})`),
+    );
   }
-  return body as Sector;
+  return readSectorResponse(response);
 }

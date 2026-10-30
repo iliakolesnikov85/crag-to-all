@@ -5,6 +5,12 @@ export {
   createLocationControl,
   createResetBoundsControl,
 } from './mapControls';
+export type {
+  DraftSectorMarker,
+  DraftSectorMarkerOptions,
+  NewSectorInput,
+} from './draftSectorMarker';
+export { addDraftSectorMarker } from './draftSectorMarker';
 export { buildBaseLayerOptions } from './mapLayers';
 export { escapeHtml, mapOverlayRenderKey, markerLabelFromType } from './mapOverlayHelpers';
 export type { RenderMapOverlaysOptions, SectorMarkerMode } from './mapOverlays';

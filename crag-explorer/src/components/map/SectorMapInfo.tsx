@@ -8,6 +8,7 @@ import { formatSectorCoordinatePair } from '../../utils/map/sectorCoordinates';
 import type { SectorGeoEditor, SectorGeoEditorSnapshot } from '../../utils/map/sectorGeoEditor';
 import { getCragImageUrl } from '../../utils/firebaseStorage';
 import Button from '../Button';
+import SectorTopoInput from './SectorTopoInput';
 import './SectorMapInfo.scss';
 
 const SECTOR_MAP_INFO_MAX_ROUTES = 4;
@@ -213,6 +214,8 @@ export interface SectorMapInfoProps {
   navigate?: (to: string) => void;
   /** Present when this sector's pin can be moved. */
   geoEditor?: SectorGeoEditor | null;
+  /** The sector is a draft placed on the map and has not been saved yet. */
+  isNew?: boolean;
 }
 
 const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
@@ -220,6 +223,7 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
   maxRoutes = SECTOR_MAP_INFO_MAX_ROUTES,
   navigate,
   geoEditor,
+  isNew = false,
 }) => {
   const { crag, getUrl } = useCrag();
   const snapshot = useGeoEditorSnapshot(geoEditor);
@@ -269,7 +273,9 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
         </SectorNavLink>
       )}
       <div className="sector-map-info__body">
-        {imageUrl ? (
+        {isNew && editing ? (
+          <SectorTopoInput disabled={snapshot.saving} />
+        ) : imageUrl ? (
           editing ? (
             <span className="sector-map-info__image-frame">
               <img className="sector-map-info__image" src={imageUrl} alt="" />
@@ -297,7 +303,7 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
                   type="button"
                   size="sm"
                   variant="primary"
-                  aria-label={`Save sector ${displayName}`}
+                  aria-label={isNew ? 'Create sector' : `Save sector ${displayName}`}
                   disabled={snapshot.saving}
                   onMouseDown={keepCoordinateFocus}
                   onClick={(event) => {
@@ -311,7 +317,7 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
                   type="button"
                   size="sm"
                   variant="secondary"
-                  aria-label={`Cancel sector edit for ${displayName}`}
+                  aria-label={isNew ? 'Discard new sector' : `Cancel sector edit for ${displayName}`}
                   disabled={snapshot.saving}
                   onMouseDown={keepCoordinateFocus}
                   onClick={(event) => {

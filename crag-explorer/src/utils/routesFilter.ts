@@ -47,6 +47,13 @@ export function getAvailableGrades(routes: Route[]): string[] {
   );
 }
 
+/** Slider indexes that include every known grade. `[0, 0]` when the slider is hidden. */
+export function fullGradeRange(sectors: readonly Sector[]): [number, number] {
+  const count = getAvailableGrades(sectors.flatMap((sector) => sector.routes)).length;
+  if (count <= 1) return [0, 0];
+  return [0, count - 1];
+}
+
 export function isGradeInRange(
   grade: string | undefined,
   availableGrades: string[],
