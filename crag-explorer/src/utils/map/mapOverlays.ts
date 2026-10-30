@@ -1,6 +1,6 @@
 import * as L from 'leaflet';
 import { createRoot, type Root } from 'react-dom/client';
-import { renderSectorMapInfo } from '../../components/SectorMapInfo';
+import { renderSectorMapInfo } from '../../components/map/SectorMapInfo';
 import { CragContextType } from '../../context/CragContext';
 import { CragData, CragMapMarker, CragMapTrail, LatLng, Sector } from '../../types';
 import { createPieChartSVG, getSectorGradeCounts } from '../grades';

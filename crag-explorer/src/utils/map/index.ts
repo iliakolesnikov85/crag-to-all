@@ -1,4 +1,6 @@
+export type { AddSectorControl } from './mapControls';
 export {
+  createAddSectorControl,
   createControlButton,
   createLocationControl,
   createResetBoundsControl,

@@ -2,12 +2,12 @@ import React, { useSyncExternalStore } from 'react';
 import type { Root } from 'react-dom/client';
 import { MdEdit, MdInfoOutline, MdLocationOn } from 'react-icons/md';
 import { Link } from 'react-router';
-import { CragContext, CragContextType, useCrag } from '../context/CragContext';
-import type { Sector } from '../types';
-import { formatSectorCoordinatePair } from '../utils/map/sectorCoordinates';
-import type { SectorGeoEditor, SectorGeoEditorSnapshot } from '../utils/map/sectorGeoEditor';
-import { getCragImageUrl } from '../utils/firebaseStorage';
-import Button from './Button';
+import { CragContext, CragContextType, useCrag } from '../../context/CragContext';
+import type { Sector } from '../../types';
+import { formatSectorCoordinatePair } from '../../utils/map/sectorCoordinates';
+import type { SectorGeoEditor, SectorGeoEditorSnapshot } from '../../utils/map/sectorGeoEditor';
+import { getCragImageUrl } from '../../utils/firebaseStorage';
+import Button from '../Button';
 import './SectorMapInfo.scss';
 
 const SECTOR_MAP_INFO_MAX_ROUTES = 4;

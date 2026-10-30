@@ -9,7 +9,8 @@ import { useCrag } from '../context/CragContext';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useIsMobileLayout } from '../hooks/useIsMobileLayout';
 import { useMapFullscreen } from '../hooks/useMapFullscreen';
-import SectorMapInfo from './SectorMapInfo';
+import PlaceSectorMapButton from './map/PlaceSectorMapButton';
+import SectorMapInfo from './map/SectorMapInfo';
 import {
   applyInitialMapView,
   attachBaseLayers,
@@ -65,6 +66,10 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved }) => 
     queueMicrotask(() => {
       skipNextMapClickRef.current = false;
     });
+  }, []);
+
+  const clearSelectedSector = useCallback(() => {
+    setSelectedSector(null);
   }, []);
 
   const handleSectorGeoSaved = useCallback((sector: Sector) => {
@@ -240,6 +245,12 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved }) => 
   return (
     <div className={`map-widget${fullscreen ? ' map-widget--fullscreen' : ''}`}>
       <div ref={mapRef} className="map-container" />
+      {canEditSectorGeo && (
+        <PlaceSectorMapButton
+          map={mapReady ? mapInstanceRef.current : null}
+          onStart={clearSelectedSector}
+        />
+      )}
       {isMobile && selectedSector && !hideSelectedPanel && (
         <div className="sector-map-info-panel">
           <SectorMapInfo sector={selectedSector} geoEditor={selectedEditor} />

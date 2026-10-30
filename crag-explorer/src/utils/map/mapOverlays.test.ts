@@ -4,7 +4,7 @@ import { CRAG_DATA_PROTOCOL, type CragData, type Sector } from '../../types';
 import { renderMapOverlays } from './mapOverlays';
 import type { SectorEditPatch, SectorGeoEditor } from './sectorGeoEditor';
 
-vi.mock('../../components/SectorMapInfo', () => ({
+vi.mock('../../components/map/SectorMapInfo', () => ({
   renderSectorMapInfo: vi.fn(),
 }));
 

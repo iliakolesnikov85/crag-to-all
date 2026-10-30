@@ -1,13 +1,13 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CragContext } from '../context/CragContext';
-import type { Sector } from '../types';
+import { CragContext } from '../../context/CragContext';
+import type { Sector } from '../../types';
 import {
   createSectorGeoEditor,
   type SectorEditPatch,
   type SectorGeoEditHost,
   type SectorGeoEditor,
-} from '../utils/map/sectorGeoEditor';
+} from '../../utils/map/sectorGeoEditor';
 import SectorMapInfo from './SectorMapInfo';
 
 const cragValue = {
