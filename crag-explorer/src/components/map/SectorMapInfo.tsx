@@ -1,140 +1,33 @@
-import React, { useSyncExternalStore } from 'react';
-import type { Root } from 'react-dom/client';
+import React from 'react';
 import { MdEdit, MdInfoOutline, MdLocationOn } from 'react-icons/md';
 import { Link } from 'react-router';
-import { CragContext, CragContextType, useCrag } from '../../context/CragContext';
-import type { LatLng, Sector } from '../../types';
+import { useCrag } from '../../context/CragContext';
+import type { SectorEditor } from '../../hooks/useSectorEditor';
+import type { Sector } from '../../types';
 import { getCragImageUrl } from '../../utils/firebaseStorage';
-import {
-  getEmptyDraftTopoSnapshot,
-  type DraftTopo,
-  type DraftTopoSnapshot,
-} from '../../utils/map/draftTopo';
-import {
-  formatSectorCoordinate,
-  formatSectorCoordinatePair,
-  parseLatitude,
-  parseLongitude,
-  sameSectorGeo,
-} from '../../utils/map/sectorCoordinates';
-import type { SectorGeoEditor, SectorGeoEditorSnapshot } from '../../utils/map/sectorGeoEditor';
-import { TOPO_TYPE_ERROR, readTopoGps, validateTopoFile } from '../../utils/topoImage';
+import { formatSectorCoordinatePair } from '../../utils/map/sectorCoordinates';
+import { sectorMarkerKey, type SectorEditState } from '../../utils/map/sectorEditState';
 import Button from '../Button';
 import Modal from '../Modal';
 import SectorTopoInput from './SectorTopoInput';
+import { useTopoPicker } from './useTopoPicker';
 import './SectorMapInfo.scss';
 
 const SECTOR_MAP_INFO_MAX_ROUTES = 4;
 const SECTOR_MARKER_DRAG_HINT = 'You can drag the marker on the map to move it.';
 
-const READ_ONLY_SNAPSHOT: SectorGeoEditorSnapshot = {
-  editing: false,
-  saving: false,
-  latText: '',
-  lonText: '',
-  nameText: '',
-  latError: null,
-  lonError: null,
-  nameError: null,
-  saveError: null,
-};
-
-function subscribeToNothing(): () => void {
-  return () => { };
-}
-
-function getReadOnlySnapshot(): SectorGeoEditorSnapshot {
-  return READ_ONLY_SNAPSHOT;
-}
-
-function useGeoEditorSnapshot(geoEditor?: SectorGeoEditor | null): SectorGeoEditorSnapshot {
-  return useSyncExternalStore(
-    geoEditor ? geoEditor.subscribe : subscribeToNothing,
-    geoEditor ? geoEditor.getSnapshot : getReadOnlySnapshot,
-    geoEditor ? geoEditor.getSnapshot : getReadOnlySnapshot,
-  );
-}
-
-function useDraftTopo(topo?: DraftTopo | null): DraftTopoSnapshot {
-  return useSyncExternalStore(
-    topo ? topo.subscribe : subscribeToNothing,
-    topo ? topo.getSnapshot : getEmptyDraftTopoSnapshot,
-    topo ? topo.getSnapshot : getEmptyDraftTopoSnapshot,
-  );
-}
-
-function editedGeo(snapshot: SectorGeoEditorSnapshot): LatLng | null {
-  const lat = parseLatitude(snapshot.latText);
-  const lon = parseLongitude(snapshot.lonText);
-  if (!lat.ok || !lon.ok) return null;
-  return { lat: lat.value, lon: lon.value };
-}
-
-async function acceptTopoFile(
-  file: File,
-  topo: DraftTopo,
-  geoEditor: SectorGeoEditor,
-): Promise<void> {
-  const readId = topo.beginRead();
-  try {
-    const validation = await validateTopoFile(file);
-    if (!topo.isCurrentRead(readId)) return;
-    if (!validation.ok) {
-      topo.reject(readId, validation.error);
-      return;
-    }
-  } catch (error) {
-    console.error('Could not read the selected image:', error);
-    if (!topo.isCurrentRead(readId)) return;
-    topo.reject(readId, TOPO_TYPE_ERROR);
-    return;
-  }
-  topo.accept(file);
-  let gps: LatLng | null;
-  try {
-    gps = await readTopoGps(file);
-  } catch (error) {
-    console.warn('Could not read photo location:', error);
-    if (topo.isCurrentRead(readId)) topo.finishRead(readId);
-    return;
-  }
-  if (!topo.isCurrentRead(readId)) return;
-  topo.finishRead(readId);
-  if (!gps) return;
-  const current = editedGeo(geoEditor.getSnapshot());
-  if (current && sameSectorGeo(current, gps)) return;
-  topo.setGpsPrompt(gps);
-}
-
-function applyPhotoLocation(topo: DraftTopo, geoEditor: SectorGeoEditor): void {
-  const gps = topo.getSnapshot().gpsPrompt;
-  if (!gps) return;
-  const before = geoEditor.getSnapshot();
-  if (!before.editing || before.saving) return;
-  const latText = formatSectorCoordinate(gps.lat);
-  const lonText = formatSectorCoordinate(gps.lon);
-  geoEditor.setLatText(latText);
-  geoEditor.setLonText(lonText);
-  geoEditor.commitDraft();
-  const after = geoEditor.getSnapshot();
-  if (after.latText !== latText || after.lonText !== lonText) return;
-  topo.dismissGpsPrompt();
-}
-
-function keepCoordinateFocus(event: React.MouseEvent<HTMLElement>): void {
-  // Blur would commit the draft and re-render before click, so the button can move
-  // out from under the pointer. Keeping focus lets Apply and Cancel receive the click.
-  // Stopping the event here also keeps Leaflet from treating it as a map click that
-  // closes the popup.
+/** Blur would commit the draft and re-render before click, so the button can move
+ * out from under the pointer. Keeping focus lets Apply and Cancel receive the click. */
+function keepFocus(event: React.MouseEvent<HTMLElement>): void {
   event.preventDefault();
-  event.stopPropagation();
 }
 
 function onEditKeyDown(
   event: React.KeyboardEvent<HTMLDivElement>,
-  editor: SectorGeoEditor,
+  editor: SectorEditor,
   blockApply = false,
 ): void {
+  // Esc must cancel the edit without also leaving map fullscreen.
   event.stopPropagation();
   if (event.key === 'Enter') {
     event.preventDefault();
@@ -157,129 +50,89 @@ function nameInputClass(invalid: boolean): string {
     : 'sector-map-info__name-input';
 }
 
-function SectorNavLink({
-  to,
-  className,
-  children,
-  navigate,
+function SectorCoordinatesEditor({
+  edit,
+  editor,
+  blockApply,
 }: {
-  to: string;
-  className?: string;
-  children: React.ReactNode;
-  navigate?: (to: string) => void;
+  edit: SectorEditState;
+  editor: SectorEditor;
+  blockApply: boolean;
 }) {
-  if (navigate) {
-    return (
-      <a
-        href={to}
-        className={className}
-        rel="noopener noreferrer"
-        onClick={(event) => {
-          if (event.defaultPrevented) return;
-          if (event.button !== 0) return;
-          if (event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
-          event.preventDefault();
-          navigate(to);
-        }}
-      >
-        {children}
-      </a>
-    );
-  }
-
+  const disabled = edit.saving;
   return (
-    <Link to={to} className={className}>
-      {children}
-    </Link>
+    <div
+      className="sector-map-info__coords sector-map-info__coords--editing"
+      aria-busy={disabled || undefined}
+      onKeyDown={(event) => onEditKeyDown(event, editor, blockApply)}
+    >
+      <MdLocationOn className="sector-map-info__coords-pin" aria-hidden="true" />
+      <div className="sector-map-info__coords-fields">
+        <label className="sector-map-info__coord">
+          <span className="sector-map-info__coord-label">Latitude</span>
+          <input
+            className={coordinateInputClass(edit.latError != null)}
+            aria-label="Latitude"
+            inputMode="decimal"
+            autoComplete="off"
+            spellCheck={false}
+            disabled={disabled}
+            value={edit.latText}
+            onChange={(event) => editor.setLatText(event.target.value)}
+            onBlur={() => editor.commitDraft()}
+          />
+        </label>
+        <label className="sector-map-info__coord">
+          <span className="sector-map-info__coord-label">Longitude</span>
+          <input
+            className={coordinateInputClass(edit.lonError != null)}
+            aria-label="Longitude"
+            inputMode="decimal"
+            autoComplete="off"
+            spellCheck={false}
+            disabled={disabled}
+            value={edit.lonText}
+            onChange={(event) => editor.setLonText(event.target.value)}
+            onBlur={() => editor.commitDraft()}
+          />
+        </label>
+      </div>
+      {(edit.latError || edit.lonError || edit.saveError) ? (
+        <div className="sector-map-info__coords-errors" role="alert">
+          {edit.latError ? <p>{edit.latError}</p> : null}
+          {edit.lonError ? <p>{edit.lonError}</p> : null}
+          {edit.saveError ? <p>{edit.saveError}</p> : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
 function SectorCoordinates({
   sector,
-  geoEditor,
-  blockApply = false,
+  onEdit,
 }: {
   sector: Sector;
-  geoEditor?: SectorGeoEditor | null;
-  blockApply?: boolean;
+  /** Present when this sector's pin can be moved. */
+  onEdit: (() => void) | null;
 }) {
-  const snapshot = useGeoEditorSnapshot(geoEditor);
-
-  if (snapshot.editing && geoEditor) {
-    const disabled = snapshot.saving;
-    return (
-      <div
-        className="sector-map-info__coords sector-map-info__coords--editing"
-        aria-busy={disabled || undefined}
-        onKeyDown={(event) => onEditKeyDown(event, geoEditor, blockApply)}
-      >
-        <MdLocationOn className="sector-map-info__coords-pin" aria-hidden="true" />
-        <div className="sector-map-info__coords-fields">
-          <label className="sector-map-info__coord">
-            <span className="sector-map-info__coord-label">Latitude</span>
-            <input
-              className={coordinateInputClass(snapshot.latError != null)}
-              aria-label="Latitude"
-              inputMode="decimal"
-              autoComplete="off"
-              spellCheck={false}
-              disabled={disabled}
-              value={snapshot.latText}
-              onChange={(event) => geoEditor.setLatText(event.target.value)}
-              onBlur={() => geoEditor.commitDraft()}
-            />
-          </label>
-          <label className="sector-map-info__coord">
-            <span className="sector-map-info__coord-label">Longitude</span>
-            <input
-              className={coordinateInputClass(snapshot.lonError != null)}
-              aria-label="Longitude"
-              inputMode="decimal"
-              autoComplete="off"
-              spellCheck={false}
-              disabled={disabled}
-              value={snapshot.lonText}
-              onChange={(event) => geoEditor.setLonText(event.target.value)}
-              onBlur={() => geoEditor.commitDraft()}
-            />
-          </label>
-        </div>
-        {(snapshot.latError || snapshot.lonError || snapshot.saveError) ? (
-          <div className="sector-map-info__coords-errors" role="alert">
-            {snapshot.latError ? <p>{snapshot.latError}</p> : null}
-            {snapshot.lonError ? <p>{snapshot.lonError}</p> : null}
-            {snapshot.saveError ? <p>{snapshot.saveError}</p> : null}
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
-  const label = geoEditor
-    ? `${snapshot.latText}, ${snapshot.lonText}`
-    : sector.geo
-      ? formatSectorCoordinatePair(sector.geo)
-      : null;
-  if (!label) return null;
+  if (!sector.geo) return null;
 
   return (
     <div className="sector-map-info__coords">
       <MdLocationOn className="sector-map-info__coords-pin" aria-hidden="true" />
-      <span className="sector-map-info__coords-value">{label}</span>
-      {geoEditor ? (
+      <span className="sector-map-info__coords-value">{formatSectorCoordinatePair(sector.geo)}</span>
+      {onEdit ? (
         <div className="sector-map-info__coords-actions">
           <Button
             type="button"
             iconOnly
             size="sm"
             variant="ghost"
-            aria-label={`Edit sector ${snapshot.nameText}`}
+            aria-label={`Edit sector ${sector.name}`}
             title="Edit sector"
-            onMouseDown={keepCoordinateFocus}
-            onClick={(event) => {
-              keepCoordinateFocus(event);
-              geoEditor.startEdit();
-            }}
+            onMouseDown={keepFocus}
+            onClick={onEdit}
           >
             <MdEdit />
           </Button>
@@ -292,12 +145,10 @@ function SectorCoordinates({
 export interface SectorMapInfoProps {
   sector: Sector;
   maxRoutes?: number;
-  /** When set (e.g. Leaflet popup outside the router tree), links call this instead of <Link>. */
-  navigate?: (to: string) => void;
-  /** Present when this sector's pin can be moved. */
-  geoEditor?: SectorGeoEditor | null;
-  /** Chosen topo for a draft sector. Shared with the save path. */
-  topo?: DraftTopo | null;
+  /** Shared pin editor. The card edits when `editor.state` targets this sector. */
+  editor?: SectorEditor | null;
+  /** Whether this sector's pin may be moved and renamed. */
+  editable?: boolean;
   /** The sector is a draft placed on the map and has not been saved yet. */
   isNew?: boolean;
 }
@@ -305,19 +156,16 @@ export interface SectorMapInfoProps {
 const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
   sector,
   maxRoutes = SECTOR_MAP_INFO_MAX_ROUTES,
-  navigate,
-  geoEditor,
-  topo,
+  editor = null,
+  editable = false,
   isNew = false,
 }) => {
   const { crag, getUrl } = useCrag();
-  const snapshot = useGeoEditorSnapshot(geoEditor);
-  const topoSnapshot = useDraftTopo(topo);
-  const editing = snapshot.editing;
-  const displayName = geoEditor ? snapshot.nameText : sector.name;
-  const sectorPath = getUrl(
-    `sector/${encodeURIComponent(displayName.toLowerCase())}`,
-  );
+  const edit = editor?.state && editor.state.target === sectorMarkerKey(sector) ? editor.state : null;
+  const topo = useTopoPicker(isNew ? edit : null, isNew ? editor : null);
+  const editing = edit != null && editor != null;
+  const displayName = edit ? edit.nameText : sector.name;
+  const sectorPath = getUrl(`sector/${encodeURIComponent(displayName.toLowerCase())}`);
   const firstImage = sector.images?.[0];
   const imageUrl = firstImage
     ? getCragImageUrl(crag.cragId, firstImage.imageFile)
@@ -325,63 +173,49 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
   const routes = sector.routes ?? [];
   const visible = routes.slice(0, maxRoutes);
   const remaining = routes.length - visible.length;
-  const gpsPrompt = topoSnapshot.gpsPrompt;
-  const waitForPhotoLocation = topoSnapshot.pending || gpsPrompt != null;
-
-  const handleTopoFile = (file: File) => {
-    if (!topo || !geoEditor) return;
-    void acceptTopoFile(file, topo, geoEditor);
-  };
-
-  const confirmPhotoLocation = () => {
-    if (!topo || !geoEditor) return;
-    applyPhotoLocation(topo, geoEditor);
-  };
+  const waitForPhotoLocation = topo.pending || topo.gpsPrompt != null;
+  const canStartEdit = editable && editor != null && sector.id != null && typeof sector.version === 'number';
 
   return (
     <div className="sector-map-info">
-      {editing && geoEditor ? (
+      {editing ? (
         <div
           className="sector-map-info__name-edit"
-          onKeyDown={(event) => onEditKeyDown(event, geoEditor, waitForPhotoLocation)}
+          onKeyDown={(event) => onEditKeyDown(event, editor, waitForPhotoLocation)}
         >
           <label className="sector-map-info__name-field">
             <span className="sector-map-info__name-label">Name</span>
             <input
-              className={nameInputClass(snapshot.nameError != null)}
+              className={nameInputClass(edit.nameError != null)}
               aria-label="Name"
               autoComplete="off"
               spellCheck={false}
-              disabled={snapshot.saving}
-              value={snapshot.nameText}
-              onChange={(event) => geoEditor.setNameText(event.target.value)}
+              disabled={edit.saving}
+              value={edit.nameText}
+              onChange={(event) => editor.setNameText(event.target.value)}
             />
           </label>
-          {snapshot.nameError ? (
-            <p className="sector-map-info__name-error" role="alert">{snapshot.nameError}</p>
+          {edit.nameError ? (
+            <p className="sector-map-info__name-error" role="alert">{edit.nameError}</p>
           ) : null}
         </div>
       ) : (
-        <SectorNavLink
-          to={sectorPath}
-          className="sector-map-info__name"
-          navigate={navigate}
-        >
+        <Link to={sectorPath} className="sector-map-info__name">
           {displayName}
-        </SectorNavLink>
+        </Link>
       )}
       <div className="sector-map-info__body">
         {isNew && editing ? (
           <div className="sector-map-info__topo">
             <SectorTopoInput
-              disabled={snapshot.saving}
-              previewUrl={topoSnapshot.previewUrl}
-              onFile={handleTopoFile}
+              disabled={edit.saving}
+              previewUrl={topo.previewUrl}
+              onFile={topo.chooseFile}
             />
-            {topoSnapshot.pending ? (
+            {topo.pending ? (
               <p className="sector-map-info__topo-status" role="status">Checking photo...</p>
-            ) : topoSnapshot.error ? (
-              <p className="sector-map-info__topo-error" role="alert">{topoSnapshot.error}</p>
+            ) : topo.error ? (
+              <p className="sector-map-info__topo-error" role="alert">{topo.error}</p>
             ) : null}
           </div>
         ) : imageUrl ? (
@@ -390,23 +224,15 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
               <img className="sector-map-info__image" src={imageUrl} alt="" />
             </span>
           ) : (
-            <SectorNavLink
-              to={sectorPath}
-              className="sector-map-info__image-link"
-              navigate={navigate}
-            >
+            <Link to={sectorPath} className="sector-map-info__image-link">
               <img className="sector-map-info__image" src={imageUrl} alt="" />
-            </SectorNavLink>
+            </Link>
           )
         ) : null}
         <div className="sector-map-info__details">
-          <SectorCoordinates
-            sector={sector}
-            geoEditor={geoEditor}
-            blockApply={waitForPhotoLocation}
-          />
-          {editing && geoEditor ? (
+          {editing ? (
             <>
+              <SectorCoordinatesEditor edit={edit} editor={editor} blockApply={waitForPhotoLocation} />
               <p className="sector-map-info__hint">
                 <MdInfoOutline className="sector-map-info__hint-icon" aria-hidden="true" />
                 <span>{SECTOR_MARKER_DRAG_HINT}</span>
@@ -417,12 +243,11 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
                   size="sm"
                   variant="primary"
                   aria-label={isNew ? 'Create sector' : `Save sector ${displayName}`}
-                  disabled={snapshot.saving || waitForPhotoLocation}
-                  onMouseDown={keepCoordinateFocus}
-                  onClick={(event) => {
-                    keepCoordinateFocus(event);
+                  disabled={edit.saving || waitForPhotoLocation}
+                  onMouseDown={keepFocus}
+                  onClick={() => {
                     if (waitForPhotoLocation) return;
-                    geoEditor.apply();
+                    editor.apply();
                   }}
                 >
                   Save
@@ -432,60 +257,59 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
                   size="sm"
                   variant="secondary"
                   aria-label={isNew ? 'Discard new sector' : `Cancel sector edit for ${displayName}`}
-                  disabled={snapshot.saving}
-                  onMouseDown={keepCoordinateFocus}
-                  onClick={(event) => {
-                    keepCoordinateFocus(event);
-                    geoEditor.cancel();
-                  }}
+                  disabled={edit.saving}
+                  onMouseDown={keepFocus}
+                  onClick={() => editor.cancel()}
                 >
                   Cancel
                 </Button>
               </div>
             </>
           ) : (
-            <div className="sector-map-info__routes">
-              {visible.map((route) => (
-                <div key={`${route.name}-${route.grade}`} className="sector-map-info__route">
-                  {route.name}, {route.grade}
-                </div>
-              ))}
-              {remaining > 0 && (
-                <SectorNavLink
-                  to={sectorPath}
-                  className="sector-map-info__more"
-                  navigate={navigate}
-                >
-                  and {remaining} more...
-                </SectorNavLink>
-              )}
-            </div>
+            <>
+              <SectorCoordinates
+                sector={sector}
+                onEdit={canStartEdit ? () => editor.startEdit(sector) : null}
+              />
+              <div className="sector-map-info__routes">
+                {visible.map((route) => (
+                  <div key={`${route.name}-${route.grade}`} className="sector-map-info__route">
+                    {route.name}, {route.grade}
+                  </div>
+                ))}
+                {remaining > 0 && (
+                  <Link to={sectorPath} className="sector-map-info__more">
+                    and {remaining} more...
+                  </Link>
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>
-      {topo && gpsPrompt ? (
+      {topo.gpsPrompt ? (
         <Modal
           open
           title="Use photo location?"
-          onClose={() => topo.dismissGpsPrompt()}
+          onClose={topo.dismissGpsPrompt}
           footer={
             <>
               <Button
                 type="button"
                 size="sm"
                 variant="secondary"
-                onClick={() => topo.dismissGpsPrompt()}
+                onClick={topo.dismissGpsPrompt}
               >
                 Keep map location
               </Button>
-              <Button type="button" size="sm" variant="primary" onClick={confirmPhotoLocation}>
+              <Button type="button" size="sm" variant="primary" onClick={topo.usePhotoLocation}>
                 Use photo location
               </Button>
             </>
           }
         >
           <p className="sector-map-info__location-prompt">
-            This photo was taken at {formatSectorCoordinatePair(gpsPrompt)}. Use that location for the new sector?
+            This photo was taken at {formatSectorCoordinatePair(topo.gpsPrompt)}. Use that location for the new sector?
           </p>
         </Modal>
       ) : null}
@@ -494,17 +318,5 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
 };
 
 export { SECTOR_MAP_INFO_MAX_ROUTES };
-
-export function renderSectorMapInfo(
-  root: Root,
-  props: SectorMapInfoProps,
-  cragContext: CragContextType,
-): void {
-  root.render(
-    <CragContext.Provider value={cragContext}>
-      <SectorMapInfo {...props} />
-    </CragContext.Provider>,
-  );
-}
 
 export default SectorMapInfo;

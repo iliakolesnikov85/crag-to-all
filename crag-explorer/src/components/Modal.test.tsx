@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { setBodyScrollLock } from '../utils/bodyScrollLock';
 import Modal from './Modal';
 
 describe('Modal', () => {
@@ -65,5 +66,27 @@ describe('Modal', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(document.documentElement.classList.contains('scroll-locked')).toBe(false);
+  });
+
+  it('keeps an outer scroll lock when the dialog closes', () => {
+    setBodyScrollLock(true);
+    try {
+      const view = render(
+        <Modal open title="Use photo location?" onClose={() => {}}>
+          <p>This photo was taken elsewhere.</p>
+        </Modal>,
+      );
+
+      view.rerender(
+        <Modal open={false} title="Use photo location?" onClose={() => {}}>
+          <p>This photo was taken elsewhere.</p>
+        </Modal>,
+      );
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(document.documentElement).toHaveClass('scroll-locked');
+    } finally {
+      setBodyScrollLock(false);
+    }
   });
 });

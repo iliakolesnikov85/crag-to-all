@@ -5,87 +5,41 @@
   min-height: 0;
   overflow: hidden;
 
-  .leaflet-control-fullscreen {
+  /* Toolbar under the zoom control. Each button is its own bordered square,
+     stacked with a small gap, like the previous standalone controls. */
+  .map-toolbar.leaflet-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .map-toolbar__button {
     width: 30px;
     height: 30px;
+    padding: 0;
     color: #333;
-    text-decoration: none;
     background: white;
-    border: 2px solid rgba(0,0,0,0.2);
+    border: 2px solid rgba(0, 0, 0, 0.2);
     border-radius: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
+    cursor: pointer;
+    font: inherit;
 
     svg {
       display: block;
     }
   }
-  .leaflet-control-fullscreen:hover {
+  .map-toolbar__button:hover {
     background: #f4f4f4;
     color: #000;
-    text-decoration: none;
   }
-
-  .leaflet-control-location {
-    width: 30px;
-    height: 30px;
-    color: #333;
-    text-decoration: none;
-    background: white;
-    border: 2px solid rgba(0,0,0,0.2);
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    svg {
-      display: block;
-    }
-  }
-  .leaflet-control-location:hover {
-    background: #f4f4f4;
-    color: #000;
-    text-decoration: none;
-  }
-
-  .leaflet-control-reset-bounds {
-    width: 30px;
-    height: 30px;
-    color: #333;
-    text-decoration: none;
-    background: white;
-    border: 2px solid rgba(0,0,0,0.2);
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    svg {
-      display: block;
-    }
-  }
-  .leaflet-control-reset-bounds:hover {
-    background: #f4f4f4;
-    color: #000;
-    text-decoration: none;
-  }
-
-  .leaflet-control-add-sector {
-    width: 30px;
-    height: 30px;
-    background: white;
-    border: 2px solid rgba(0,0,0,0.2);
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .leaflet-control-add-sector:hover {
-    background: #f4f4f4;
-  }
-  .leaflet-control-add-sector--active,
-  .leaflet-control-add-sector--active:hover {
+  .map-toolbar__button--active,
+  .map-toolbar__button--active:hover {
     background: #e3f2fd;
     border-color: #1565c0;
   }
@@ -223,9 +177,49 @@
     font-size: 0.95rem;
   }
 
-  .leaflet-popup.sector-map-info-popup .leaflet-popup-content {
-    margin: 10px 12px;
+  /* Sector card pinned above a marker. Position comes from the map as CSS variables. */
+  .sector-map-card {
+    position: absolute;
+    left: var(--anchor-x, 0px);
+    top: var(--anchor-y, 0px);
+    /* Center on the pin and sit above it (pin is 30px, label hangs below). */
+    transform: translate(-50%, calc(-100% - 22px));
+    z-index: 1000;
     min-width: 520px;
+    max-width: 640px;
+    padding: 10px 12px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 3px 14px rgba(0, 0, 0, 0.4);
+  }
+
+  .sector-map-card::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: -8px;
+    width: 16px;
+    height: 16px;
+    margin-left: -8px;
+    background: #fff;
+    transform: rotate(45deg);
+    box-shadow: 3px 3px 4px rgba(0, 0, 0, 0.12);
+  }
+
+  .sector-map-card--hidden {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .sector-map-card .sector-map-card__close {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 1;
+  }
+
+  .sector-map-card .sector-map-info__name {
+    padding-right: 1.75rem;
   }
 
   /* Compass arrow styles */
@@ -323,6 +317,11 @@
     background: #fff;
     border-top: 1px solid rgba(0, 0, 0, 0.12);
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+  }
+
+  .sector-map-info-panel--hidden {
+    visibility: hidden;
+    pointer-events: none;
   }
 
   @media (max-width: 768px) {
