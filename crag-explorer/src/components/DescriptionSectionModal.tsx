@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useState } from 'react';
+import React, { useId, useState } from 'react';
 import type { DescriptionSection } from '../types';
 import {
   DESCRIPTION_NAME_MAX_LENGTH,
@@ -36,13 +36,6 @@ const DescriptionSectionModal: React.FC<DescriptionSectionModalProps> = ({
   const [name, setName] = useState(initialName);
   const [html, setHtml] = useState(initialHtml);
   const [localError, setLocalError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    setName(initialName);
-    setHtml(initialHtml);
-    setLocalError(null);
-  }, [open, initialName, initialHtml]);
 
   const handleClose = () => {
     if (saving) return;
@@ -82,6 +75,7 @@ const DescriptionSectionModal: React.FC<DescriptionSectionModalProps> = ({
     <Modal
       open={open}
       title={mode === 'add' ? 'Add section' : 'Edit section'}
+      closeOnBackdrop={false}
       onClose={handleClose}
       footer={
         <>

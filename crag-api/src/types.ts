@@ -4,6 +4,7 @@ import type {
   CragMapTrail,
   CragSource,
   DescriptionSection,
+  LatLng,
   OpenTopoTilePackInfo,
   Sector,
   SectorDocument as SharedSectorDocument,
@@ -27,6 +28,17 @@ export type CragPatchInput = Pick<CragDocument, 'version'> &
   };
 
 export type SectorWriteInput = Omit<Sector, 'id' | 'order' | 'version' | 'updatedAt'>;
+
+/** Partial sector update. `null` clears an optional text field. */
+export interface SectorPatch {
+  geo?: LatLng;
+  name?: string;
+  season?: string | null;
+  approachTime?: string | null;
+  altitude?: string | null;
+  orientation?: string | null;
+  timeInSun?: string | null;
+}
 
 export interface ImageUploadResponse {
   imageFile: string;

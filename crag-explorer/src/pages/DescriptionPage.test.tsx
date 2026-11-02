@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { patchCragDescription } from '../api/client';
 import { canEditCrag } from '../api/permissions';
@@ -142,6 +143,55 @@ describe('DescriptionPage', () => {
       version: 4,
       description: saved,
       sectors: sampleCragData.sectors,
+    });
+  });
+
+  it('saves the description version from when the dialog opened', async () => {
+    function ReloadableDescription() {
+      const [current, setCurrent] = useState({ description: sections, version: 3 });
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => setCurrent({
+              version: 9,
+              description: [
+                { subheader: 'Remote access', paragraphs: ['Changed elsewhere.'] },
+                sections[1],
+              ],
+            })}
+          >
+            Reload crag
+          </button>
+          <DescriptionPage description={current.description} version={current.version} />
+        </>
+      );
+    }
+
+    vi.mocked(patchCragDescription).mockImplementation(async (_cragId, _version, description) => ({
+      description,
+      version: 4,
+    }));
+    render(
+      withQueryClient(
+        <CragContext.Provider value={cragValue}>
+          <ReloadableDescription />
+        </CragContext.Provider>,
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Access' }));
+    const dialog = screen.getByRole('dialog', { name: 'Edit section' });
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Approach' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Reload crag' }));
+
+    expect(within(dialog).getByLabelText('Name')).toHaveValue('Approach');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(patchCragDescription).toHaveBeenCalledWith(CRAG_ID, 3, [
+        { subheader: 'Approach', paragraphs: [paragraphsToHtml(sections[0].paragraphs)] },
+        sections[1],
+      ]);
     });
   });
 

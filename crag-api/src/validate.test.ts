@@ -67,11 +67,43 @@ describe('validate', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(HttpError);
       expect((error as HttpError).status).toBe(400);
-      expect((error as HttpError).message).toBe('PATCH body must include geo or name');
+      expect((error as HttpError).message).toBe(
+        'PATCH body must include at least one sector field besides version',
+      );
     }
     expect(parseSectorGeoPatch({ version: 1, name: 'Loaf 6*(^&%&$^%' })).toEqual({
       version: 1,
       name: 'Loaf 6*(^&%&$^%',
     });
+  });
+
+  it('parses sector detail fields and null clears', () => {
+    expect(parseSectorGeoPatch({
+      version: 3,
+      altitude: ' 2000m ',
+      approachTime: '30min',
+      season: 'Apr; Jun; Aug - Oct',
+      orientation: 'N, NW,',
+      timeInSun: '02:30 -',
+    })).toEqual({
+      version: 3,
+      altitude: '2000m',
+      approachTime: '30min',
+      season: 'Apr; Jun; Aug - Oct',
+      orientation: 'N, NW,',
+      timeInSun: '02:30 -',
+    });
+    expect(parseSectorGeoPatch({ version: 4, season: null, timeInSun: null })).toEqual({
+      version: 4,
+      season: null,
+      timeInSun: null,
+    });
+    try {
+      parseSectorGeoPatch({ version: 1, altitude: '   ' });
+      throw new Error('expected parseSectorGeoPatch to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(HttpError);
+      expect((error as HttpError).status).toBe(400);
+    }
   });
 });

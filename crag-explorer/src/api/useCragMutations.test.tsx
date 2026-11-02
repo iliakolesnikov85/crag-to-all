@@ -10,7 +10,7 @@ import {
   useCreateSector,
   useDeleteSector,
   usePatchCragDescription,
-  usePatchSectorGeo,
+  usePatchSector,
 } from './useCragMutations';
 
 vi.mock('./client', () => ({
@@ -174,7 +174,7 @@ describe('crag cache updates', () => {
     const client = createAppQueryClient();
     client.setQueryData(queryKeys.crag(SAMPLE_CRAG_ID), loadedCrag);
 
-    const { result } = renderMutation(client, () => usePatchSectorGeo(SAMPLE_CRAG_ID));
+    const { result } = renderMutation(client, () => usePatchSector(SAMPLE_CRAG_ID));
     await result.current.mutateAsync({
       sectorId: 'sector-1',
       version: 1,

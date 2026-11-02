@@ -265,6 +265,66 @@ describe('crag-api', () => {
     expect(sector.routes[0].sectorName).toBe('north wall');
   });
 
+  it('patches sector details and clears fields that are set to null', async () => {
+    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    const created = await request(app)
+      .post('/api/crags/roshka/sectors')
+      .send({
+        name: 'Main Wall',
+        geo: { lat: 42.5, lon: 45.2 },
+        routes: [{ name: 'Classic', grade: '6a' }],
+      });
+    expect(created.status).toBe(201);
+    const sectorId = created.body.id as string;
+    const routeId = created.body.routes[0].id as string;
+
+    const patched = await request(app)
+      .patch(`/api/crags/roshka/sectors/${sectorId}`)
+      .send({
+        version: 1,
+        altitude: '2000m',
+        approachTime: '30min',
+        season: 'Apr; Jun; Aug - Oct',
+        orientation: 'N, NW,',
+        timeInSun: '08:00 - 11:00',
+      });
+    expect(patched.status).toBe(200);
+    expect(patched.body).toEqual(expect.objectContaining({
+      version: 2,
+      name: 'Main Wall',
+      altitude: '2000m',
+      approachTime: '30min',
+      season: 'Apr; Jun; Aug - Oct',
+      orientation: 'N, NW,',
+      timeInSun: '08:00 - 11:00',
+      geo: { lat: 42.5, lon: 45.2 },
+    }));
+    expect(patched.body.routes).toEqual([
+      expect.objectContaining({ id: routeId, name: 'Classic', sectorName: 'Main Wall' }),
+    ]);
+
+    const cleared = await request(app)
+      .patch(`/api/crags/roshka/sectors/${sectorId}`)
+      .send({ version: 2, season: null, timeInSun: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.version).toBe(3);
+    expect(cleared.body.season).toBeUndefined();
+    expect(cleared.body.timeInSun).toBeUndefined();
+    expect(cleared.body.altitude).toBe('2000m');
+    expect(cleared.body.orientation).toBe('N, NW,');
+
+    const blank = await request(app)
+      .patch(`/api/crags/roshka/sectors/${sectorId}`)
+      .send({ version: 3, altitude: '   ' });
+    expect(blank.status).toBe(400);
+
+    const assembled = await request(app).get('/api/crags/roshka');
+    const sector = assembled.body.sectors.find((item: { id: string }) => item.id === sectorId);
+    expect(sector.season).toBeUndefined();
+    expect(sector.altitude).toBe('2000m');
+    expect(sector.routes[0].name).toBe('Classic');
+  });
+
   it('rejects a case-insensitive duplicate sector name on create and replace', async () => {
     await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
     await request(app).post('/api/crags').send({ name: 'Other', cragId: 'other' });

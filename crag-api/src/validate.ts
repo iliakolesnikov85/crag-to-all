@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { CRAG_MAP_MARKER_TYPES } from '@crag-to-all/shared-crag';
 import { z, ZodError } from 'zod';
 import { badRequest } from './http';
-import type { CragCreateInput, CragPatchInput, SectorWriteInput } from './types';
+import type { CragCreateInput, CragPatchInput, SectorPatch, SectorWriteInput } from './types';
 
 const CRAG_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const MAX_CRAG_ID_LENGTH = 64;
@@ -166,15 +166,30 @@ const replaceSectorBodySchema = sectorBodySchema.extend({
   version: versionSchema,
 });
 
+const clearableText = nonemptyString(MAX_TEXT_LENGTH).nullable().optional();
+
 const sectorGeoPatchSchema = z
   .object({
     version: versionSchema,
     geo: latLngSchema.optional(),
     name: nonemptyString(MAX_NAME_LENGTH).optional(),
+    season: clearableText,
+    approachTime: clearableText,
+    altitude: clearableText,
+    orientation: clearableText,
+    timeInSun: clearableText,
   })
-  .refine((patch) => patch.geo !== undefined || patch.name !== undefined, {
-    message: 'PATCH body must include geo or name',
-  });
+  .refine(
+    (patch) =>
+      patch.geo !== undefined ||
+      patch.name !== undefined ||
+      patch.season !== undefined ||
+      patch.approachTime !== undefined ||
+      patch.altitude !== undefined ||
+      patch.orientation !== undefined ||
+      patch.timeInSun !== undefined,
+    { message: 'PATCH body must include at least one sector field besides version' },
+  );
 
 function toSectorWrite(body: z.infer<typeof sectorBodySchema>): SectorWriteInput {
   const sector: SectorWriteInput = {
@@ -222,15 +237,17 @@ function parseSectorWrite(body: unknown): SectorWriteInput {
   return toSectorWrite(parseWith(sectorBodySchema, body));
 }
 
-function parseSectorGeoPatch(
-  body: unknown,
-): { version: number; geo?: z.infer<typeof latLngSchema>; name?: string } {
+function parseSectorGeoPatch(body: unknown): SectorPatch & { version: number } {
   const parsed = parseWith(sectorGeoPatchSchema, body);
-  return {
-    version: parsed.version,
-    ...(parsed.geo !== undefined ? { geo: parsed.geo } : {}),
-    ...(parsed.name !== undefined ? { name: parsed.name } : {}),
-  };
+  const patch: SectorPatch & { version: number } = { version: parsed.version };
+  if (parsed.geo !== undefined) patch.geo = parsed.geo;
+  if (parsed.name !== undefined) patch.name = parsed.name;
+  if (parsed.season !== undefined) patch.season = parsed.season;
+  if (parsed.approachTime !== undefined) patch.approachTime = parsed.approachTime;
+  if (parsed.altitude !== undefined) patch.altitude = parsed.altitude;
+  if (parsed.orientation !== undefined) patch.orientation = parsed.orientation;
+  if (parsed.timeInSun !== undefined) patch.timeInSun = parsed.timeInSun;
+  return patch;
 }
 
 function parseReplaceSector(body: unknown): { version: number; sector: SectorWriteInput } {

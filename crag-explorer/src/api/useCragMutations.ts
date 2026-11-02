@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import type { CragData, DescriptionSection, LatLng, Sector } from '../types';
+import type { CragData, DescriptionSection, Sector } from '../types';
 import {
   createSector,
   deleteSector,
   patchCragDescription,
   patchSectorGeo,
   type CreateSectorInput,
+  type SectorPatch,
 } from './client';
 import { queryKeys } from './queryClient';
 
@@ -72,13 +73,13 @@ export function usePatchCragDescription(cragId: string) {
   });
 }
 
-export function usePatchSectorGeo(cragId: string) {
+export function usePatchSector(cragId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: {
       sectorId: string;
       version: number;
-      patch: { name?: string; geo?: LatLng };
+      patch: SectorPatch;
     }) => patchSectorGeo(cragId, input.sectorId, input.version, input.patch),
     onMutate: () => cancelInFlightCragFetch(queryClient, cragId),
     onSuccess: (sector) => {

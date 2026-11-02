@@ -11,9 +11,18 @@ interface ModalProps {
   onClose: () => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /** Form dialogs keep edits when the press lands outside the panel. */
+  closeOnBackdrop?: boolean;
 }
 
-const Modal: React.FC<ModalProps> = ({ open, title, onClose, children, footer }) => {
+const Modal: React.FC<ModalProps> = ({
+  open,
+  title,
+  onClose,
+  children,
+  footer,
+  closeOnBackdrop = true,
+}) => {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
@@ -48,6 +57,7 @@ const Modal: React.FC<ModalProps> = ({ open, title, onClose, children, footer })
   if (!open) return null;
 
   const handleBackdropMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!closeOnBackdrop) return;
     if (event.target !== event.currentTarget) return;
     onCloseRef.current();
   };

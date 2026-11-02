@@ -3,10 +3,13 @@ import type { LatLng, Route, Sector } from '@crag-to-all/shared-crag';
 import type { Db } from 'mongodb';
 import { sectorNameKey, toSector, toSectorDocument } from '../convertors';
 import { alreadyExists, isDuplicateKeyError, notFound, readOnly, versionConflict } from '../http';
-import type { SectorWriteInput } from '../types';
+import type { SectorDocument, SectorPatch, SectorWriteInput } from '../types';
 import { cragsCol, now, sectorsCol } from './collections';
 
 const SECTOR_NAME_TAKEN = 'A sector with this name already exists.';
+const DETAIL_FIELDS = ['season', 'approachTime', 'altitude', 'orientation', 'timeInSun'] as const;
+
+type DetailField = (typeof DETAIL_FIELDS)[number];
 
 async function requireWritableCrag(db: Db, cragId: string): Promise<void> {
   const crag = await cragsCol(db).findOne({ _id: cragId });
@@ -54,6 +57,21 @@ function rethrowSectorWriteError(error: unknown, action: string): never {
   }
   console.error(`Failed to ${action} sector:`, error);
   throw error;
+}
+
+function detailUpdates(patch: SectorPatch): {
+  fields: Partial<Pick<SectorDocument, DetailField>>;
+  cleared: Partial<Record<DetailField, ''>>;
+} {
+  const fields: Partial<Pick<SectorDocument, DetailField>> = {};
+  const cleared: Partial<Record<DetailField, ''>> = {};
+  for (const field of DETAIL_FIELDS) {
+    const value = patch[field];
+    if (value === undefined) continue;
+    if (value === null) cleared[field] = '';
+    else fields[field] = value;
+  }
+  return { fields, cleared };
 }
 
 async function nextSectorOrder(db: Db, cragId: string): Promise<number> {
@@ -124,7 +142,7 @@ export async function patchSectorGeo(
   cragId: string,
   sectorId: string,
   version: number,
-  patch: { geo?: LatLng; name?: string },
+  patch: SectorPatch,
 ): Promise<Sector> {
   await requireWritableCrag(db, cragId);
 
@@ -137,13 +155,19 @@ export async function patchSectorGeo(
     await assertSectorNameAvailable(db, cragId, sectorId, patch.name);
   }
 
+  const details = detailUpdates(patch);
   const $set: {
     updatedAt: Date;
     geo?: LatLng;
     name?: string;
     nameKey?: string;
     routes?: Route[];
-  } = { updatedAt: now() };
+    season?: string;
+    approachTime?: string;
+    altitude?: string;
+    orientation?: string;
+    timeInSun?: string;
+  } = { updatedAt: now(), ...details.fields };
   if (patch.geo !== undefined) $set.geo = patch.geo;
   if (patch.name !== undefined) {
     const name = patch.name;
@@ -154,11 +178,18 @@ export async function patchSectorGeo(
     }
   }
 
+  const update: {
+    $set: typeof $set;
+    $inc: { version: number };
+    $unset?: typeof details.cleared;
+  } = { $set, $inc: { version: 1 } };
+  if (Object.keys(details.cleared).length > 0) update.$unset = details.cleared;
+
   let updated;
   try {
     updated = await sectorsCol(db).findOneAndUpdate(
       { _id: sectorId, cragId, version },
-      { $set, $inc: { version: 1 } },
+      update,
       { returnDocument: 'after' },
     );
   } catch (error) {

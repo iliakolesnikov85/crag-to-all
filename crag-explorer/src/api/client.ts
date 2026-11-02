@@ -30,15 +30,20 @@ async function readErrorMessage(
   return fallback;
 }
 
+function isSectorGeo(geo: unknown): geo is LatLng | null {
+  if (geo === null) return true;
+  if (!geo || typeof geo !== 'object') return false;
+  const point = geo as Partial<LatLng>;
+  return typeof point.lat === 'number' && typeof point.lon === 'number';
+}
+
 async function readSectorResponse(response: Response): Promise<Sector> {
   const body = (await response.json()) as Partial<Sector>;
   if (
     typeof body.id !== 'string'
     || typeof body.name !== 'string'
     || typeof body.version !== 'number'
-    || !body.geo
-    || typeof body.geo.lat !== 'number'
-    || typeof body.geo.lon !== 'number'
+    || !isSectorGeo(body.geo)
   ) {
     throw new Error('Sector save returned an unexpected response');
   }
@@ -117,11 +122,21 @@ export async function patchCragDescription(
   };
 }
 
+export interface SectorPatch {
+  name?: string;
+  geo?: LatLng;
+  season?: string | null;
+  approachTime?: string | null;
+  altitude?: string | null;
+  orientation?: string | null;
+  timeInSun?: string | null;
+}
+
 export async function patchSectorGeo(
   cragId: string,
   sectorId: string,
   version: number,
-  patch: { name?: string; geo?: LatLng },
+  patch: SectorPatch,
 ): Promise<Sector> {
   const response = await apiFetch(
     `${cragDocumentPath(cragId)}/sectors/${encodeURIComponent(sectorId)}`,

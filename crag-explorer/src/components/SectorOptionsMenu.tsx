@@ -4,10 +4,15 @@ import './SectorOptionsMenu.scss';
 
 interface SectorOptionsMenuProps {
   disabled?: boolean;
+  onEdit: () => void;
   onDelete: () => void;
 }
 
-const SectorOptionsMenu: React.FC<SectorOptionsMenuProps> = ({ disabled = false, onDelete }) => {
+const SectorOptionsMenu: React.FC<SectorOptionsMenuProps> = ({
+  disabled = false,
+  onEdit,
+  onDelete,
+}) => {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -49,6 +54,17 @@ const SectorOptionsMenu: React.FC<SectorOptionsMenuProps> = ({ disabled = false,
       </button>
       {open ? (
         <div className="sector-options-menu__panel" role="menu">
+          <button
+            type="button"
+            className="sector-options-menu__item"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onEdit();
+            }}
+          >
+            Edit
+          </button>
           <button
             type="button"
             className="sector-options-menu__item"

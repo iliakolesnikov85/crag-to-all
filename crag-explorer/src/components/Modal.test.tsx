@@ -37,6 +37,23 @@ describe('Modal', () => {
     expect(onClose).toHaveBeenCalledTimes(3);
   });
 
+  it('stays open when the backdrop is pressed and backdrop closing is off', () => {
+    const onClose = vi.fn();
+    render(
+      <Modal open closeOnBackdrop={false} title="Edit sector" onClose={onClose}>
+        <p>Body</p>
+      </Modal>,
+    );
+
+    fireEvent.mouseDown(document.querySelector('.modal-backdrop') as Element);
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Edit sector' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the dialog open when the press starts inside it', () => {
     const onClose = vi.fn();
     render(

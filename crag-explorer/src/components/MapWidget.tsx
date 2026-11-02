@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { uploadCragImage } from '../api/client';
 import { canEditCrag } from '../api/permissions';
-import { useCreateSector, usePatchSectorGeo } from '../api/useCragMutations';
+import { useCreateSector, usePatchSector } from '../api/useCragMutations';
 import { useCrag } from '../context/CragContext';
 import { useIsMobileLayout } from '../hooks/useIsMobileLayout';
 import { useLeafletMap } from '../hooks/useLeafletMap';
@@ -34,7 +34,7 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSec
   const { crag } = useCrag();
   const online = useOnlineStatus();
   const isMobile = useIsMobileLayout();
-  const patchSectorGeo = usePatchSectorGeo(crag.cragId);
+  const patchSector = usePatchSector(crag.cragId);
   const createSectorMutation = useCreateSector(crag.cragId);
   const mapRef = useRef<HTMLDivElement>(null);
   const map = useLeafletMap(mapRef, { cragId: crag.cragId, cragData, online });
@@ -62,7 +62,7 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSec
       if (!sector.id || typeof sector.version !== 'number') {
         return Promise.reject(new Error('This sector cannot be saved because it has no id or version.'));
       }
-      return patchSectorGeo.mutateAsync({ sectorId: sector.id, version: sector.version, patch });
+      return patchSector.mutateAsync({ sectorId: sector.id, version: sector.version, patch });
     },
     createSector: async (input, topo) => {
       const images = topo ? [await uploadCragImage(crag.cragId, topo)] : undefined;

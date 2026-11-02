@@ -21,6 +21,11 @@ type SectionEditor =
   | { mode: 'add' }
   | { mode: 'edit'; index: number };
 
+interface DescriptionBaseline {
+  description: DescriptionSection[];
+  version: number;
+}
+
 function editorKey(editor: SectionEditor | null): string {
   if (editor?.mode === 'edit') return `edit-${editor.index}`;
   if (editor?.mode === 'add') return 'add';
@@ -34,16 +39,20 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
   const { crag } = useCrag();
   const patchDescription = usePatchCragDescription(crag.cragId);
   const [editor, setEditor] = useState<SectionEditor | null>(null);
+  const [baseline, setBaseline] = useState<DescriptionBaseline | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const canEdit = canEditCrag(crag);
   const pending = patchDescription.isPending;
-  const editingSection = editor?.mode === 'edit' ? description[editor.index] : undefined;
+  const editingSection = editor?.mode === 'edit'
+    ? (baseline?.description ?? description)[editor.index]
+    : undefined;
 
   const closeEditor = () => {
     if (pending) return;
     setEditor(null);
+    setBaseline(null);
     setSaveError(null);
   };
 
@@ -51,6 +60,7 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
     if (!canEdit || pending) return;
     setActionError(null);
     setSaveError(null);
+    setBaseline(version == null ? null : { description: description.slice(), version });
     setEditor({ mode: 'add' });
   };
 
@@ -58,6 +68,7 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
     if (!canEdit || pending) return;
     setActionError(null);
     setSaveError(null);
+    setBaseline(version == null ? null : { description: description.slice(), version });
     setEditor({ mode: 'edit', index });
   };
 
@@ -66,7 +77,7 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
       setSaveError(PERMISSION_MESSAGE);
       return;
     }
-    if (version == null) {
+    if (baseline == null) {
       setSaveError(MISSING_VERSION_MESSAGE);
       return;
     }
@@ -74,13 +85,14 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
 
     const next =
       editor.mode === 'add'
-        ? [...description, section]
-        : description.map((item, index) => (index === editor.index ? section : item));
+        ? [...baseline.description, section]
+        : baseline.description.map((item, index) => (index === editor.index ? section : item));
 
     setSaveError(null);
     try {
-      await patchDescription.mutateAsync({ version, description: next });
+      await patchDescription.mutateAsync({ version: baseline.version, description: next });
       setEditor(null);
+      setBaseline(null);
     } catch (error) {
       console.error('Failed to save description:', error);
       setSaveError(error instanceof Error ? error.message : 'Failed to save description');
