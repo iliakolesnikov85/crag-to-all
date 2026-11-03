@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import {
-  MdArrowForward,
   MdCalendarMonth,
   MdDirectionsWalk,
   MdExplore,
@@ -10,6 +9,7 @@ import {
   MdWbSunny,
 } from 'react-icons/md';
 import { pointsToBezierPath } from '@crag-to-all/shared-crag';
+import RouteOptionsMenu from './RouteOptionsMenu';
 import RouteRating from './RouteRating';
 import { Route, Sector } from '../types';
 import './SectorView.scss';
@@ -21,9 +21,12 @@ export interface SectorViewProps {
   imagesPaths?: string[];
   getImageUrl?: (cragId: string, imageFile: string) => string;
   printMode?: boolean;
-  createLink?: (to: string, children: React.ReactNode) => React.ReactNode;
+  createLink?: (to: string, children: React.ReactNode, title?: string) => React.ReactNode;
   headerActions?: React.ReactNode;
   headerAlert?: string | null;
+  /** Index into `sector.routes`. Present only when the viewer can edit routes. */
+  onEditRoute?: (index: number) => void;
+  routeMenuDisabled?: boolean;
 }
 
 const SectorView: React.FC<SectorViewProps> = ({
@@ -36,6 +39,8 @@ const SectorView: React.FC<SectorViewProps> = ({
   createLink,
   headerActions,
   headerAlert,
+  onEditRoute,
+  routeMenuDisabled = false,
 }) => {
 
   const [highlighted, setHighlighted] = useState<number[]>([]);
@@ -56,31 +61,37 @@ const SectorView: React.FC<SectorViewProps> = ({
   if (!sector || !Array.isArray(sector.images)) return null;
 
   // Default link renderer that just returns text
-  const defaultLink = (_to: string, children: React.ReactNode) => <span>{children}</span>;
+  const defaultLink = (_to: string, children: React.ReactNode, _title?: string) => <span>{children}</span>;
   const renderLink = createLink || defaultLink;
 
-  const renderTagChip = (tag: string, routeForLink: Route) => {
-    if (tag === 'Video beta' && !printMode) {
-      const betaVideosPath = `/beta-videos/${encodeURIComponent(sector.name.toLowerCase())}/${encodeURIComponent(routeForLink.name.toLowerCase())}`;
-      return renderLink(
-        betaVideosPath,
-        <span className="tag-chip tag-chip--video-beta" title="Watch beta videos">
-          <MdVideocam className="beta-video-icon" aria-hidden="true" />
-          {tag}
-          <span className="tag-chip__arrow" aria-hidden="true"><MdArrowForward /></span>
-        </span>
-      );
-    }
-    return <span className="tag-chip">{tag}</span>;
+  const renderTagChip = (tag: string) => <span className="tag-chip">{tag}</span>;
+
+  const renderVideoLink = (routeForLink: Route) => {
+    if (printMode || (routeForLink.videos?.length ?? 0) === 0) return null;
+    const betaVideosPath = `/beta-videos/${encodeURIComponent(sector.name.toLowerCase())}/${encodeURIComponent(routeForLink.name.toLowerCase())}`;
+    return (
+      <span className="beta-video-link" onClick={(event) => event.stopPropagation()}>
+        {renderLink(
+          betaVideosPath,
+          <MdVideocam className="beta-video-icon" aria-hidden="true" />,
+          'Watch beta videos',
+        )}
+      </span>
+    );
   };
 
   const title = route?.name || sector.name;
+  const titleVideoLink = route ? renderVideoLink(route) : null;
+
+  const renderRouteHeight = (height: number | undefined) => (
+    typeof height === 'number' ? <div className="route-height">Height: {height} m</div> : null
+  );
 
   return (
     <div className={`sector-view ${printMode ? 'print-mode' : ''} ${route ? 'route-view' : ''}`}>
       {headerActions || headerAlert ? (
         <div className="sector-view-header">
-          <h2>{title}</h2>
+          <h2>{title}{titleVideoLink}</h2>
           {headerActions}
           {headerAlert ? (
             <p className="sector-view-header__alert" role="alert">
@@ -89,7 +100,7 @@ const SectorView: React.FC<SectorViewProps> = ({
           ) : null}
         </div>
       ) : (
-        <h2>{title}</h2>
+        <h2>{title}{titleVideoLink}</h2>
       )}
       {route ? <div className="sector-link-container">Sector: {renderLink(`/sector/${encodeURIComponent(sector.name.toLowerCase())}`, sector.name)}</div> : null}
       <div className="sector-info">
@@ -143,10 +154,11 @@ const SectorView: React.FC<SectorViewProps> = ({
             <RouteRating rating={route.rating} ratingVotes={route.ratingVotes} />
           </div>
           {route.description && <div className="route-desc">{route.description}</div>}
+          {renderRouteHeight(route.height)}
           {route.tags && route.tags.length > 0 && (
             <div className="route-tags">
               {route.tags.map((tag, index) => (
-                <React.Fragment key={index}>{renderTagChip(tag, route)}</React.Fragment>
+                <React.Fragment key={index}>{renderTagChip(tag)}</React.Fragment>
               ))}
             </div>
           )}
@@ -155,10 +167,10 @@ const SectorView: React.FC<SectorViewProps> = ({
       <div className="topos-list">
         {sector.images.filter(image => !route || route.images.some(img => img.imageFile === image.imageFile)).map((image, imageIdx) => {
           // Find all routes that reference this image
-          const routesForImage: (Route & { routeIndex?: number })[] = sector.routes
-            .map(route => {
+          const routesForImage: (Route & { routeIndex?: number; sourceIndex: number })[] = sector.routes
+            .map((route, sourceIndex) => {
               const imgRef = route.images.find(img => img.imageFile === image.imageFile);
-              return { ...route, routeIndex: imgRef?.routeIndex };
+              return { ...route, routeIndex: imgRef?.routeIndex, sourceIndex };
             })
             .filter(x => x.routeIndex !== undefined)
             .sort((a, b) => (a!.routeIndex as number) - (b!.routeIndex as number));
@@ -243,16 +255,30 @@ const SectorView: React.FC<SectorViewProps> = ({
                             onClick={() => onRouteClick(imageIdx, routeIdx)}
                           >
                             <div className="route-content">
-                              <span className="route-number">{routeIdx + 1}. </span>
-                              <span className="route-name">{renderLink(`/sector/${encodeURIComponent(sector.name.toLowerCase())}/${encodeURIComponent(route!.name.toLowerCase())}`, route!.name)}{(route!.grade ? `,` : '')}</span>
-                              {route!.grade && <span className="route-grade"> {route!.grade}</span>}
-                              <RouteRating rating={route!.rating} ratingVotes={route!.ratingVotes} />
+                              <div className="route-title-row">
+                                <div className="route-title-main">
+                                  <span className="route-number">{routeIdx + 1}. </span>
+                                  <span className="route-name">{renderLink(`/sector/${encodeURIComponent(sector.name.toLowerCase())}/${encodeURIComponent(route!.name.toLowerCase())}`, route!.name)}</span>
+                                  {renderVideoLink(route!)}
+                                  {route!.grade ? <span className="route-name">,</span> : null}
+                                  {route!.grade && <span className="route-grade"> {route!.grade}</span>}
+                                  <RouteRating rating={route!.rating} ratingVotes={route!.ratingVotes} />
+                                </div>
+                                {onEditRoute && !printMode ? (
+                                  <RouteOptionsMenu
+                                    routeName={route!.name}
+                                    disabled={routeMenuDisabled}
+                                    onEditDetails={() => onEditRoute(route!.sourceIndex)}
+                                  />
+                                ) : null}
+                              </div>
                               {route!.description && <div className="route-desc">{route!.description}</div>}
+                              {renderRouteHeight(route!.height)}
                             </div>
                             {route!.tags && route!.tags.length > 0 && (
                               <div className="route-tags">
                                 {route!.tags.map((tag, tagIndex) => (
-                                  <React.Fragment key={tagIndex}>{renderTagChip(tag, route!)}</React.Fragment>
+                                  <React.Fragment key={tagIndex}>{renderTagChip(tag)}</React.Fragment>
                                 ))}
                               </div>
                             )}

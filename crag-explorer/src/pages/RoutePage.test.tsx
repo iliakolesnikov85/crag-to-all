@@ -34,6 +34,37 @@ describe('RoutePage lookup', () => {
     expect(screen.getByText('Grade: 6A+')).toBeInTheDocument();
   });
 
+  it('shows the height below the description', () => {
+    const sectors = sampleCragData.sectors.map((sector) => (
+      sector.name === 'Main Wall'
+        ? {
+            ...sector,
+            routes: sector.routes.map((route) => (
+              route.name === 'Classic'
+                ? { ...route, description: 'A steep start', height: 12 }
+                : route
+            )),
+          }
+        : sector
+    ));
+    render(
+      <MemoryRouter initialEntries={[`/sector/${encodeURIComponent('main wall')}/classic`]}>
+        <CragContext.Provider value={cragValue}>
+          <Routes>
+            <Route
+              path="/sector/:sectorName/:routeName"
+              element={<RoutePage sectors={sectors} />}
+            />
+          </Routes>
+        </CragContext.Provider>
+      </MemoryRouter>,
+    );
+
+    const description = screen.getByText('A steep start');
+    const height = screen.getByText('Height: 12 m');
+    expect(description.compareDocumentPosition(height) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('shows not found when the sector name does not match', () => {
     renderRoute('/sector/unknown-wall/classic');
     expect(screen.getByText('Sector not found.')).toBeInTheDocument();

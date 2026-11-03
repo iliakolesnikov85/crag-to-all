@@ -1,4 +1,4 @@
-import type { Crag, CragData, DescriptionSection, LatLng, Sector } from '../types';
+import type { Crag, CragData, DescriptionSection, LatLng, Route, Sector } from '../types';
 import { getAccessToken } from './auth';
 
 const CRAGS_PATH = '/api/crags';
@@ -130,6 +130,7 @@ export interface SectorPatch {
   altitude?: string | null;
   orientation?: string | null;
   timeInSun?: string | null;
+  routes?: Route[];
 }
 
 export async function patchSectorGeo(

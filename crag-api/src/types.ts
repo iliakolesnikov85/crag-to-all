@@ -6,6 +6,7 @@ import type {
   DescriptionSection,
   LatLng,
   OpenTopoTilePackInfo,
+  Route,
   Sector,
   SectorDocument as SharedSectorDocument,
 } from '@crag-to-all/shared-crag';
@@ -38,6 +39,8 @@ export interface SectorPatch {
   altitude?: string | null;
   orientation?: string | null;
   timeInSun?: string | null;
+  /** Full replacement of the sector's routes. */
+  routes?: Route[];
 }
 
 export interface ImageUploadResponse {

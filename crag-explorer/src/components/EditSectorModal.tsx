@@ -13,6 +13,7 @@ import {
 } from '../utils/sectorDetails';
 import { SECTOR_NAME_MAX_LENGTH } from '../utils/sectorName';
 import Button from './Button';
+import ChoiceGroup, { type ChoiceOption } from './ChoiceGroup';
 import Modal from './Modal';
 import './EditSectorModal.scss';
 
@@ -28,57 +29,12 @@ interface EditSectorModalProps {
   onSave: (patch: SectorDetailsPatch) => void;
 }
 
-interface ChoiceOption<T extends string | number> {
-  value: T;
-  label: string;
-}
-
 const MONTH_OPTIONS: ChoiceOption<number>[] = MONTHS.map((label, value) => ({ value, label }));
 const ORIENTATION_OPTIONS: ChoiceOption<Orientation>[] = ORIENTATIONS.map((direction) => ({
   value: direction,
   label: direction,
 }));
 const LEAVE_CONFIRM = 'Leave this edit? Your unsaved changes will be lost.';
-
-function ChoiceGroup<T extends string | number>({
-  label,
-  options,
-  selected,
-  disabled,
-  onToggle,
-}: {
-  label: string;
-  options: readonly ChoiceOption<T>[];
-  selected: readonly T[];
-  disabled: boolean;
-  onToggle: (value: T) => void;
-}) {
-  const labelId = useId();
-  return (
-    <div className="edit-sector-field">
-      <span className="edit-sector-label" id={labelId}>
-        {label}
-      </span>
-      <div className="edit-sector-choices" role="group" aria-labelledby={labelId}>
-        {options.map((option) => {
-          const pressed = selected.includes(option.value);
-          return (
-            <button
-              key={option.label}
-              type="button"
-              className="edit-sector-choice"
-              aria-pressed={pressed}
-              disabled={disabled}
-              onClick={() => onToggle(option.value)}
-            >
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 function digitsOnly(value: string): string {
   return value.replace(/\D/g, '').slice(0, 5);

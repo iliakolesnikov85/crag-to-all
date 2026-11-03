@@ -27,6 +27,7 @@ export type ButtonProps = {
   rel?: string;
   title?: string;
   'aria-label'?: string;
+  'aria-haspopup'?: React.AriaAttributes['aria-haspopup'];
   'aria-expanded'?: boolean | 'true' | 'false';
   'aria-current'?: React.AriaAttributes['aria-current'];
 };
@@ -82,6 +83,7 @@ const Button: React.FC<ButtonProps> = ({
   rel,
   title,
   'aria-label': ariaLabel,
+  'aria-haspopup': ariaHasPopup,
   'aria-expanded': ariaExpanded,
   'aria-current': ariaCurrent,
 }) => {
@@ -98,6 +100,7 @@ const Button: React.FC<ButtonProps> = ({
   const sharedAria = {
     title,
     'aria-label': ariaLabel,
+    'aria-haspopup': ariaHasPopup,
     'aria-expanded': ariaExpanded,
     'aria-current': ariaCurrent,
   };

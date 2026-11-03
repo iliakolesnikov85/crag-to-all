@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { CRAG_MAP_MARKER_TYPES } from '@crag-to-all/shared-crag';
+import { CRAG_MAP_MARKER_TYPES, ROUTE_TYPES, type Route } from '@crag-to-all/shared-crag';
 import { z, ZodError } from 'zod';
 import { badRequest } from './http';
 import type { CragCreateInput, CragPatchInput, SectorPatch, SectorWriteInput } from './types';
@@ -82,12 +82,19 @@ const routeVideoSchema = z.object({
 const routeSchema = z.object({
   id: nonemptyString(128).optional(),
   name: nonemptyString(MAX_NAME_LENGTH),
-  grade: nonemptyString(32),
+  /** Scraped routes can omit a grade. An empty grade must not reject the rest of the patch. */
+  grade: z.string().trim().max(32).default(''),
   sectorName: nonemptyString(MAX_NAME_LENGTH).optional(),
   description: z.string().max(20_000).default(''),
   tags: z.array(nonemptyString(MAX_TEXT_LENGTH)).default([]),
+  /** Blank or null means the route has no discipline. */
+  type: z
+    .union([z.enum(ROUTE_TYPES), z.string().trim().pipe(z.literal('')), z.null()])
+    .optional()
+    .transform((value) => (value ? value : undefined)),
   rating: z.number().finite().optional(),
   ratingVotes: nonemptyString(32).optional(),
+  height: z.number().finite().positive().max(999).optional(),
   images: z.array(routeImageSchema).default([]),
   videos: z.array(routeVideoSchema).optional(),
 });
@@ -178,6 +185,7 @@ const sectorGeoPatchSchema = z
     altitude: clearableText,
     orientation: clearableText,
     timeInSun: clearableText,
+    routes: z.array(routeSchema).optional(),
   })
   .refine(
     (patch) =>
@@ -187,17 +195,37 @@ const sectorGeoPatchSchema = z
       patch.approachTime !== undefined ||
       patch.altitude !== undefined ||
       patch.orientation !== undefined ||
-      patch.timeInSun !== undefined,
+      patch.timeInSun !== undefined ||
+      patch.routes !== undefined,
     { message: 'PATCH body must include at least one sector field besides version' },
   );
+
+function normalizeRoutes(routes: z.infer<typeof routeSchema>[]): Route[] {
+  return routes.map((route) => {
+    const normalized: Route = {
+      id: route.id ?? randomUUID(),
+      name: route.name,
+      grade: route.grade,
+      sectorName: route.sectorName ?? '',
+      description: route.description,
+      tags: route.tags,
+      images: route.images,
+    };
+    if (route.rating !== undefined) normalized.rating = route.rating;
+    if (route.ratingVotes !== undefined) normalized.ratingVotes = route.ratingVotes;
+    if (route.type !== undefined) normalized.type = route.type;
+    if (route.height !== undefined) normalized.height = route.height;
+    if (route.videos !== undefined) normalized.videos = route.videos;
+    return normalized;
+  });
+}
 
 function toSectorWrite(body: z.infer<typeof sectorBodySchema>): SectorWriteInput {
   const sector: SectorWriteInput = {
     name: body.name,
     geo: body.geo ?? null,
-    routes: body.routes.map((route) => ({
+    routes: normalizeRoutes(body.routes).map((route) => ({
       ...route,
-      id: route.id ?? randomUUID(),
       sectorName: body.name,
     })),
     images: body.images,
@@ -247,6 +275,7 @@ function parseSectorGeoPatch(body: unknown): SectorPatch & { version: number } {
   if (parsed.altitude !== undefined) patch.altitude = parsed.altitude;
   if (parsed.orientation !== undefined) patch.orientation = parsed.orientation;
   if (parsed.timeInSun !== undefined) patch.timeInSun = parsed.timeInSun;
+  if (parsed.routes !== undefined) patch.routes = normalizeRoutes(parsed.routes);
   return patch;
 }
 

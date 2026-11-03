@@ -85,6 +85,26 @@ describe('Modal', () => {
     expect(document.documentElement.classList.contains('scroll-locked')).toBe(false);
   });
 
+  it('closes only the top dialog when Escape is pressed', () => {
+    const closeList = vi.fn();
+    const closeDetails = vi.fn();
+    render(
+      <>
+        <Modal open title="Routes" onClose={closeList}>
+          <p>List</p>
+        </Modal>
+        <Modal open title="Edit route" onClose={closeDetails}>
+          <p>Details</p>
+        </Modal>
+      </>,
+    );
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(closeDetails).toHaveBeenCalledTimes(1);
+    expect(closeList).not.toHaveBeenCalled();
+  });
+
   it('keeps an outer scroll lock when the dialog closes', () => {
     setBodyScrollLock(true);
     try {

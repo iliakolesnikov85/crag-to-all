@@ -106,4 +106,64 @@ describe('validate', () => {
       expect((error as HttpError).status).toBe(400);
     }
   });
+
+  it('parses a routes patch, assigns ids, and keeps an empty grade and a duplicate name', () => {
+    const parsed = parseSectorGeoPatch({
+      version: 2,
+      routes: [{ id: 'route-1', name: ' Classic ', grade: '6A', height: 5, type: 'Boulder', tags: ['Crimpers'] }],
+    });
+    expect(parsed.routes).toEqual([
+      expect.objectContaining({
+        id: 'route-1',
+        name: 'Classic',
+        grade: '6A',
+        height: 5,
+        type: 'Boulder',
+        tags: ['Crimpers'],
+        description: '',
+      }),
+    ]);
+
+    const created = parseSectorGeoPatch({
+      version: 1,
+      routes: [{ name: 'Direct', grade: '7A' }],
+    });
+    expect(created.routes?.[0]?.id).toEqual(expect.any(String));
+
+    const kept = parseSectorGeoPatch({
+      version: 1,
+      routes: [
+        { name: 'Classic', grade: '6A' },
+        { name: ' classic ', grade: '' },
+        { name: 'Ungraded' },
+      ],
+    });
+    expect(kept.routes?.map((route) => ({ name: route.name, grade: route.grade }))).toEqual([
+      { name: 'Classic', grade: '6A' },
+      { name: 'classic', grade: '' },
+      { name: 'Ungraded', grade: '' },
+    ]);
+
+    const typed = parseSectorGeoPatch({
+      version: 1,
+      routes: [
+        { name: 'Classic', grade: '6A', type: '' },
+        { name: 'Direct', grade: '7A', type: null },
+        { name: 'Arete', grade: '6B', type: '   ' },
+        { name: 'Sporty', grade: '6C', type: 'Sport' },
+      ],
+    });
+    expect(typed.routes?.map((route) => route.type)).toEqual([undefined, undefined, undefined, 'Sport']);
+
+    try {
+      parseSectorGeoPatch({
+        version: 1,
+        routes: [{ name: 'Classic', grade: '6A', height: 0 }],
+      });
+      throw new Error('expected parseSectorGeoPatch to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(HttpError);
+      expect((error as HttpError).status).toBe(400);
+    }
+  });
 });

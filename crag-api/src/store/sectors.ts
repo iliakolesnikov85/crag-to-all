@@ -170,12 +170,18 @@ export async function patchSectorGeo(
   } = { updatedAt: now(), ...details.fields };
   if (patch.geo !== undefined) $set.geo = patch.geo;
   if (patch.name !== undefined) {
-    const name = patch.name;
-    $set.name = name;
-    $set.nameKey = sectorNameKey(name);
-    if (existing.routes?.length) {
-      $set.routes = existing.routes.map((route) => ({ ...route, sectorName: name }));
-    }
+    $set.name = patch.name;
+    $set.nameKey = sectorNameKey(patch.name);
+  }
+  const sectorName = patch.name ?? existing.name;
+  if (patch.routes !== undefined) {
+    $set.routes = patch.routes.map((route) => ({
+      ...route,
+      id: route.id ?? randomUUID(),
+      sectorName,
+    }));
+  } else if (patch.name !== undefined && existing.routes?.length) {
+    $set.routes = existing.routes.map((route) => ({ ...route, sectorName }));
   }
 
   const update: {

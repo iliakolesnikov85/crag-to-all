@@ -325,6 +325,131 @@ describe('crag-api', () => {
     expect(sector.routes[0].name).toBe('Classic');
   });
 
+  it('replaces sector routes, assigns ids, and keeps a duplicate name', async () => {
+    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    const created = await request(app)
+      .post('/api/crags/roshka/sectors')
+      .send({
+        name: 'Main Wall',
+        routes: [{
+          name: 'Classic',
+          grade: '6a',
+          rating: 2.5,
+          ratingVotes: '10 votes',
+          images: [{ imageFile: 'wall.jpg', routeIndex: 0 }],
+          videos: [{ url: 'https://example.com/v', addedBy: 'Ada' }],
+        }],
+      });
+    expect(created.status).toBe(201);
+    const sectorId = created.body.id as string;
+    const routeId = created.body.routes[0].id as string;
+
+    const patched = await request(app)
+      .patch(`/api/crags/roshka/sectors/${sectorId}`)
+      .send({
+        version: 1,
+        routes: [{
+          id: routeId,
+          name: 'Classic',
+          grade: '6A+',
+          height: 5,
+          description: 'High start',
+          tags: ['Crimpers'],
+          rating: 2.5,
+          ratingVotes: '10 votes',
+          type: 'Boulder',
+          sectorName: 'Somewhere',
+          images: [{ imageFile: 'wall.jpg', routeIndex: 0 }],
+          videos: [{ url: 'https://example.com/v', addedBy: 'Ada' }],
+        }, {
+          name: 'Direct',
+          grade: '7A',
+          height: 4.5,
+          type: 'Sport',
+        }],
+      });
+    expect(patched.status).toBe(200);
+    expect(patched.body.version).toBe(2);
+    expect(patched.body.routes[0]).toEqual(expect.objectContaining({
+      id: routeId,
+      name: 'Classic',
+      grade: '6A+',
+      height: 5,
+      sectorName: 'Main Wall',
+      description: 'High start',
+      tags: ['Crimpers'],
+      rating: 2.5,
+      ratingVotes: '10 votes',
+      type: 'Boulder',
+      images: [{ imageFile: 'wall.jpg', routeIndex: 0 }],
+      videos: [{ url: 'https://example.com/v', addedBy: 'Ada' }],
+    }));
+    expect(patched.body.routes[1]).toEqual(expect.objectContaining({
+      name: 'Direct',
+      grade: '7A',
+      height: 4.5,
+      type: 'Sport',
+      sectorName: 'Main Wall',
+    }));
+    expect(patched.body.routes[1].id).toEqual(expect.any(String));
+    expect(patched.body.routes[1].id).not.toBe(routeId);
+
+    const renamed = await request(app)
+      .patch(`/api/crags/roshka/sectors/${sectorId}`)
+      .send({
+        version: 2,
+        name: 'North Wall',
+        routes: [{
+          id: routeId,
+          name: 'Classic',
+          grade: '6A+',
+          height: 5,
+          images: [{ imageFile: 'wall.jpg', routeIndex: 0 }],
+        }],
+      });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.name).toBe('North Wall');
+    expect(renamed.body.routes).toEqual([
+      expect.objectContaining({ id: routeId, sectorName: 'North Wall', height: 5 }),
+    ]);
+
+    const invalidHeight = await request(app)
+      .patch(`/api/crags/roshka/sectors/${sectorId}`)
+      .send({
+        version: 3,
+        routes: [{ name: 'Direct', grade: '6A', height: 0 }],
+      });
+    expect(invalidHeight.status).toBe(400);
+
+    const duplicate = await request(app)
+      .patch(`/api/crags/roshka/sectors/${sectorId}`)
+      .send({
+        version: 3,
+        routes: [
+          { name: 'Direct', grade: '6A' },
+          { name: 'direct', grade: '' },
+        ],
+      });
+    expect(duplicate.status).toBe(200);
+    expect(duplicate.body.routes.map((route: { name: string; grade: string }) => ({
+      name: route.name,
+      grade: route.grade,
+    }))).toEqual([
+      { name: 'Direct', grade: '6A' },
+      { name: 'direct', grade: '' },
+    ]);
+
+    const assembled = await request(app).get('/api/crags/roshka');
+    const sector = assembled.body.sectors.find((item: { id: string }) => item.id === sectorId);
+    expect(sector.routes.map((route: { name: string; grade: string }) => ({
+      name: route.name,
+      grade: route.grade,
+    }))).toEqual([
+      { name: 'Direct', grade: '6A' },
+      { name: 'direct', grade: '' },
+    ]);
+  });
+
   it('rejects a case-insensitive duplicate sector name on create and replace', async () => {
     await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
     await request(app).post('/api/crags').send({ name: 'Other', cragId: 'other' });

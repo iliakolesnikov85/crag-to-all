@@ -7,12 +7,21 @@ export const CRAG_MAP_MARKER_TYPES = [
 
 export const CRAG_SOURCES = ['external', 'explorer'] as const;
 
+export const ROUTE_TYPES = [
+  'Boulder',
+  'Sport',
+  'Ice or Mixed',
+  'DWS',
+] as const;
+
 /** Bump when the stored crag JSON shape changes incompatibly. */
 export const CRAG_DATA_PROTOCOL = 1;
 
 export type CragMapMarkerType = (typeof CRAG_MAP_MARKER_TYPES)[number];
 
 export type CragSource = (typeof CRAG_SOURCES)[number];
+
+export type RouteType = (typeof ROUTE_TYPES)[number];
 
 export interface LatLng {
   lat: number;
@@ -51,8 +60,11 @@ export interface Route {
   sectorName: string;
   description: string;
   tags: string[];
+  type?: RouteType;
   rating?: number;
   ratingVotes?: string;
+  /** Length of the climb, in meters. */
+  height?: number;
   images: Array<{ imageFile: string; routeIndex: number }>;
   videos?: Array<{ url: string; addedBy: string }>;
 }

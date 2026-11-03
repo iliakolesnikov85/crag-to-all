@@ -40,10 +40,11 @@ const RoutePage: React.FC<RoutePageProps> = ({ sectors, onSectorChange, onRouteC
         sector={sector}
         route={route}
         getImageUrl={getCragImageUrl}
-        createLink={(to: string, children: React.ReactNode) => (
+        createLink={(to: string, children: React.ReactNode, title?: string) => (
           <Link
             className="link"
             to={getUrl(to)}
+            title={title}
             onClick={() => {
               if (to !== '/map') return;
               if (sector?.geo) setMapCenter(crag.cragId, [sector?.geo.lat, sector?.geo.lon], 17);

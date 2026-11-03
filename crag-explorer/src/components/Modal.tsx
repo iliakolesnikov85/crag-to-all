@@ -5,6 +5,9 @@ import { setBodyScrollLock } from '../utils/bodyScrollLock';
 import Button from './Button';
 import './Modal.scss';
 
+/** Open dialogs, oldest first. Escape closes only the latest one. */
+const openDialogs: Array<{ close: () => void }> = [];
+
 interface ModalProps {
   open: boolean;
   title: string;
@@ -40,15 +43,21 @@ const Modal: React.FC<ModalProps> = ({
     );
     (field ?? dialog)?.focus();
 
+    const entry = { close: () => onCloseRef.current() };
+    openDialogs.push(entry);
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      if (openDialogs[openDialogs.length - 1] !== entry) return;
       event.preventDefault();
-      onCloseRef.current();
+      entry.close();
     };
     document.addEventListener('keydown', onKeyDown);
 
     return () => {
       document.removeEventListener('keydown', onKeyDown);
+      const index = openDialogs.lastIndexOf(entry);
+      if (index >= 0) openDialogs.splice(index, 1);
       setBodyScrollLock(false);
       previouslyFocused?.focus();
     };

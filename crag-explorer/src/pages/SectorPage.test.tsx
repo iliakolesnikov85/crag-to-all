@@ -96,6 +96,21 @@ describe('SectorPage lookup', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows the route height below its description', () => {
+    renderDeletable({
+      ...deletableSector,
+      routes: deletableSector.routes.map((route) => (
+        route.name === 'Classic'
+          ? { ...route, description: 'A steep start', height: 12 }
+          : route
+      )),
+    });
+
+    const description = screen.getByText('A steep start');
+    const height = screen.getByText('Height: 12 m');
+    expect(description.compareDocumentPosition(height) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('shows not found when the sector name does not match', () => {
     renderSector('/sector/unknown-wall');
     expect(screen.getByText('Sector not found.')).toBeInTheDocument();
@@ -114,6 +129,7 @@ describe('SectorPage delete', () => {
     renderDeletable();
 
     expect(screen.queryByRole('button', { name: 'Sector options' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Options for Classic' })).not.toBeInTheDocument();
   });
 
   it('opens a menu with Delete sector', () => {
@@ -490,5 +506,234 @@ describe('SectorPage edit', () => {
       'This sector cannot be edited because it has no version.',
     );
     expect(patchSectorGeo).not.toHaveBeenCalled();
+  });
+});
+
+const ratedRoute: Sector = {
+  ...editableSector,
+  routes: [
+    {
+      ...editableSector.routes[0],
+      id: 'route-1',
+      rating: 2.5,
+      ratingVotes: '10 votes',
+      videos: [{ url: 'https://example.com/v', addedBy: 'Ada' }],
+    },
+    editableSector.routes[1],
+  ],
+};
+
+function openRoutesItem() {
+  fireEvent.click(screen.getByRole('button', { name: 'Sector options' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Routes' }));
+}
+
+describe('SectorPage routes', () => {
+  beforeEach(() => {
+    vi.mocked(canEditCrag).mockReturnValue(true);
+    vi.mocked(deleteSector).mockReset();
+    vi.mocked(patchSectorGeo).mockReset();
+  });
+
+  it('hides a stored Boulder tag without removing it', async () => {
+    const withBoulder: Sector = {
+      ...ratedRoute,
+      routes: [
+        { ...ratedRoute.routes[0], tags: ['Boulder', 'Video beta'], type: 'Sport' },
+        ratedRoute.routes[1],
+      ],
+    };
+    vi.mocked(patchSectorGeo).mockResolvedValue({ ...withBoulder, version: 3 });
+    renderDeletable(withBoulder);
+    openRoutesItem();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Classic' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Edit route' });
+    expect(within(dialog).queryByRole('button', { name: 'Boulder' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Video beta' })).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Type')).toHaveValue('Sport');
+    fireEvent.change(within(dialog).getByLabelText('Type'), { target: { value: '' } });
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+        routes: [
+          expect.objectContaining({
+            tags: ['Boulder', 'Video beta'],
+          }),
+          withBoulder.routes[1],
+        ],
+      });
+    });
+    const saved = vi.mocked(patchSectorGeo).mock.calls[0]?.[3].routes[0];
+    expect(saved.type).toBeUndefined();
+  });
+
+  it('edits a route and keeps its images, videos, and id', async () => {
+    vi.mocked(patchSectorGeo).mockResolvedValue({ ...ratedRoute, version: 3 });
+    renderDeletable(ratedRoute);
+    openRoutesItem();
+
+    expect(screen.getByRole('dialog', { name: 'Routes' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Classic' }));
+    const dialog = screen.getByRole('dialog', { name: 'Edit route' });
+    expect(screen.queryByRole('dialog', { name: 'Routes' })).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Type')).toHaveValue('');
+    fireEvent.change(within(dialog).getByLabelText('Type'), { target: { value: 'Sport' } });
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Direct' } });
+    fireEvent.change(within(dialog).getByLabelText('Height'), { target: { value: '5' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Crimpers' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '2 stars' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Edit route' })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('dialog', { name: 'Routes' })).toBeInTheDocument();
+    expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+      routes: [
+        {
+          id: 'route-1',
+          name: 'Direct',
+          grade: '6A+',
+          sectorName: 'Main Wall',
+          description: '',
+          type: 'Sport',
+          tags: ['Crimpers'],
+          rating: 2,
+          height: 5,
+          images: ratedRoute.routes[0].images,
+          videos: [{ url: 'https://example.com/v', addedBy: 'Ada' }],
+        },
+        ratedRoute.routes[1],
+      ],
+    });
+  });
+
+  it('adds a route', async () => {
+    vi.mocked(patchSectorGeo).mockResolvedValue({ ...editableSector, version: 3 });
+    renderDeletable(editableSector);
+    openRoutesItem();
+    fireEvent.click(screen.getByRole('button', { name: '+ Add' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Add route' });
+    expect(screen.queryByRole('dialog', { name: 'Routes' })).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Grade')).toHaveValue('?');
+    expect(within(dialog).getByLabelText('Type')).toHaveValue('');
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Arete' } });
+    fireEvent.change(within(dialog).getByLabelText('Grade'), { target: { value: '6B' } });
+    fireEvent.change(within(dialog).getByLabelText('Description'), { target: { value: 'A steep start' } });
+    fireEvent.change(within(dialog).getByLabelText('Height'), { target: { value: '4' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Roof' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Slopers' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '3 stars' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+        routes: [
+          ...editableSector.routes,
+          {
+            name: 'Arete',
+            grade: '6B',
+            sectorName: 'Main Wall',
+            description: 'A steep start',
+            tags: ['Slopers', 'Roof'],
+            rating: 3,
+            height: 4,
+            images: [],
+          },
+        ],
+      });
+    });
+  });
+
+  it('deletes a route after confirmation and leaves it when cancelled', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    vi.mocked(patchSectorGeo).mockResolvedValue({ ...ratedRoute, version: 3, routes: [ratedRoute.routes[1]] });
+    renderDeletable(ratedRoute);
+    openRoutesItem();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Classic' }));
+
+    expect(confirm).toHaveBeenCalledWith('Delete the "Classic" route?');
+    expect(patchSectorGeo).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Classic' }));
+
+    await waitFor(() => {
+      expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+        routes: [ratedRoute.routes[1]],
+      });
+    });
+    confirm.mockRestore();
+  });
+
+  it('rejects a duplicate route name before saving', () => {
+    renderDeletable(editableSector);
+    openRoutesItem();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Classic' }));
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'mystery' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(screen.getByText('A route with this name already exists.')).toBeInTheDocument();
+    expect(patchSectorGeo).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Edit route' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Routes' })).not.toBeInTheDocument();
+
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    confirm.mockRestore();
+
+    expect(screen.queryByRole('dialog', { name: 'Edit route' })).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Routes' })).toBeInTheDocument();
+  });
+
+  it('shows an error when routes cannot be opened', () => {
+    renderDeletable({ ...editableSector, id: undefined });
+    openRoutesItem();
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'This sector cannot be edited because it has no id.',
+    );
+  });
+
+  it('opens route details from the route gear menu and saves them', async () => {
+    vi.mocked(patchSectorGeo).mockResolvedValue({ ...ratedRoute, version: 3 });
+    renderDeletable(ratedRoute);
+
+    expect(screen.queryByRole('menuitem', { name: 'Edit details' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Options for Classic' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit details' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Edit route' });
+    expect(within(dialog).getByLabelText('Name')).toHaveValue('Classic');
+    expect(screen.queryByRole('dialog', { name: 'Routes' })).not.toBeInTheDocument();
+
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Direct' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Edit route' })).not.toBeInTheDocument();
+    });
+    expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+      routes: [
+        expect.objectContaining({ id: 'route-1', name: 'Direct' }),
+        ratedRoute.routes[1],
+      ],
+    });
+  });
+
+  it('shows an error when route details cannot be opened', () => {
+    renderDeletable({ ...editableSector, version: undefined });
+    fireEvent.click(screen.getByRole('button', { name: 'Options for Classic' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit details' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'This sector cannot be edited because it has no version.',
+    );
   });
 });
