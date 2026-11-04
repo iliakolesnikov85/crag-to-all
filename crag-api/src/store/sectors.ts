@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { LatLng, Route, Sector } from '@crag-to-all/shared-crag';
+import type { Image, LatLng, Route, Sector } from '@crag-to-all/shared-crag';
 import type { Db } from 'mongodb';
 import { sectorNameKey, toSector, toSectorDocument } from '../convertors';
 import { alreadyExists, isDuplicateKeyError, notFound, readOnly, versionConflict } from '../http';
@@ -72,6 +72,23 @@ function detailUpdates(patch: SectorPatch): {
     else fields[field] = value;
   }
   return { fields, cleared };
+}
+
+/** Drop route image refs whose file is absent from `images`. Other route fields stay as stored. */
+function routesAfterImagePatch(
+  routes: readonly Route[],
+  images: readonly Image[],
+): Route[] | undefined {
+  const remaining = new Set(images.map((image) => image.imageFile));
+  let changed = false;
+  const next = routes.map((route) => {
+    const refs = route.images ?? [];
+    const kept = refs.filter((ref) => remaining.has(ref.imageFile));
+    if (kept.length === refs.length) return route;
+    changed = true;
+    return { ...route, images: kept };
+  });
+  return changed ? next : undefined;
 }
 
 async function nextSectorOrder(db: Db, cragId: string): Promise<number> {
@@ -162,6 +179,7 @@ export async function patchSectorGeo(
     name?: string;
     nameKey?: string;
     routes?: Route[];
+    images?: Image[];
     season?: string;
     approachTime?: string;
     altitude?: string;
@@ -182,6 +200,15 @@ export async function patchSectorGeo(
     }));
   } else if (patch.name !== undefined && existing.routes?.length) {
     $set.routes = existing.routes.map((route) => ({ ...route, sectorName }));
+  }
+  if (patch.images !== undefined) {
+    $set.images = patch.images;
+    // An explicit routes patch is the source of truth. Otherwise unlink files
+    // that this image list no longer contains, without revalidating the routes.
+    if (patch.routes === undefined) {
+      const unlinked = routesAfterImagePatch($set.routes ?? existing.routes ?? [], patch.images);
+      if (unlinked) $set.routes = unlinked;
+    }
   }
 
   const update: {

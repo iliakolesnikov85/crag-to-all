@@ -1,4 +1,4 @@
-import type { Crag, CragData, DescriptionSection, LatLng, Route, Sector } from '../types';
+import type { Crag, CragData, DescriptionSection, Image, LatLng, Route, Sector } from '../types';
 import { getAccessToken } from './auth';
 
 const CRAGS_PATH = '/api/crags';
@@ -131,6 +131,11 @@ export interface SectorPatch {
   orientation?: string | null;
   timeInSun?: string | null;
   routes?: Route[];
+  /**
+   * Full replacement of the sector's topo images, in display order.
+   * The server drops route image refs for a file that no longer appears here.
+   */
+  images?: Image[];
 }
 
 export async function patchSectorGeo(

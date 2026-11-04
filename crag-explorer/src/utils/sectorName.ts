@@ -17,7 +17,7 @@ export interface SectorNameFailure {
 
 export type SectorNameResult = SectorNameSuccess | SectorNameFailure;
 
-/** Rules shared by the map editor and the edit-sector modal. */
+/** Rules shared by the map editor and the sector details modal. */
 export function validateSectorName(
   value: string,
   takenNames: readonly string[] = [],

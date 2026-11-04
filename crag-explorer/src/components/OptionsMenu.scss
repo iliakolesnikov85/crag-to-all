@@ -20,6 +20,12 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
+.options-menu__separator {
+  height: 1px;
+  margin: 0.25rem 0;
+  background: #e5e5e5;
+}
+
 .options-menu__item {
   display: block;
   width: 100%;

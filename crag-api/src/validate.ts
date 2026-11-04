@@ -186,6 +186,7 @@ const sectorGeoPatchSchema = z
     orientation: clearableText,
     timeInSun: clearableText,
     routes: z.array(routeSchema).optional(),
+    images: z.array(imageSchema).optional(),
   })
   .refine(
     (patch) =>
@@ -196,7 +197,8 @@ const sectorGeoPatchSchema = z
       patch.altitude !== undefined ||
       patch.orientation !== undefined ||
       patch.timeInSun !== undefined ||
-      patch.routes !== undefined,
+      patch.routes !== undefined ||
+      patch.images !== undefined,
     { message: 'PATCH body must include at least one sector field besides version' },
   );
 
@@ -276,6 +278,7 @@ function parseSectorGeoPatch(body: unknown): SectorPatch & { version: number } {
   if (parsed.orientation !== undefined) patch.orientation = parsed.orientation;
   if (parsed.timeInSun !== undefined) patch.timeInSun = parsed.timeInSun;
   if (parsed.routes !== undefined) patch.routes = normalizeRoutes(parsed.routes);
+  if (parsed.images !== undefined) patch.images = parsed.images;
   return patch;
 }
 

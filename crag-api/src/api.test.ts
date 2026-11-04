@@ -532,6 +532,121 @@ describe('crag-api', () => {
     );
   });
 
+  it('replaces topo images in display order', async () => {
+    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    const created = await request(app)
+      .post('/api/crags/roshka/sectors')
+      .send({
+        name: 'Main Wall',
+        routes: [{
+          name: 'Classic',
+          grade: '6a',
+          images: [{ imageFile: 'b.jpg', routeIndex: 0 }],
+        }],
+        images: [
+          { imageFile: 'a.jpg' },
+          { imageFile: 'b.jpg', lines: [[{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }]] },
+        ],
+      });
+    expect(created.status).toBe(201);
+    const sectorId = created.body.id as string;
+
+    const moved = await request(app)
+      .patch(`/api/crags/roshka/sectors/${sectorId}`)
+      .send({
+        version: 1,
+        images: [
+          { imageFile: 'b.jpg', lines: [[{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }]] },
+          { imageFile: 'a.jpg' },
+        ],
+      });
+    expect(moved.status).toBe(200);
+    expect(moved.body.version).toBe(2);
+    expect(moved.body.images).toEqual([
+      { imageFile: 'b.jpg', lines: [[{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }]] },
+      { imageFile: 'a.jpg' },
+    ]);
+    expect(moved.body.routes[0].images).toEqual([{ imageFile: 'b.jpg', routeIndex: 0 }]);
+
+    const removed = await request(app)
+      .patch(`/api/crags/roshka/sectors/${sectorId}`)
+      .send({
+        version: 2,
+        images: [{ imageFile: 'a.jpg' }],
+      });
+    expect(removed.status).toBe(200);
+    expect(removed.body.images).toEqual([{ imageFile: 'a.jpg' }]);
+    expect(removed.body.routes[0]).toEqual({
+      ...moved.body.routes[0],
+      images: [],
+    });
+  });
+
+  it('drops route links for a removed topo file and leaves the rest of the route', async () => {
+    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    const longVotes = 'Average rating 2.5 from 120 climbers';
+    const route = {
+      name: ' Classic ',
+      grade: '6a ',
+      sectorName: 'Main Wall',
+      description: 'Steep',
+      tags: ['Crimpers'],
+      ratingVotes: longVotes,
+      videos: [{ url: 'https://example.com/v', addedBy: '' }],
+      images: [
+        { imageFile: 'a.jpg', routeIndex: 0 },
+        { imageFile: 'b.jpg', routeIndex: 1 },
+      ],
+    };
+    await db.collection('sectors').insertOne({
+      _id: 'wall-1',
+      cragId: 'roshka',
+      name: 'Main Wall',
+      nameKey: 'main wall',
+      geo: { lat: 42.5, lon: 45.2 },
+      routes: [route, { ...route, name: 'Direct', images: [{ imageFile: 'b.jpg', routeIndex: 0 }] }],
+      images: [
+        { imageFile: 'a.jpg' },
+        { imageFile: 'a.jpg', lines: [[{ x: 0.2, y: 0.3 }]] },
+        { imageFile: 'b.jpg' },
+      ],
+      order: 0,
+      version: 4,
+      updatedAt: new Date(),
+    });
+
+    const keptDuplicate = await request(app)
+      .patch('/api/crags/roshka/sectors/wall-1')
+      .send({
+        version: 4,
+        images: [
+          { imageFile: 'a.jpg', lines: [[{ x: 0.2, y: 0.3 }]] },
+          { imageFile: 'b.jpg' },
+        ],
+      });
+    expect(keptDuplicate.status).toBe(200);
+    expect(keptDuplicate.body.routes[0]).toEqual(route);
+    expect(keptDuplicate.body.routes[1].name).toBe('Direct');
+
+    const removed = await request(app)
+      .patch('/api/crags/roshka/sectors/wall-1')
+      .send({
+        version: 5,
+        images: [{ imageFile: 'a.jpg', lines: [[{ x: 0.2, y: 0.3 }]] }],
+      });
+    expect(removed.status).toBe(200);
+    expect(removed.body.routes[0]).toEqual({
+      ...route,
+      images: [{ imageFile: 'a.jpg', routeIndex: 0 }],
+    });
+    expect(removed.body.routes[0].id).toBeUndefined();
+    expect(removed.body.routes[1]).toEqual({
+      ...route,
+      name: 'Direct',
+      images: [],
+    });
+  });
+
   it('keeps one sector when two creates race for the same name', async () => {
     await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
     const [first, second] = await Promise.all([

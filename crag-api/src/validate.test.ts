@@ -155,6 +155,20 @@ describe('validate', () => {
     });
     expect(typed.routes?.map((route) => route.type)).toEqual([undefined, undefined, undefined, 'Sport']);
 
+    expect(parseSectorGeoPatch({
+      version: 2,
+      images: [
+        { imageFile: ' b.jpg ', lines: [[{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }]] },
+        { imageFile: 'a.jpg' },
+      ],
+    })).toEqual({
+      version: 2,
+      images: [
+        { imageFile: 'b.jpg', lines: [[{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }]] },
+        { imageFile: 'a.jpg' },
+      ],
+    });
+
     try {
       parseSectorGeoPatch({
         version: 1,

@@ -22,7 +22,7 @@ const SectorOptionsMenu: React.FC<SectorOptionsMenuProps> = ({
       disabled={disabled}
       className="sector-options-menu"
       items={[
-        { label: 'Edit', onSelect: onEdit },
+        { label: 'Edit sector details', onSelect: onEdit },
         { label: 'Routes', onSelect: onRoutes },
         { label: 'Delete sector', onSelect: onDelete },
       ]}

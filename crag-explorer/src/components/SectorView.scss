@@ -182,9 +182,22 @@
     padding: 1rem;
   }
 
-  .topo-routes h4 {
+  .topo-routes-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
     padding-left: 10px;
     margin: 10px 0;
+
+    h4 {
+      margin: 0;
+    }
+  }
+
+  .topo-block:has(.options-menu.is-open) {
+    position: relative;
+    z-index: 5;
   }
 
   .routes-list {

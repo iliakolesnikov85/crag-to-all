@@ -137,7 +137,7 @@ describe('SectorPage delete', () => {
 
     expect(screen.queryByRole('menuitem', { name: 'Delete sector' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Sector options' }));
-    expect(screen.getByRole('menuitem', { name: 'Edit' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Edit sector details' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Delete sector' })).toBeInTheDocument();
   });
 
@@ -231,7 +231,7 @@ function HistoryControls() {
 
 function openEditItem() {
   fireEvent.click(screen.getByRole('button', { name: 'Sector options' }));
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Edit sector details' }));
 }
 
 function renderSectorAndMap() {
@@ -260,7 +260,7 @@ describe('SectorPage edit', () => {
     renderDeletable(editableSector);
     openEditItem();
 
-    expect(screen.queryByRole('menuitem', { name: 'Edit' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Edit sector details' })).not.toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: 'Edit sector' })).toBeInTheDocument();
     expect(screen.getByLabelText('Name')).toHaveValue('Main Wall');
     expect(screen.getByLabelText('Altitude')).toHaveValue('1800');
@@ -704,9 +704,9 @@ describe('SectorPage routes', () => {
     vi.mocked(patchSectorGeo).mockResolvedValue({ ...ratedRoute, version: 3 });
     renderDeletable(ratedRoute);
 
-    expect(screen.queryByRole('menuitem', { name: 'Edit details' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Edit route details' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Options for Classic' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit details' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit route details' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Edit route' });
     expect(within(dialog).getByLabelText('Name')).toHaveValue('Classic');
@@ -729,11 +729,93 @@ describe('SectorPage routes', () => {
   it('shows an error when route details cannot be opened', () => {
     renderDeletable({ ...editableSector, version: undefined });
     fireEvent.click(screen.getByRole('button', { name: 'Options for Classic' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit details' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit route details' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(
       'This sector cannot be edited because it has no version.',
     );
+  });
+});
+
+const topoSector: Sector = {
+  ...editableSector,
+  images: [
+    { imageFile: 'a.jpg' },
+    { imageFile: 'b.jpg' },
+    { imageFile: 'c.jpg' },
+  ],
+  routes: [
+    {
+      ...editableSector.routes[0],
+      images: [{ imageFile: 'b.jpg', routeIndex: 0 }],
+    },
+    editableSector.routes[1],
+  ],
+};
+
+function openTopoMenu(position: number) {
+  fireEvent.keyDown(document, { key: 'Escape' });
+  const name = `Topo image ${position} of 3 options`;
+  fireEvent.click(screen.getByRole('button', { name }));
+  const root = screen.getByRole('button', { name }).parentElement;
+  if (!root) throw new Error(`Missing menu for topo image ${position}`);
+  return within(root);
+}
+
+describe('SectorPage topo images', () => {
+  beforeEach(() => {
+    vi.mocked(canEditCrag).mockReturnValue(true);
+    vi.mocked(deleteSector).mockReset();
+    vi.mocked(patchSectorGeo).mockReset();
+  });
+
+  it('shows each topo position and hides the menu without permission', () => {
+    vi.mocked(canEditCrag).mockReturnValue(false);
+    renderDeletable(topoSector);
+
+    expect(screen.getByRole('heading', { level: 4, name: '1/3' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 4, name: '2/3' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 4, name: '3/3' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Topo image/ })).not.toBeInTheDocument();
+  });
+
+  it('deletes a topo image after confirmation', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    vi.mocked(patchSectorGeo).mockResolvedValue({ ...topoSector, version: 3 });
+    renderDeletable(topoSector);
+
+    expect(openTopoMenu(1).getByRole('menuitem', { name: 'Move up' })).toBeDisabled();
+    expect(openTopoMenu(3).getByRole('menuitem', { name: 'Move down' })).toBeDisabled();
+
+    fireEvent.click(openTopoMenu(2).getByRole('menuitem', { name: 'Delete topo image' }));
+    expect(confirm).toHaveBeenCalledWith('Delete topo image 2/3?');
+    expect(patchSectorGeo).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    fireEvent.click(openTopoMenu(2).getByRole('menuitem', { name: 'Delete topo image' }));
+
+    await waitFor(() => {
+      expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+        images: [topoSector.images[0], topoSector.images[2]],
+      });
+    });
+    confirm.mockRestore();
+  });
+
+  it('moves a topo image down after confirmation', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.mocked(patchSectorGeo).mockResolvedValue({ ...topoSector, version: 3 });
+    renderDeletable(topoSector);
+
+    fireEvent.click(openTopoMenu(2).getByRole('menuitem', { name: 'Move down' }));
+
+    expect(confirm).toHaveBeenCalledWith('Move topo image 2/3 down?');
+    await waitFor(() => {
+      expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+        images: [topoSector.images[0], topoSector.images[2], topoSector.images[1]],
+      });
+    });
+    confirm.mockRestore();
   });
 });

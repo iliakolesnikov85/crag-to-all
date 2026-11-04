@@ -48,7 +48,10 @@ const RouteListModal: React.FC<RouteListModalProps> = ({
         <ul className="route-list-modal__list">
           {routes.map((route, index) => (
             <li key={route.id ?? `${route.name}-${index}`} className="route-list-modal__row">
-              <span className="route-list-modal__name">{route.name}</span>
+              <span className="route-list-modal__name">
+                {route.name}
+                {route.grade ? `, ${route.grade}` : ''}
+              </span>
               <Button
                 type="button"
                 iconOnly

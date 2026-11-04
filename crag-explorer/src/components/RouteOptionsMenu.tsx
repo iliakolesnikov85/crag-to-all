@@ -18,7 +18,7 @@ function RouteOptionsMenu({
     <OptionsMenu
       label={`Options for ${routeName}`}
       disabled={disabled}
-      items={[{ label: 'Edit details', onSelect: onEditDetails }]}
+      items={[{ label: 'Edit route details', onSelect: onEditDetails }]}
       renderButton={({ open, ...buttonProps }) => (
         <Button
           type="button"

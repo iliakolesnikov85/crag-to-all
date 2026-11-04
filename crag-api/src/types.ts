@@ -6,6 +6,7 @@ import type {
   DescriptionSection,
   LatLng,
   OpenTopoTilePackInfo,
+  Image,
   Route,
   Sector,
   SectorDocument as SharedSectorDocument,
@@ -41,6 +42,11 @@ export interface SectorPatch {
   timeInSun?: string | null;
   /** Full replacement of the sector's routes. */
   routes?: Route[];
+  /**
+   * Full replacement of the sector's topo images, in display order.
+   * Route image refs to a file that no longer appears here are removed.
+   */
+  images?: Image[];
 }
 
 export interface ImageUploadResponse {

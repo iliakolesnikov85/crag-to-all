@@ -4,6 +4,8 @@ import './OptionsMenu.scss';
 interface OptionsMenuItem {
   label: string;
   onSelect: () => void;
+  disabled?: boolean;
+  separatorBefore?: boolean;
 }
 
 interface OptionsMenuButtonState {
@@ -82,18 +84,24 @@ function OptionsMenu({
       {open ? (
         <div className="options-menu__panel" role="menu">
           {items.map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              className="options-menu__item"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                item.onSelect();
-              }}
-            >
-              {item.label}
-            </button>
+            <div key={item.label}>
+              {item.separatorBefore ? (
+                <div className="options-menu__separator" role="separator" />
+              ) : null}
+              <button
+                type="button"
+                className="options-menu__item"
+                role="menuitem"
+                disabled={item.disabled}
+                onClick={() => {
+                  if (item.disabled) return;
+                  setOpen(false);
+                  item.onSelect();
+                }}
+              >
+                {item.label}
+              </button>
+            </div>
           ))}
         </div>
       ) : null}

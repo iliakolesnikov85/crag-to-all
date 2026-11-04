@@ -11,6 +11,7 @@ import {
 import { pointsToBezierPath } from '@crag-to-all/shared-crag';
 import RouteOptionsMenu from './RouteOptionsMenu';
 import RouteRating from './RouteRating';
+import TopoOptionsMenu from './TopoOptionsMenu';
 import { Route, Sector } from '../types';
 import './SectorView.scss';
 
@@ -27,6 +28,10 @@ export interface SectorViewProps {
   /** Index into `sector.routes`. Present only when the viewer can edit routes. */
   onEditRoute?: (index: number) => void;
   routeMenuDisabled?: boolean;
+  /** Index into `sector.images`. Present only when the viewer can edit topo images. */
+  onDeleteTopo?: (index: number) => void;
+  onMoveTopo?: (index: number, direction: -1 | 1) => void;
+  topoMenuDisabled?: boolean;
 }
 
 const SectorView: React.FC<SectorViewProps> = ({
@@ -41,6 +46,9 @@ const SectorView: React.FC<SectorViewProps> = ({
   headerAlert,
   onEditRoute,
   routeMenuDisabled = false,
+  onDeleteTopo,
+  onMoveTopo,
+  topoMenuDisabled = false,
 }) => {
 
   const [highlighted, setHighlighted] = useState<number[]>([]);
@@ -242,11 +250,21 @@ const SectorView: React.FC<SectorViewProps> = ({
                   </div>
                 </div>
                 {!route && <div className="topo-routes">
-
+                  <div className="topo-routes-header">
+                    <h4>{imageIdx + 1}/{sector.images.length}</h4>
+                    {onDeleteTopo && onMoveTopo && !printMode ? (
+                      <TopoOptionsMenu
+                        index={imageIdx}
+                        count={sector.images.length}
+                        disabled={topoMenuDisabled}
+                        onDelete={() => onDeleteTopo(imageIdx)}
+                        onMoveUp={() => onMoveTopo(imageIdx, -1)}
+                        onMoveDown={() => onMoveTopo(imageIdx, 1)}
+                      />
+                    ) : null}
+                  </div>
                   {routesForImage.length > 0 ? (
-                    <>
-                      <h4>Routes</h4>
-                      <ul className="routes-list">
+                    <ul className="routes-list">
                         {routesForImage.map((route, routeIdx) => (
                           <li
                             key={routeIdx}
@@ -285,7 +303,6 @@ const SectorView: React.FC<SectorViewProps> = ({
                           </li>
                         ))}
                       </ul>
-                    </>
                   ) : (
                     <div className="no-routes-message">
                       No routes yet :)

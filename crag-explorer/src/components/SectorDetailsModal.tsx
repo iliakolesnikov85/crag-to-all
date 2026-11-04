@@ -15,9 +15,9 @@ import { SECTOR_NAME_MAX_LENGTH } from '../utils/sectorName';
 import Button from './Button';
 import ChoiceGroup, { type ChoiceOption } from './ChoiceGroup';
 import Modal from './Modal';
-import './EditSectorModal.scss';
+import './SectorDetailsModal.scss';
 
-interface EditSectorModalProps {
+interface SectorDetailsModalProps {
   open: boolean;
   sector: Sector;
   takenNames: readonly string[];
@@ -54,7 +54,7 @@ function sameDraft(left: SectorEditDraft, right: SectorEditDraft): boolean {
     && sameItems(left.orientations, right.orientations);
 }
 
-const EditSectorModal: React.FC<EditSectorModalProps> = ({
+const SectorDetailsModal: React.FC<SectorDetailsModalProps> = ({
   open,
   sector,
   takenNames,
@@ -283,4 +283,4 @@ const EditSectorModal: React.FC<EditSectorModalProps> = ({
   );
 };
 
-export default EditSectorModal;
+export default SectorDetailsModal;

@@ -1,15 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useDeleteSector, usePatchSector } from '../api/useCragMutations';
 import { canEditCrag } from '../api/permissions';
-import EditSectorModal from '../components/EditSectorModal';
+import SectorDetailsModal from '../components/SectorDetailsModal';
 import RouteDetailsModal from '../components/RouteDetailsModal';
 import RouteListModal from '../components/RouteListModal';
 import SectorOptionsMenu from '../components/SectorOptionsMenu';
 import SectorView from '../components/SectorView';
 import { useCrag } from '../context/CragContext';
-import { Route, Sector } from '../types';
+import { Image, Route, Sector } from '../types';
 import type { SectorDetailsPatch } from '../utils/sectorDetails';
+import { moveTopoImage, removeTopoImage } from '../utils/topoImages';
 import { getCragImageUrl } from '../utils/firebaseStorage';
 import { setMapCenter } from '../utils/map';
 
@@ -26,6 +27,12 @@ interface SectorPageProps {
 type RouteEditorState =
   | { mode: 'add' }
   | { mode: 'edit'; index: number; route: Route };
+
+type EditableSector = Sector & { id: string; version: number };
+
+function hasEditIdentity(sector: Sector): sector is EditableSector {
+  return Boolean(sector.id) && typeof sector.version === 'number';
+}
 
 function otherRouteNames(routes: readonly Route[], index: number | null): string[] {
   return routes
@@ -54,9 +61,34 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
   const [routeEditor, setRouteEditor] = useState<RouteEditorState | null>(null);
   const [routeListError, setRouteListError] = useState<string | null>(null);
   const [routeEditError, setRouteEditError] = useState<string | null>(null);
-  const sector = sectors.find(s => s.name.toLowerCase() === (sectorName || '').toLowerCase());
+  const requestedName = (sectorName || '').toLowerCase();
+  const sector = sectors.find((item) => item.name.toLowerCase() === requestedName);
   const editing = editingSector !== null && sector?.id === editingSector.id;
   const canEdit = canEditCrag(crag);
+  const saving = patchSectorMutation.isPending;
+  const menusDisabled = deleteSectorMutation.isPending || saving;
+
+  const clearRouteSession = useCallback(() => {
+    setRoutesOpen(false);
+    setRoutesSectorId(null);
+    setRoutesVersion(null);
+    setRouteEditor(null);
+    setRouteListError(null);
+    setRouteEditError(null);
+  }, []);
+
+  const requireEditable = (): EditableSector | null => {
+    if (!sector) return null;
+    if (!canEdit) {
+      setHeaderError(PERMISSION_MESSAGE);
+      return null;
+    }
+    if (!hasEditIdentity(sector)) {
+      setHeaderError(sector.id ? EDIT_MISSING_VERSION_MESSAGE : EDIT_MISSING_ID_MESSAGE);
+      return null;
+    }
+    return sector;
+  };
 
   useEffect(() => {
     if (onSectorChange) {
@@ -74,17 +106,12 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
   useEffect(() => {
     if (!routesOpen && routeEditor === null) return;
     if (sector?.id != null && sector.id === routesSectorId) return;
-    setRoutesOpen(false);
-    setRoutesSectorId(null);
-    setRoutesVersion(null);
-    setRouteEditor(null);
-    setRouteListError(null);
-    setRouteEditError(null);
-  }, [routesOpen, routeEditor, routesSectorId, sector?.id]);
+    clearRouteSession();
+  }, [clearRouteSession, routesOpen, routeEditor, routesSectorId, sector?.id]);
 
   const handleDelete = async () => {
     if (!sector || deleteSectorMutation.isPending) return;
-    if (!canEditCrag(crag)) {
+    if (!canEdit) {
       setHeaderError(PERMISSION_MESSAGE);
       return;
     }
@@ -108,41 +135,19 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
   };
 
   const openEdit = () => {
-    if (!sector) return;
-    if (!canEditCrag(crag)) {
-      setHeaderError(PERMISSION_MESSAGE);
-      return;
-    }
-    if (!sector.id) {
-      setHeaderError(EDIT_MISSING_ID_MESSAGE);
-      return;
-    }
-    if (typeof sector.version !== 'number') {
-      setHeaderError(EDIT_MISSING_VERSION_MESSAGE);
-      return;
-    }
+    const target = requireEditable();
+    if (!target) return;
     setHeaderError(null);
     setEditError(null);
-    setEditingSector(sector);
+    setEditingSector(target);
   };
 
   const captureRouteBaseline = (): boolean => {
-    if (!sector) return false;
-    if (!canEditCrag(crag)) {
-      setHeaderError(PERMISSION_MESSAGE);
-      return false;
-    }
-    if (!sector.id) {
-      setHeaderError(EDIT_MISSING_ID_MESSAGE);
-      return false;
-    }
-    if (typeof sector.version !== 'number') {
-      setHeaderError(EDIT_MISSING_VERSION_MESSAGE);
-      return false;
-    }
+    const target = requireEditable();
+    if (!target) return false;
     setHeaderError(null);
-    setRoutesSectorId(sector.id);
-    setRoutesVersion(sector.version);
+    setRoutesSectorId(target.id);
+    setRoutesVersion(target.version);
     return true;
   };
 
@@ -154,33 +159,30 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
     setRoutesOpen(true);
   };
 
+  const openRouteEditor = (editor: RouteEditorState) => {
+    setRouteEditError(null);
+    setRouteEditor(editor);
+  };
+
   const openRouteDetails = (index: number) => {
     const route = sector?.routes[index];
     if (!route || !captureRouteBaseline()) return;
-    setRouteEditError(null);
-    setRouteEditor({ mode: 'edit', index, route });
+    openRouteEditor({ mode: 'edit', index, route });
   };
 
   const closeRoutes = () => {
-    if (patchSectorMutation.isPending) return;
-    setRoutesOpen(false);
-    setRoutesSectorId(null);
-    setRoutesVersion(null);
-    setRouteEditor(null);
-    setRouteListError(null);
-    setRouteEditError(null);
+    if (saving) return;
+    clearRouteSession();
   };
 
   const saveRoutes = async (routes: Route[], target: 'list' | 'details') => {
-    if (!sector?.id || routesVersion === null || patchSectorMutation.isPending) return;
-    if (!canEditCrag(crag)) {
-      const message = PERMISSION_MESSAGE;
-      if (target === 'list') setRouteListError(message);
-      else setRouteEditError(message);
+    if (!sector?.id || routesVersion === null || saving) return;
+    const setRouteError = target === 'list' ? setRouteListError : setRouteEditError;
+    if (!canEdit) {
+      setRouteError(PERMISSION_MESSAGE);
       return;
     }
-    if (target === 'list') setRouteListError(null);
-    else setRouteEditError(null);
+    setRouteError(null);
     try {
       const saved = await patchSectorMutation.mutateAsync({
         sectorId: sector.id,
@@ -192,13 +194,12 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
     } catch (error) {
       console.error('Failed to save routes:', error);
       const message = error instanceof Error ? error.message : 'Failed to save routes';
-      if (target === 'list') setRouteListError(message);
-      else setRouteEditError(message);
+      setRouteError(message);
     }
   };
 
   const handleDeleteRoute = async (index: number) => {
-    if (!sector || patchSectorMutation.isPending) return;
+    if (!sector || saving) return;
     const route = sector.routes[index];
     if (!route) return;
     const confirmed = window.confirm(`Delete the "${route.name}" route?`);
@@ -215,9 +216,60 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
     await saveRoutes(routes, 'details');
   };
 
+  const requireTopoEditable = (): EditableSector | null => {
+    if (saving) return null;
+    return requireEditable();
+  };
+
+  const saveTopoImages = async (target: EditableSector, images: Image[]) => {
+    if (saving) return;
+    setHeaderError(null);
+    try {
+      const saved = await patchSectorMutation.mutateAsync({
+        sectorId: target.id,
+        version: target.version,
+        patch: { images },
+      });
+      if (routesSectorId === target.id) setRoutesVersion(saved.version);
+      setRouteEditor((current) => {
+        if (!current || current.mode !== 'edit') return current;
+        const updated = saved.routes[current.index];
+        return updated ? { mode: 'edit', index: current.index, route: updated } : current;
+      });
+    } catch (error) {
+      console.error('Failed to update topo images:', error);
+      setHeaderError(error instanceof Error ? error.message : 'Failed to update topo images');
+    }
+  };
+
+  const handleDeleteTopo = async (index: number) => {
+    const target = requireTopoEditable();
+    if (!target?.images[index]) return;
+    const confirmed = window.confirm(
+      `Delete topo image ${index + 1}/${target.images.length}?`,
+    );
+    if (!confirmed) return;
+    const next = removeTopoImage(target.images, index);
+    if (!next) return;
+    await saveTopoImages(target, next);
+  };
+
+  const handleMoveTopo = async (index: number, direction: -1 | 1) => {
+    const target = requireTopoEditable();
+    if (!target) return;
+    const next = moveTopoImage(target.images, index, direction);
+    if (!next) return;
+    const place = direction < 0 ? 'up' : 'down';
+    const confirmed = window.confirm(
+      `Move topo image ${index + 1}/${target.images.length} ${place}?`,
+    );
+    if (!confirmed) return;
+    await saveTopoImages(target, next);
+  };
+
   const handleSave = async (patch: SectorDetailsPatch) => {
-    if (!editingSector?.id || typeof editingSector.version !== 'number' || patchSectorMutation.isPending) return;
-    if (!canEditCrag(crag)) {
+    if (!editingSector?.id || typeof editingSector.version !== 'number' || saving) return;
+    if (!canEdit) {
       setEditError(PERMISSION_MESSAGE);
       return;
     }
@@ -229,7 +281,7 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
         patch,
       });
       setEditingSector(null);
-      if (saved.name.toLowerCase() !== (sectorName || '').toLowerCase()) {
+      if (saved.name.toLowerCase() !== requestedName) {
         navigate(
           getUrl(`/sector/${encodeURIComponent(saved.name.toLowerCase())}`),
           { replace: true },
@@ -243,6 +295,11 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
 
   if (!sector) return <div className="page">Sector not found.</div>;
 
+  const focusSectorOnMap = () => {
+    if (!sector.geo) return;
+    setMapCenter(crag.cragId, [sector.geo.lat, sector.geo.lon], 17);
+  };
+
   return (
     <div className="page">
       <SectorView
@@ -252,7 +309,7 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
         headerActions={
           canEdit ? (
             <SectorOptionsMenu
-              disabled={deleteSectorMutation.isPending || patchSectorMutation.isPending}
+              disabled={menusDisabled}
               onEdit={openEdit}
               onRoutes={openRoutes}
               onDelete={() => void handleDelete()}
@@ -261,54 +318,50 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
         }
         headerAlert={headerError}
         onEditRoute={canEdit ? openRouteDetails : undefined}
-        routeMenuDisabled={deleteSectorMutation.isPending || patchSectorMutation.isPending}
+        routeMenuDisabled={menusDisabled}
+        onDeleteTopo={canEdit ? (index) => void handleDeleteTopo(index) : undefined}
+        onMoveTopo={canEdit ? (index, direction) => void handleMoveTopo(index, direction) : undefined}
+        topoMenuDisabled={menusDisabled}
         createLink={(to: string, children: React.ReactNode, title?: string) => (
           <Link
             className="link"
             to={getUrl(to)}
             title={title}
             onClick={() => {
-              if (to !== '/map') return;
-              if (sector?.geo) setMapCenter(crag.cragId, [sector?.geo.lat, sector?.geo.lon], 17);
+              if (to === '/map') focusSectorOnMap();
             }}
           >
             {children}
           </Link>
         )}
       />
-      <EditSectorModal
+      <SectorDetailsModal
         key={editing ? 'editing' : 'idle'}
         open={editing}
         sector={editingSector ?? sector}
         takenNames={otherSectorNames(sectors, editingSector ?? sector)}
         mapUrl={getUrl('/map')}
-        saving={patchSectorMutation.isPending}
+        saving={saving}
         error={editError}
         onClose={() => {
-          if (patchSectorMutation.isPending) return;
+          if (saving) return;
           setEditingSector(null);
           setEditError(null);
         }}
-        onLocationClick={() => {
-          if (sector.geo) setMapCenter(crag.cragId, [sector.geo.lat, sector.geo.lon], 17);
-        }}
+        onLocationClick={focusSectorOnMap}
         onSave={(patch) => void handleSave(patch)}
       />
       <RouteListModal
         open={routesOpen && routeEditor === null}
         routes={sector.routes}
-        saving={patchSectorMutation.isPending}
+        saving={saving}
         error={routeListError}
         onClose={closeRoutes}
-        onAdd={() => {
-          setRouteEditError(null);
-          setRouteEditor({ mode: 'add' });
-        }}
+        onAdd={() => openRouteEditor({ mode: 'add' })}
         onEdit={(index) => {
           const route = sector.routes[index];
           if (!route) return;
-          setRouteEditError(null);
-          setRouteEditor({ mode: 'edit', index, route });
+          openRouteEditor({ mode: 'edit', index, route });
         }}
         onDelete={(index) => void handleDeleteRoute(index)}
       />
@@ -327,12 +380,16 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
           sector.routes,
           routeEditor?.mode === 'edit' ? routeEditor.index : null,
         )}
-        saving={patchSectorMutation.isPending}
+        saving={saving}
         error={routeEditError}
         onClose={() => {
-          if (patchSectorMutation.isPending) return;
-          setRouteEditor(null);
-          setRouteEditError(null);
+          if (saving) return;
+          if (routesOpen) {
+            setRouteEditor(null);
+            setRouteEditError(null);
+            return;
+          }
+          clearRouteSession();
         }}
         onSave={(route) => void handleSaveRoute(route)}
       />
