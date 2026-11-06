@@ -158,16 +158,33 @@ describe('validate', () => {
     expect(parseSectorGeoPatch({
       version: 2,
       images: [
-        { imageFile: ' b.jpg ', lines: [[{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }]] },
+        { imageFile: ' b.jpg ' },
         { imageFile: 'a.jpg' },
       ],
     })).toEqual({
       version: 2,
       images: [
-        { imageFile: 'b.jpg', lines: [[{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }]] },
+        { imageFile: 'b.jpg' },
         { imageFile: 'a.jpg' },
       ],
     });
+
+    const withLine = parseSectorGeoPatch({
+      version: 2,
+      routes: [{
+        name: 'Classic',
+        images: [{
+          imageFile: 'b.jpg',
+          routeIndex: 0,
+          line: [{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }],
+        }],
+      }],
+    });
+    expect(withLine.routes?.[0]?.images).toEqual([{
+      imageFile: 'b.jpg',
+      routeIndex: 0,
+      line: [{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }],
+    }]);
 
     try {
       parseSectorGeoPatch({

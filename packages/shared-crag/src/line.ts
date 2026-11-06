@@ -25,3 +25,9 @@ export function pointsToBezierPath(points: LinePoint[]): string {
 
   return parts.join(' ');
 }
+
+/** Point with the greatest y. Image fractions grow downward, so this is the lowest point. */
+export function lowestLinePoint(points: LinePoint[]): LinePoint | undefined {
+  if (points.length === 0) return undefined;
+  return points.reduce((lowest, point) => (point.y > lowest.y ? point : lowest));
+}

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { CRAG_DATA_PROTOCOL } from '@crag-to-all/shared-crag';
 import { MongoClient, type Db } from 'mongodb';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import request from 'supertest';
@@ -85,7 +86,7 @@ describe('crag-api', () => {
     expect(crag.body.id).toBe('roshka');
     expect(crag.body.cragId).toBe('roshka');
     expect(crag.body.sectors).toEqual([]);
-    expect(crag.body.protocolVersion).toBe(1);
+    expect(crag.body.protocolVersion).toBe(CRAG_DATA_PROTOCOL);
     expect(crag.body.source).toBe('explorer');
   });
 
@@ -541,11 +542,15 @@ describe('crag-api', () => {
         routes: [{
           name: 'Classic',
           grade: '6a',
-          images: [{ imageFile: 'b.jpg', routeIndex: 0 }],
+          images: [{
+            imageFile: 'b.jpg',
+            routeIndex: 0,
+            line: [{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }],
+          }],
         }],
         images: [
           { imageFile: 'a.jpg' },
-          { imageFile: 'b.jpg', lines: [[{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }]] },
+          { imageFile: 'b.jpg' },
         ],
       });
     expect(created.status).toBe(201);
@@ -556,17 +561,21 @@ describe('crag-api', () => {
       .send({
         version: 1,
         images: [
-          { imageFile: 'b.jpg', lines: [[{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }]] },
+          { imageFile: 'b.jpg' },
           { imageFile: 'a.jpg' },
         ],
       });
     expect(moved.status).toBe(200);
     expect(moved.body.version).toBe(2);
     expect(moved.body.images).toEqual([
-      { imageFile: 'b.jpg', lines: [[{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }]] },
+      { imageFile: 'b.jpg' },
       { imageFile: 'a.jpg' },
     ]);
-    expect(moved.body.routes[0].images).toEqual([{ imageFile: 'b.jpg', routeIndex: 0 }]);
+    expect(moved.body.routes[0].images).toEqual([{
+      imageFile: 'b.jpg',
+      routeIndex: 0,
+      line: [{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }],
+    }]);
 
     const removed = await request(app)
       .patch(`/api/crags/roshka/sectors/${sectorId}`)
@@ -607,7 +616,7 @@ describe('crag-api', () => {
       routes: [route, { ...route, name: 'Direct', images: [{ imageFile: 'b.jpg', routeIndex: 0 }] }],
       images: [
         { imageFile: 'a.jpg' },
-        { imageFile: 'a.jpg', lines: [[{ x: 0.2, y: 0.3 }]] },
+        { imageFile: 'a.jpg' },
         { imageFile: 'b.jpg' },
       ],
       order: 0,
@@ -620,7 +629,7 @@ describe('crag-api', () => {
       .send({
         version: 4,
         images: [
-          { imageFile: 'a.jpg', lines: [[{ x: 0.2, y: 0.3 }]] },
+          { imageFile: 'a.jpg' },
           { imageFile: 'b.jpg' },
         ],
       });
@@ -632,7 +641,7 @@ describe('crag-api', () => {
       .patch('/api/crags/roshka/sectors/wall-1')
       .send({
         version: 5,
-        images: [{ imageFile: 'a.jpg', lines: [[{ x: 0.2, y: 0.3 }]] }],
+        images: [{ imageFile: 'a.jpg' }],
       });
     expect(removed.status).toBe(200);
     expect(removed.body.routes[0]).toEqual({

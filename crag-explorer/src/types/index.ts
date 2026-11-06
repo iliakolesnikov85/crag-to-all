@@ -4,6 +4,7 @@ export type {
   Sector,
   DescriptionSection,
   Route,
+  RouteImage,
   RouteType,
   Image,
   LinePoint,

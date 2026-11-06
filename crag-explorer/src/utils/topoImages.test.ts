@@ -4,7 +4,7 @@ import { moveTopoImage, removeTopoImage } from './topoImages';
 
 const images: Image[] = [
   { imageFile: 'a.jpg' },
-  { imageFile: 'b.jpg', lines: [[{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }]] },
+  { imageFile: 'b.jpg' },
   { imageFile: 'a.jpg' },
 ];
 
@@ -22,7 +22,6 @@ describe('topoImages', () => {
     ]);
     expect(moveTopoImage(images, 0, -1)).toBeNull();
     expect(moveTopoImage(images, 2, 1)).toBeNull();
-    expect(moveTopoImage(images, 1, -1)?.[0].lines).toEqual(images[1].lines);
   });
 
   it('removes one image by index and keeps the others', () => {

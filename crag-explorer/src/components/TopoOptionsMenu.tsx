@@ -20,23 +20,19 @@ function TopoOptionsMenu({
   onMoveDown,
 }: TopoOptionsMenuProps) {
   const position = index + 1;
+  const moveItems = [
+    index > 0 ? { label: 'Move image up', onSelect: onMoveUp } : null,
+    index < count - 1 ? { label: 'Move image down', onSelect: onMoveDown } : null,
+  ].filter((item) => item !== null);
   return (
     <OptionsMenu
       label={`Topo image ${position} of ${count} options`}
       disabled={disabled}
       items={[
         { label: 'Delete topo image', onSelect: onDelete },
-        {
-          label: 'Move up',
-          onSelect: onMoveUp,
-          disabled: index <= 0,
-          separatorBefore: true,
-        },
-        {
-          label: 'Move down',
-          onSelect: onMoveDown,
-          disabled: index >= count - 1,
-        },
+        ...moveItems.map((item, itemIndex) =>
+          itemIndex === 0 ? { ...item, separatorBefore: true } : item,
+        ),
       ]}
       renderButton={({ open, ...buttonProps }) => (
         <Button

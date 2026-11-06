@@ -15,7 +15,7 @@ export const ROUTE_TYPES = [
 ] as const;
 
 /** Bump when the stored crag JSON shape changes incompatibly. */
-export const CRAG_DATA_PROTOCOL = 1;
+export const CRAG_DATA_PROTOCOL = 2;
 
 export type CragMapMarkerType = (typeof CRAG_MAP_MARKER_TYPES)[number];
 
@@ -53,6 +53,19 @@ export interface DescriptionSection {
   paragraphs: string[];
 }
 
+export interface LinePoint {
+  x: number;
+  y: number;
+}
+
+export interface RouteImage {
+  imageFile: string;
+  /** Display order of this route on the topo. */
+  routeIndex: number;
+  /** Polyline in image fractions (0–1). y grows downward. */
+  line?: LinePoint[];
+}
+
 export interface Route {
   id?: string;
   name: string;
@@ -65,19 +78,12 @@ export interface Route {
   ratingVotes?: string;
   /** Length of the climb, in meters. */
   height?: number;
-  images: Array<{ imageFile: string; routeIndex: number }>;
+  images: RouteImage[];
   videos?: Array<{ url: string; addedBy: string }>;
-}
-
-export interface LinePoint {
-  x: number;
-  y: number;
 }
 
 export interface Image {
   imageFile: string;
-  labelPositions?: any[];
-  lines?: Array<Array<LinePoint>>;
 }
 
 export interface CragMapTrail {

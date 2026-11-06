@@ -65,13 +65,12 @@ const linePointSchema = z.object({
 
 const imageSchema = z.object({
   imageFile: nonemptyString(MAX_TEXT_LENGTH),
-  labelPositions: z.array(z.unknown()).optional(),
-  lines: z.array(z.array(linePointSchema)).optional(),
 });
 
 const routeImageSchema = z.object({
   imageFile: nonemptyString(MAX_TEXT_LENGTH),
   routeIndex: z.number().int().min(0),
+  line: z.array(linePointSchema).optional(),
 });
 
 const routeVideoSchema = z.object({

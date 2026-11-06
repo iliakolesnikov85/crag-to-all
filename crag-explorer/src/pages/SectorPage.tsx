@@ -10,6 +10,7 @@ import SectorView from '../components/SectorView';
 import { useCrag } from '../context/CragContext';
 import { Image, Route, Sector } from '../types';
 import type { SectorDetailsPatch } from '../utils/sectorDetails';
+import { moveRouteOnImage } from '../utils/routeOrder';
 import { moveTopoImage, removeTopoImage } from '../utils/topoImages';
 import { getCragImageUrl } from '../utils/firebaseStorage';
 import { setMapCenter } from '../utils/map';
@@ -221,6 +222,15 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
     return requireEditable();
   };
 
+  const rememberSavedSector = (targetId: string, saved: Sector) => {
+    if (routesSectorId === targetId) setRoutesVersion(saved.version);
+    setRouteEditor((current) => {
+      if (!current || current.mode !== 'edit') return current;
+      const updated = saved.routes[current.index];
+      return updated ? { mode: 'edit', index: current.index, route: updated } : current;
+    });
+  };
+
   const saveTopoImages = async (target: EditableSector, images: Image[]) => {
     if (saving) return;
     setHeaderError(null);
@@ -230,12 +240,7 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
         version: target.version,
         patch: { images },
       });
-      if (routesSectorId === target.id) setRoutesVersion(saved.version);
-      setRouteEditor((current) => {
-        if (!current || current.mode !== 'edit') return current;
-        const updated = saved.routes[current.index];
-        return updated ? { mode: 'edit', index: current.index, route: updated } : current;
-      });
+      rememberSavedSector(target.id, saved);
     } catch (error) {
       console.error('Failed to update topo images:', error);
       setHeaderError(error instanceof Error ? error.message : 'Failed to update topo images');
@@ -265,6 +270,31 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
     );
     if (!confirmed) return;
     await saveTopoImages(target, next);
+  };
+
+  const handleMoveRoute = async (imageFile: string, index: number, direction: -1 | 1) => {
+    const target = requireTopoEditable();
+    if (!target) return;
+    const next = moveRouteOnImage(target.routes, imageFile, index, direction);
+    if (!next) return;
+    const count = target.routes.filter((route) =>
+      route.images.some((image) => image.imageFile === imageFile),
+    ).length;
+    const place = direction < 0 ? 'up' : 'down';
+    const confirmed = window.confirm(`Move route ${index + 1}/${count} ${place}?`);
+    if (!confirmed) return;
+    setHeaderError(null);
+    try {
+      const saved = await patchSectorMutation.mutateAsync({
+        sectorId: target.id,
+        version: target.version,
+        patch: { routes: next },
+      });
+      rememberSavedSector(target.id, saved);
+    } catch (error) {
+      console.error('Failed to move route:', error);
+      setHeaderError(error instanceof Error ? error.message : 'Failed to move route');
+    }
   };
 
   const handleSave = async (patch: SectorDetailsPatch) => {
@@ -318,6 +348,7 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
         }
         headerAlert={headerError}
         onEditRoute={canEdit ? openRouteDetails : undefined}
+        onMoveRoute={canEdit ? (imageFile, index, direction) => void handleMoveRoute(imageFile, index, direction) : undefined}
         routeMenuDisabled={menusDisabled}
         onDeleteTopo={canEdit ? (index) => void handleDeleteTopo(index) : undefined}
         onMoveTopo={canEdit ? (index, direction) => void handleMoveTopo(index, direction) : undefined}

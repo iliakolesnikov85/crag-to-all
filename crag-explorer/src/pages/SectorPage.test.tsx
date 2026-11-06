@@ -726,6 +726,96 @@ describe('SectorPage routes', () => {
     });
   });
 
+  it('moves a route down on its topo after confirmation', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const alpha = {
+      id: 'route-a',
+      name: 'Alpha',
+      grade: '6A',
+      sectorName: 'Main Wall',
+      description: '',
+      tags: [] as string[],
+      images: [
+        { imageFile: 'wall.jpg', routeIndex: 2, line: [{ x: 0.2, y: 0.4 }] },
+        { imageFile: 'other.jpg', routeIndex: 0 },
+      ],
+    };
+    const bravo = {
+      id: 'route-b',
+      name: 'Bravo',
+      grade: '6B',
+      sectorName: 'Main Wall',
+      description: '',
+      tags: [] as string[],
+      images: [{ imageFile: 'wall.jpg', routeIndex: 0 }],
+    };
+    const charlie = {
+      id: 'route-c',
+      name: 'Charlie',
+      grade: '6C',
+      sectorName: 'Main Wall',
+      description: '',
+      tags: [] as string[],
+      images: [{ imageFile: 'wall.jpg', routeIndex: 1 }],
+    };
+    const ordered: Sector = {
+      ...editableSector,
+      images: [{ imageFile: 'wall.jpg' }, { imageFile: 'other.jpg' }],
+      routes: [alpha, bravo, charlie],
+    };
+    vi.mocked(patchSectorGeo).mockResolvedValue({ ...ordered, version: 3 });
+    renderDeletable(ordered);
+
+    const openRouteMenu = (topoLabel: string, routeName: string) => {
+      fireEvent.keyDown(document, { key: 'Escape' });
+      const heading = screen.getByRole('heading', { level: 4, name: topoLabel });
+      const block = heading.closest('.topo-block');
+      if (!(block instanceof HTMLElement)) throw new Error(`Missing topo ${topoLabel}`);
+      const scope = within(block);
+      fireEvent.click(scope.getByRole('button', { name: `Options for ${routeName}` }));
+      return scope;
+    };
+
+    const firstMenu = openRouteMenu('1/2', 'Bravo');
+    expect(firstMenu.queryByRole('menuitem', { name: 'Move route up' })).not.toBeInTheDocument();
+    expect(firstMenu.getByRole('menuitem', { name: 'Move route down' })).toBeInTheDocument();
+
+    const lastMenu = openRouteMenu('1/2', 'Alpha');
+    expect(lastMenu.getByRole('menuitem', { name: 'Move route up' })).toBeInTheDocument();
+    expect(lastMenu.queryByRole('menuitem', { name: 'Move route down' })).not.toBeInTheDocument();
+
+    const alone = openRouteMenu('2/2', 'Alpha');
+    expect(alone.queryByRole('menuitem', { name: 'Move route up' })).not.toBeInTheDocument();
+    expect(alone.queryByRole('menuitem', { name: 'Move route down' })).not.toBeInTheDocument();
+
+    fireEvent.click(openRouteMenu('1/2', 'Charlie').getByRole('menuitem', { name: 'Move route down' }));
+    expect(confirm).toHaveBeenCalledWith('Move route 2/3 down?');
+    expect(patchSectorGeo).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    fireEvent.click(openRouteMenu('1/2', 'Charlie').getByRole('menuitem', { name: 'Move route down' }));
+
+    await waitFor(() => {
+      expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+        routes: [
+          {
+            ...alpha,
+            images: [
+              { imageFile: 'wall.jpg', routeIndex: 1, line: [{ x: 0.2, y: 0.4 }] },
+              { imageFile: 'other.jpg', routeIndex: 0 },
+            ],
+          },
+          bravo,
+          {
+            ...charlie,
+            images: [{ imageFile: 'wall.jpg', routeIndex: 2 }],
+          },
+        ],
+      });
+    });
+    confirm.mockRestore();
+  });
+
   it('shows an error when route details cannot be opened', () => {
     renderDeletable({ ...editableSector, version: undefined });
     fireEvent.click(screen.getByRole('button', { name: 'Options for Classic' }));
@@ -785,8 +875,13 @@ describe('SectorPage topo images', () => {
     vi.mocked(patchSectorGeo).mockResolvedValue({ ...topoSector, version: 3 });
     renderDeletable(topoSector);
 
-    expect(openTopoMenu(1).getByRole('menuitem', { name: 'Move up' })).toBeDisabled();
-    expect(openTopoMenu(3).getByRole('menuitem', { name: 'Move down' })).toBeDisabled();
+    const firstMenu = openTopoMenu(1);
+    expect(firstMenu.queryByRole('menuitem', { name: 'Move image up' })).not.toBeInTheDocument();
+    expect(firstMenu.getByRole('menuitem', { name: 'Move image down' })).toBeInTheDocument();
+
+    const lastMenu = openTopoMenu(3);
+    expect(lastMenu.getByRole('menuitem', { name: 'Move image up' })).toBeInTheDocument();
+    expect(lastMenu.queryByRole('menuitem', { name: 'Move image down' })).not.toBeInTheDocument();
 
     fireEvent.click(openTopoMenu(2).getByRole('menuitem', { name: 'Delete topo image' }));
     expect(confirm).toHaveBeenCalledWith('Delete topo image 2/3?');
@@ -808,7 +903,7 @@ describe('SectorPage topo images', () => {
     vi.mocked(patchSectorGeo).mockResolvedValue({ ...topoSector, version: 3 });
     renderDeletable(topoSector);
 
-    fireEvent.click(openTopoMenu(2).getByRole('menuitem', { name: 'Move down' }));
+    fireEvent.click(openTopoMenu(2).getByRole('menuitem', { name: 'Move image down' }));
 
     expect(confirm).toHaveBeenCalledWith('Move topo image 2/3 down?');
     await waitFor(() => {

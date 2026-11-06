@@ -8,7 +8,7 @@ import {
   MdVideocam,
   MdWbSunny,
 } from 'react-icons/md';
-import { pointsToBezierPath } from '@crag-to-all/shared-crag';
+import { lowestLinePoint, pointsToBezierPath, type LinePoint } from '@crag-to-all/shared-crag';
 import RouteOptionsMenu from './RouteOptionsMenu';
 import RouteRating from './RouteRating';
 import TopoOptionsMenu from './TopoOptionsMenu';
@@ -27,6 +27,8 @@ export interface SectorViewProps {
   headerAlert?: string | null;
   /** Index into `sector.routes`. Present only when the viewer can edit routes. */
   onEditRoute?: (index: number) => void;
+  /** Visual index of a route on one topo image. Present only when the viewer can reorder routes. */
+  onMoveRoute?: (imageFile: string, index: number, direction: -1 | 1) => void;
   routeMenuDisabled?: boolean;
   /** Index into `sector.images`. Present only when the viewer can edit topo images. */
   onDeleteTopo?: (index: number) => void;
@@ -45,6 +47,7 @@ const SectorView: React.FC<SectorViewProps> = ({
   headerActions,
   headerAlert,
   onEditRoute,
+  onMoveRoute,
   routeMenuDisabled = false,
   onDeleteTopo,
   onMoveTopo,
@@ -175,10 +178,10 @@ const SectorView: React.FC<SectorViewProps> = ({
       <div className="topos-list">
         {sector.images.filter(image => !route || route.images.some(img => img.imageFile === image.imageFile)).map((image, imageIdx) => {
           // Find all routes that reference this image
-          const routesForImage: (Route & { routeIndex?: number; sourceIndex: number })[] = sector.routes
+          const routesForImage: (Route & { routeIndex?: number; line?: LinePoint[]; sourceIndex: number })[] = sector.routes
             .map((route, sourceIndex) => {
               const imgRef = route.images.find(img => img.imageFile === image.imageFile);
-              return { ...route, routeIndex: imgRef?.routeIndex, sourceIndex };
+              return { ...route, routeIndex: imgRef?.routeIndex, line: imgRef?.line, sourceIndex };
             })
             .filter(x => x.routeIndex !== undefined)
             .sort((a, b) => (a!.routeIndex as number) - (b!.routeIndex as number));
@@ -193,7 +196,7 @@ const SectorView: React.FC<SectorViewProps> = ({
                       alt={`Topo ${imageIdx + 1}`}
                     />
                     {/* SVG overlay for route lines */}
-                    {image.lines && (
+                    {routesForImage.some((rt) => (rt.line?.length ?? 0) >= 2) && (
                       <svg
                         className="topo-svg-overlay"
                         viewBox="0 0 1 1"
@@ -201,7 +204,7 @@ const SectorView: React.FC<SectorViewProps> = ({
                         style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
                       >
                         {routesForImage.map((rt, rtIdx) => {
-                          const points = image.lines && image.lines[rt.routeIndex!];
+                          const points = rt.line;
                           if (!points || points.length < 2) return null;
                           const isHighlighted = highlighted[imageIdx] === rtIdx || (route && route.name === rt.name);
                           return (
@@ -216,35 +219,22 @@ const SectorView: React.FC<SectorViewProps> = ({
                     )}
                     {/* Route numbers container */}
                     {!route && <div className="route-numbers-container">
-                      {image.labelPositions && routesForImage.map((rt, routeIdx) => {
-                        const labelPosition = image.labelPositions
-                          ? image.labelPositions[rt.routeIndex!]
-                          : null;
-                        if (labelPosition) {
-                          // Parse "left:X%; top:Y%" format
-                          const leftMatch = labelPosition.match(/left:([\d.]+)%/);
-                          const topMatch = labelPosition.match(/top:([\d.]+)%/);
-
-                          if (leftMatch && topMatch) {
-                            const left = parseFloat(leftMatch[1]);
-                            const top = parseFloat(topMatch[1]);
-
-                            return (
-                              <div
-                                key={`route-${routeIdx}`}
-                                className="route-number-overlay"
-                                onClick={() => onRouteClick(imageIdx, routeIdx)}
-                                style={{
-                                  left: `${left}%`,
-                                  top: `${top}%`,
-                                }}
-                              >
-                                {routeIdx + 1}
-                              </div>
-                            );
-                          }
-                        }
-                        return null;
+                      {routesForImage.map((rt, routeIdx) => {
+                        const label = rt.line ? lowestLinePoint(rt.line) : undefined;
+                        if (!label) return null;
+                        return (
+                          <div
+                            key={`route-${routeIdx}`}
+                            className="route-number-overlay"
+                            onClick={() => onRouteClick(imageIdx, routeIdx)}
+                            style={{
+                              left: `${label.x * 100}%`,
+                              top: `${label.y * 100}%`,
+                            }}
+                          >
+                            {routeIdx + 1}
+                          </div>
+                        );
                       })}
                     </div>}
                   </div>
@@ -285,8 +275,20 @@ const SectorView: React.FC<SectorViewProps> = ({
                                 {onEditRoute && !printMode ? (
                                   <RouteOptionsMenu
                                     routeName={route!.name}
+                                    index={routeIdx}
+                                    count={routesForImage.length}
                                     disabled={routeMenuDisabled}
                                     onEditDetails={() => onEditRoute(route!.sourceIndex)}
+                                    onMoveUp={
+                                      onMoveRoute
+                                        ? () => onMoveRoute(image.imageFile, routeIdx, -1)
+                                        : undefined
+                                    }
+                                    onMoveDown={
+                                      onMoveRoute
+                                        ? () => onMoveRoute(image.imageFile, routeIdx, 1)
+                                        : undefined
+                                    }
                                   />
                                 ) : null}
                               </div>

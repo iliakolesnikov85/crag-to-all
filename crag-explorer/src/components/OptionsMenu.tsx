@@ -4,7 +4,6 @@ import './OptionsMenu.scss';
 interface OptionsMenuItem {
   label: string;
   onSelect: () => void;
-  disabled?: boolean;
   separatorBefore?: boolean;
 }
 
@@ -92,9 +91,7 @@ function OptionsMenu({
                 type="button"
                 className="options-menu__item"
                 role="menuitem"
-                disabled={item.disabled}
                 onClick={() => {
-                  if (item.disabled) return;
                   setOpen(false);
                   item.onSelect();
                 }}
