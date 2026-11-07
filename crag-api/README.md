@@ -32,7 +32,7 @@ Optional `.env` (see `.env.example`): `PORT`, `MONGODB_URI`, `MONGODB_DB`, `FIRE
 
 | Method | Path | Role |
 | --- | --- | --- |
-| GET | `/api/crags` | Catalog (`{ id, cragId, cragName, source, externalId? }[]`) |
+| GET | `/api/crags` | Catalog (`{ id, cragId, cragName, source }[]`) |
 | POST | `/api/crags` | Create empty `explorer` crag (`{ name, cragId? }`) |
 | GET | `/api/crags/:cragId` | Assembled `CragData` plus `version` |
 | PATCH | `/api/crags/:cragId` | Crag-level fields; body must include `version`; stale version → **409** |

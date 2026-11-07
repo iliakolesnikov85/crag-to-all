@@ -6,6 +6,7 @@ function makeRoute(
   overrides: Partial<Route> & Pick<Route, 'name' | 'grade'>,
 ): Route {
   return {
+    id: overrides.name,
     sectorName: 'Main Wall',
     description: '',
     tags: [],

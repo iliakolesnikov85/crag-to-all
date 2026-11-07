@@ -15,7 +15,7 @@ export const ROUTE_TYPES = [
 ] as const;
 
 /** Bump when the stored crag JSON shape changes incompatibly. */
-export const CRAG_DATA_PROTOCOL = 2;
+export const CRAG_DATA_PROTOCOL = 3;
 
 export type CragMapMarkerType = (typeof CRAG_MAP_MARKER_TYPES)[number];
 
@@ -29,10 +29,8 @@ export interface LatLng {
 }
 
 export interface Sector {
-  /** Stable document id. For source=external, defaults to externalId. */
+  /** Stable document id. */
   id?: string;
-  /** Thetopo (or other upstream) sector id. */
-  externalId?: string;
   name: string;
   geo: LatLng | null;
   season?: string;
@@ -67,7 +65,8 @@ export interface RouteImage {
 }
 
 export interface Route {
-  id?: string;
+  /** App-assigned id. Never an upstream route id. */
+  id: string;
   name: string;
   grade: string;
   sectorName: string;
@@ -120,12 +119,10 @@ export interface OpenTopoTilePackInfo {
 
 export interface CragData {
   protocolVersion: number;
-  /** Stable document id. For source=external, defaults to externalId. */
+  /** Stable document id. */
   id?: string;
   /** Catalog / URL slug; same as id when both are present. */
   cragId?: string;
-  /** Thetopo (or other upstream) crag id. */
-  externalId?: string;
   source?: CragSource;
   name: string;
   sectors: Sector[];
@@ -138,12 +135,10 @@ export interface CragData {
 }
 
 export interface Crag {
-  /** Stable document id. For source=external, defaults to externalId. */
+  /** Stable document id. */
   id?: string;
   cragName: string;
   /** Catalog / URL slug; same as id when both are present. */
   cragId: string;
-  /** Thetopo (or other upstream) crag id. */
-  externalId?: string;
   source?: CragSource;
 }

@@ -22,6 +22,10 @@
   outline: none;
 }
 
+.modal-panel--wide {
+  width: min(72rem, 100%);
+}
+
 .modal-header {
   display: flex;
   align-items: center;

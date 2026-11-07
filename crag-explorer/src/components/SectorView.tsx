@@ -27,9 +27,13 @@ export interface SectorViewProps {
   headerAlert?: string | null;
   /** Index into `sector.routes`. Present only when the viewer can edit routes. */
   onEditRoute?: (index: number) => void;
+  /** Redraw the line for one route on the topo image it is listed under. */
+  onRedrawRoute?: (imageFile: string, sourceIndex: number) => void;
   /** Visual index of a route on one topo image. Present only when the viewer can reorder routes. */
   onMoveRoute?: (imageFile: string, index: number, direction: -1 | 1) => void;
   routeMenuDisabled?: boolean;
+  /** Open the route list to draw lines on this topo. Index into `sector.images`. */
+  onDrawLines?: (index: number) => void;
   /** Index into `sector.images`. Present only when the viewer can edit topo images. */
   onDeleteTopo?: (index: number) => void;
   onMoveTopo?: (index: number, direction: -1 | 1) => void;
@@ -47,8 +51,10 @@ const SectorView: React.FC<SectorViewProps> = ({
   headerActions,
   headerAlert,
   onEditRoute,
+  onRedrawRoute,
   onMoveRoute,
   routeMenuDisabled = false,
+  onDrawLines,
   onDeleteTopo,
   onMoveTopo,
   topoMenuDisabled = false,
@@ -242,11 +248,12 @@ const SectorView: React.FC<SectorViewProps> = ({
                 {!route && <div className="topo-routes">
                   <div className="topo-routes-header">
                     <h4>{imageIdx + 1}/{sector.images.length}</h4>
-                    {onDeleteTopo && onMoveTopo && !printMode ? (
+                    {onDrawLines && onDeleteTopo && onMoveTopo && !printMode ? (
                       <TopoOptionsMenu
                         index={imageIdx}
                         count={sector.images.length}
                         disabled={topoMenuDisabled}
+                        onDrawLines={() => onDrawLines(imageIdx)}
                         onDelete={() => onDeleteTopo(imageIdx)}
                         onMoveUp={() => onMoveTopo(imageIdx, -1)}
                         onMoveDown={() => onMoveTopo(imageIdx, 1)}
@@ -279,6 +286,11 @@ const SectorView: React.FC<SectorViewProps> = ({
                                     count={routesForImage.length}
                                     disabled={routeMenuDisabled}
                                     onEditDetails={() => onEditRoute(route!.sourceIndex)}
+                                    onRedraw={
+                                      onRedrawRoute
+                                        ? () => onRedrawRoute(image.imageFile, route!.sourceIndex)
+                                        : undefined
+                                    }
                                     onMoveUp={
                                       onMoveRoute
                                         ? () => onMoveRoute(image.imageFile, routeIdx, -1)

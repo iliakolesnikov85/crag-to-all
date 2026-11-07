@@ -13,6 +13,7 @@ function makeRoute(
   overrides: Partial<Route> & Pick<Route, 'name' | 'grade' | 'sectorName'>,
 ): Route {
   return {
+    id: overrides.name,
     description: '',
     tags: [],
     images: [],

@@ -25,6 +25,7 @@ describe('pickBestImage', () => {
         images: [{ imageFile: 'a.jpg' }, { imageFile: 'b.jpg' }],
         routes: [
           {
+            id: 'r',
             name: 'r',
             grade: '6A',
             sectorName: 'Wall',
@@ -44,6 +45,7 @@ describe('pickBestImage', () => {
         images: [{ imageFile: 'a.jpg' }, { imageFile: 'b.jpg' }],
         routes: [
           {
+            id: 'one',
             name: 'one',
             grade: '6A',
             sectorName: 'Wall',
@@ -52,6 +54,7 @@ describe('pickBestImage', () => {
             images: [{ imageFile: 'b.jpg', routeIndex: 0 }],
           },
           {
+            id: 'two',
             name: 'two',
             grade: '6B',
             sectorName: 'Wall',
@@ -60,6 +63,7 @@ describe('pickBestImage', () => {
             images: [{ imageFile: 'b.jpg', routeIndex: 0 }],
           },
           {
+            id: 'three',
             name: 'three',
             grade: '6C',
             sectorName: 'Wall',

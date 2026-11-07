@@ -2,15 +2,16 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useDeleteSector, usePatchSector } from '../api/useCragMutations';
 import { canEditCrag } from '../api/permissions';
+import DrawRouteModal from '../components/DrawRouteModal';
 import SectorDetailsModal from '../components/SectorDetailsModal';
 import RouteDetailsModal from '../components/RouteDetailsModal';
 import RouteListModal from '../components/RouteListModal';
 import SectorOptionsMenu from '../components/SectorOptionsMenu';
 import SectorView from '../components/SectorView';
 import { useCrag } from '../context/CragContext';
-import { Image, Route, Sector } from '../types';
+import { Image, Route, Sector, type LinePoint } from '../types';
 import type { SectorDetailsPatch } from '../utils/sectorDetails';
-import { moveRouteOnImage } from '../utils/routeOrder';
+import { moveRouteOnImage, removeRouteFromImage, setRouteLineOnImage } from '../utils/routeOrder';
 import { moveTopoImage, removeTopoImage } from '../utils/topoImages';
 import { getCragImageUrl } from '../utils/firebaseStorage';
 import { setMapCenter } from '../utils/map';
@@ -28,6 +29,12 @@ interface SectorPageProps {
 type RouteEditorState =
   | { mode: 'add' }
   | { mode: 'edit'; index: number; route: Route };
+
+type RouteDrawState = {
+  index: number;
+  route: Route;
+  imageFile: string;
+};
 
 type EditableSector = Sector & { id: string; version: number };
 
@@ -47,6 +54,12 @@ function otherSectorNames(sectors: readonly Sector[], sector: Sector): string[] 
     .map((item) => item.name);
 }
 
+function indexOfDrawnRoute(routes: readonly Route[], draw: RouteDrawState): number {
+  const current = routes[draw.index];
+  if (current?.id === draw.route.id) return draw.index;
+  return routes.findIndex((route) => route.id === draw.route.id);
+}
+
 const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
   const { sectorName } = useParams<{ sectorName: string }>();
   const { crag, getUrl } = useCrag();
@@ -57,11 +70,14 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
   const [editingSector, setEditingSector] = useState<Sector | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [routesOpen, setRoutesOpen] = useState(false);
+  const [drawImageFile, setDrawImageFile] = useState<string | null>(null);
   const [routesSectorId, setRoutesSectorId] = useState<string | null>(null);
   const [routesVersion, setRoutesVersion] = useState<number | null>(null);
   const [routeEditor, setRouteEditor] = useState<RouteEditorState | null>(null);
+  const [routeDraw, setRouteDraw] = useState<RouteDrawState | null>(null);
   const [routeListError, setRouteListError] = useState<string | null>(null);
   const [routeEditError, setRouteEditError] = useState<string | null>(null);
+  const [routeDrawError, setRouteDrawError] = useState<string | null>(null);
   const requestedName = (sectorName || '').toLowerCase();
   const sector = sectors.find((item) => item.name.toLowerCase() === requestedName);
   const editing = editingSector !== null && sector?.id === editingSector.id;
@@ -71,11 +87,14 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
 
   const clearRouteSession = useCallback(() => {
     setRoutesOpen(false);
+    setDrawImageFile(null);
     setRoutesSectorId(null);
     setRoutesVersion(null);
     setRouteEditor(null);
+    setRouteDraw(null);
     setRouteListError(null);
     setRouteEditError(null);
+    setRouteDrawError(null);
   }, []);
 
   const requireEditable = (): EditableSector | null => {
@@ -105,10 +124,10 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
   }, [editingSector, sector?.id]);
 
   useEffect(() => {
-    if (!routesOpen && routeEditor === null) return;
+    if (!routesOpen && routeEditor === null && routeDraw === null) return;
     if (sector?.id != null && sector.id === routesSectorId) return;
     clearRouteSession();
-  }, [clearRouteSession, routesOpen, routeEditor, routesSectorId, sector?.id]);
+  }, [clearRouteSession, routesOpen, routeEditor, routeDraw, routesSectorId, sector?.id]);
 
   const handleDelete = async () => {
     if (!sector || deleteSectorMutation.isPending) return;
@@ -154,9 +173,22 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
 
   const openRoutes = () => {
     if (!captureRouteBaseline()) return;
+    setDrawImageFile(null);
     setRouteListError(null);
     setRouteEditError(null);
     setRouteEditor(null);
+    setRoutesOpen(true);
+  };
+
+  const openDrawLines = (imageIndex: number) => {
+    const imageFile = sector?.images[imageIndex]?.imageFile;
+    if (!imageFile || !captureRouteBaseline()) return;
+    setDrawImageFile(imageFile);
+    setRouteListError(null);
+    setRouteEditError(null);
+    setRouteDrawError(null);
+    setRouteEditor(null);
+    setRouteDraw(null);
     setRoutesOpen(true);
   };
 
@@ -171,17 +203,31 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
     openRouteEditor({ mode: 'edit', index, route });
   };
 
+  const openRedraw = (imageFile: string, index: number) => {
+    const route = sector?.routes[index];
+    if (!route || !captureRouteBaseline()) return;
+    setRouteDrawError(null);
+    setRouteDraw({ index, route, imageFile });
+  };
+
   const closeRoutes = () => {
     if (saving) return;
     clearRouteSession();
   };
 
-  const saveRoutes = async (routes: Route[], target: 'list' | 'details') => {
-    if (!sector?.id || routesVersion === null || saving) return;
-    const setRouteError = target === 'list' ? setRouteListError : setRouteEditError;
+  const saveRoutes = async (
+    routes: Route[],
+    target: 'list' | 'details' | 'line',
+  ): Promise<Sector | null> => {
+    if (!sector?.id || routesVersion === null || saving) return null;
+    const setRouteError = target === 'list'
+      ? setRouteListError
+      : target === 'details'
+        ? setRouteEditError
+        : setRouteDrawError;
     if (!canEdit) {
       setRouteError(PERMISSION_MESSAGE);
-      return;
+      return null;
     }
     setRouteError(null);
     try {
@@ -192,10 +238,13 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
       });
       setRoutesVersion(saved.version);
       if (target === 'details') setRouteEditor(null);
+      if (target === 'line') setRouteDraw(null);
+      return saved;
     } catch (error) {
       console.error('Failed to save routes:', error);
       const message = error instanceof Error ? error.message : 'Failed to save routes';
       setRouteError(message);
+      return null;
     }
   };
 
@@ -209,12 +258,50 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
     await saveRoutes(routes, 'list');
   };
 
+  const handleRemoveFromImage = async (index: number) => {
+    if (!sector || !drawImageFile || saving) return;
+    const route = sector.routes[index];
+    if (!route) return;
+    const confirmed = window.confirm(
+      `Remove the "${route.name}" route from this topo image?`,
+    );
+    if (!confirmed) return;
+    const routes = removeRouteFromImage(sector.routes, index, drawImageFile);
+    if (!routes) return;
+    await saveRoutes(routes, 'list');
+  };
+
   const handleSaveRoute = async (route: Route) => {
-    if (!sector) return;
-    const routes = routeEditor?.mode === 'edit'
-      ? sector.routes.map((item, index) => (index === routeEditor.index ? route : item))
-      : [...sector.routes, route];
-    await saveRoutes(routes, 'details');
+    if (!sector || !routeEditor) return;
+    const adding = routeEditor.mode === 'add';
+    const routes = adding
+      ? [...sector.routes, route]
+      : sector.routes.map((item, index) => (index === routeEditor.index ? route : item));
+    const saved = await saveRoutes(routes, 'details');
+    if (!saved || !adding || !drawImageFile) return;
+    const index = saved.routes.findIndex((item) => item.id === route.id);
+    const savedRoute = index >= 0 ? saved.routes[index] : undefined;
+    if (!savedRoute) return;
+    setRouteDrawError(null);
+    setRouteDraw({ index, route: savedRoute, imageFile: drawImageFile });
+  };
+
+  const openDrawFromList = (index: number) => {
+    if (!drawImageFile) return;
+    const route = sector?.routes[index];
+    if (!route) return;
+    setRouteDrawError(null);
+    setRouteDraw({ index, route, imageFile: drawImageFile });
+  };
+
+  const handleSaveRouteLine = async (line: LinePoint[]) => {
+    if (!sector || !routeDraw) return;
+    const located = indexOfDrawnRoute(sector.routes, routeDraw);
+    const routes = located >= 0 ? sector.routes : [...sector.routes, routeDraw.route];
+    const index = located >= 0 ? located : routes.length - 1;
+    const next = setRouteLineOnImage(routes, index, routeDraw.imageFile, line);
+    if (!next) return;
+    await saveRoutes(next, 'line');
   };
 
   const requireTopoEditable = (): EditableSector | null => {
@@ -348,8 +435,10 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
         }
         headerAlert={headerError}
         onEditRoute={canEdit ? openRouteDetails : undefined}
+        onRedrawRoute={canEdit ? openRedraw : undefined}
         onMoveRoute={canEdit ? (imageFile, index, direction) => void handleMoveRoute(imageFile, index, direction) : undefined}
         routeMenuDisabled={menusDisabled}
+        onDrawLines={canEdit ? openDrawLines : undefined}
         onDeleteTopo={canEdit ? (index) => void handleDeleteTopo(index) : undefined}
         onMoveTopo={canEdit ? (index, direction) => void handleMoveTopo(index, direction) : undefined}
         topoMenuDisabled={menusDisabled}
@@ -383,7 +472,9 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
         onSave={(patch) => void handleSave(patch)}
       />
       <RouteListModal
-        open={routesOpen && routeEditor === null}
+        open={routesOpen && routeEditor === null && routeDraw === null}
+        mode={drawImageFile ? 'draw' : 'routes'}
+        imageFile={drawImageFile ?? undefined}
         routes={sector.routes}
         saving={saving}
         error={routeListError}
@@ -395,6 +486,8 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
           openRouteEditor({ mode: 'edit', index, route });
         }}
         onDelete={(index) => void handleDeleteRoute(index)}
+        onDraw={openDrawFromList}
+        onRemove={(index) => void handleRemoveFromImage(index)}
       />
       <RouteDetailsModal
         key={
@@ -402,7 +495,7 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
             ? 'route-idle'
             : routeEditor.mode === 'add'
               ? 'route-add'
-              : `route-${routeEditor.index}-${routeEditor.route.id ?? routeEditor.route.name}`
+              : `route-${routeEditor.index}-${routeEditor.route.id}`
         }
         open={routeEditor !== null}
         route={routeEditor?.mode === 'edit' ? routeEditor.route : null}
@@ -424,6 +517,27 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
         }}
         onSave={(route) => void handleSaveRoute(route)}
       />
+      {routeDraw ? (
+        <DrawRouteModal
+          key={`${routeDraw.index}-${routeDraw.imageFile}`}
+          open
+          route={routeDraw.route}
+          imageFile={routeDraw.imageFile}
+          imageUrl={getCragImageUrl(crag.cragId, routeDraw.imageFile)}
+          saving={saving}
+          error={routeDrawError}
+          onClose={() => {
+            if (saving) return;
+            if (routesOpen) {
+              setRouteDraw(null);
+              setRouteDrawError(null);
+              return;
+            }
+            clearRouteSession();
+          }}
+          onSave={(line) => void handleSaveRouteLine(line)}
+        />
+      ) : null}
     </div>
   );
 };

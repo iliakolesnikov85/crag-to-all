@@ -692,7 +692,16 @@ describe('crag-api', () => {
       cragId: 'roshka',
       name: 'Cave',
       geo: { lat: 44.1, lon: 6.2 },
-      routes: [],
+      routes: [{
+        id: 'route-1',
+        externalId: '88421',
+        name: 'Classic',
+        grade: '6a',
+        sectorName: 'Cave',
+        description: '',
+        tags: [],
+        images: [],
+      }],
       images: [],
       order: 0,
       externalId: 'cave-1',
@@ -731,7 +740,63 @@ describe('crag-api', () => {
 
     const assembled = await request(app).get('/api/crags/roshka');
     expect(assembled.status).toBe(200);
+    expect(assembled.body.externalId).toBeUndefined();
     expect(assembled.body.sectors).toMatchObject([{ id: 'cave-1', name: 'Cave', version: 3 }]);
+    expect(assembled.body.sectors[0].externalId).toBeUndefined();
+    expect(assembled.body.sectors[0].routes[0]).toMatchObject({
+      id: 'route-1',
+      name: 'Classic',
+    });
+    expect(assembled.body.sectors[0].routes[0].externalId).toBeUndefined();
+
+    const catalog = await request(app).get('/api/crags');
+    expect(catalog.body).toEqual([
+      { id: 'roshka', cragId: 'roshka', cragName: 'Roshka', source: 'external' },
+    ]);
+  });
+
+  it('keeps a route external id in storage and omits it from the response', async () => {
+    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await db.collection('sectors').insertOne({
+      _id: 'wall-1',
+      cragId: 'roshka',
+      name: 'Main Wall',
+      nameKey: 'main wall',
+      geo: null,
+      routes: [{
+        id: 'route-1',
+        externalId: '88421',
+        name: 'Classic',
+        grade: '6a',
+        sectorName: 'Main Wall',
+        description: '',
+        tags: [],
+        images: [],
+      }],
+      images: [],
+      order: 0,
+      version: 1,
+      updatedAt: new Date(),
+    });
+
+    const patched = await request(app).patch('/api/crags/roshka/sectors/wall-1').send({
+      version: 1,
+      routes: [{ id: 'route-1', name: 'Direct', grade: '7a' }],
+    });
+    expect(patched.status).toBe(200);
+    expect(patched.body.routes[0]).toMatchObject({
+      id: 'route-1',
+      name: 'Direct',
+      grade: '7a',
+    });
+    expect(patched.body.routes[0].externalId).toBeUndefined();
+
+    const stored = await db.collection('sectors').findOne({ _id: 'wall-1' });
+    expect(stored?.routes?.[0]).toMatchObject({
+      id: 'route-1',
+      externalId: '88421',
+      name: 'Direct',
+    });
   });
 
   it('returns 404 for a missing crag or sector', async () => {

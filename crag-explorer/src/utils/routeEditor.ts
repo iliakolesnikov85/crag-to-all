@@ -157,7 +157,7 @@ function buildRouteWrite(
 
   const ratingChanged = draft.rating !== existing?.rating;
   const route: Route = {
-    ...(existing?.id ? { id: existing.id } : {}),
+    id: existing?.id ?? crypto.randomUUID(),
     name: nameResult.name,
     grade: draft.grade.trim() || '?',
     sectorName,

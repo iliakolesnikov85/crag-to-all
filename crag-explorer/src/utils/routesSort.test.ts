@@ -11,6 +11,7 @@ function route(
   overrides: Partial<RouteListRow> & Pick<Route, 'name' | 'grade' | 'sectorName'>,
 ): RouteListRow {
   return {
+    id: overrides.name,
     description: '',
     tags: [],
     images: [],
@@ -92,6 +93,7 @@ describe('sortRouteRows', () => {
       '(empty:Empty Sector)',
     ]);
     expect(sorted[2]).toEqual({
+      id: 'empty:Empty Sector',
       name: '',
       grade: '',
       sectorName: 'Empty Sector',

@@ -16,6 +16,8 @@ interface ModalProps {
   footer?: React.ReactNode;
   /** Form dialogs keep edits when the press lands outside the panel. */
   closeOnBackdrop?: boolean;
+  /** Photo dialogs need more than the default form width. */
+  wide?: boolean;
 }
 
 const Modal: React.FC<ModalProps> = ({
@@ -25,6 +27,7 @@ const Modal: React.FC<ModalProps> = ({
   children,
   footer,
   closeOnBackdrop = true,
+  wide = false,
 }) => {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -74,7 +77,7 @@ const Modal: React.FC<ModalProps> = ({
   return createPortal(
     <div className="modal-backdrop" onMouseDown={handleBackdropMouseDown}>
       <div
-        className="modal-panel"
+        className={wide ? 'modal-panel modal-panel--wide' : 'modal-panel'}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

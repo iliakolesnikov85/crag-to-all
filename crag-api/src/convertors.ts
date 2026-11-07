@@ -1,5 +1,10 @@
-import type { Crag, CragData, Sector } from '@crag-to-all/shared-crag';
+import type { Crag, CragData, Route, Sector, StoredRoute } from '@crag-to-all/shared-crag';
 import type { CragDocument, CragResponse, SectorDocument, SectorWriteInput } from './types';
+
+function toPublicRoute(route: StoredRoute): Route {
+  const { externalId: _externalId, ...rest } = route;
+  return rest;
+}
 
 export function toCrag(doc: CragDocument): Crag {
   return {
@@ -7,7 +12,6 @@ export function toCrag(doc: CragDocument): Crag {
     cragId: doc._id,
     cragName: doc.name,
     source: doc.source,
-    ...(doc.externalId ? { externalId: doc.externalId } : {}),
   };
 }
 
@@ -24,7 +28,6 @@ export function toCragResponse(doc: CragDocument): CragResponse {
     ...(doc.opentopoTilePack ? { opentopoTilePack: doc.opentopoTilePack } : {}),
     version: doc.version,
     updatedAt: doc.updatedAt.toISOString(),
-    ...(doc.externalId ? { externalId: doc.externalId } : {}),
   };
 }
 
@@ -38,11 +41,10 @@ export function toSector(doc: SectorDocument): Sector {
     ...(doc.altitude !== undefined ? { altitude: doc.altitude } : {}),
     ...(doc.orientation !== undefined ? { orientation: doc.orientation } : {}),
     ...(doc.timeInSun !== undefined ? { timeInSun: doc.timeInSun } : {}),
-    routes: doc.routes,
+    routes: doc.routes.map(toPublicRoute),
     images: doc.images,
     version: doc.version,
     updatedAt: doc.updatedAt.toISOString(),
-    ...(doc.externalId ? { externalId: doc.externalId } : {}),
   };
 }
 
@@ -60,7 +62,6 @@ export function toCragData(crag: CragDocument, sectors: SectorDocument[]): CragD
     source: crag.source,
     version: crag.version,
     updatedAt: crag.updatedAt.toISOString(),
-    ...(crag.externalId ? { externalId: crag.externalId } : {}),
   };
 }
 
@@ -93,6 +94,5 @@ export function toSectorDocument(
   if (sector.altitude !== undefined) doc.altitude = sector.altitude;
   if (sector.orientation !== undefined) doc.orientation = sector.orientation;
   if (sector.timeInSun !== undefined) doc.timeInSun = sector.timeInSun;
-  if (sector.externalId !== undefined) doc.externalId = sector.externalId;
   return doc;
 }

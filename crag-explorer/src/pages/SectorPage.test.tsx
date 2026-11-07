@@ -635,6 +635,7 @@ describe('SectorPage routes', () => {
         routes: [
           ...editableSector.routes,
           {
+            id: expect.any(String),
             name: 'Arete',
             grade: '6B',
             sectorName: 'Main Wall',
@@ -647,6 +648,8 @@ describe('SectorPage routes', () => {
         ],
       });
     });
+    expect(screen.getByRole('dialog', { name: 'Routes' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Draw "Arete" on the topo' })).not.toBeInTheDocument();
   });
 
   it('deletes a route after confirmation and leaves it when cancelled', async () => {
@@ -826,6 +829,241 @@ describe('SectorPage routes', () => {
       'This sector cannot be edited because it has no version.',
     );
   });
+
+  it('redraws a route line from the gear menu and saves that topo only', async () => {
+    const classic = {
+      ...ratedRoute.routes[0],
+      images: [
+        {
+          imageFile: 'wall.jpg',
+          routeIndex: 0,
+          line: [{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }],
+        },
+        {
+          imageFile: 'other.jpg',
+          routeIndex: 0,
+          line: [{ x: 0.5, y: 0.5 }, { x: 0.6, y: 0.6 }],
+        },
+      ],
+    };
+    const sector: Sector = {
+      ...ratedRoute,
+      images: [{ imageFile: 'wall.jpg' }, { imageFile: 'other.jpg' }],
+      routes: [classic, ratedRoute.routes[1]],
+    };
+    vi.mocked(patchSectorGeo).mockResolvedValue({ ...sector, version: 3 });
+    renderDeletable(sector);
+
+    const heading = screen.getByRole('heading', { level: 4, name: '1/2' });
+    const block = heading.closest('.topo-block');
+    if (!(block instanceof HTMLElement)) throw new Error('Missing topo 1/2');
+    const scope = within(block);
+    fireEvent.click(scope.getByRole('button', { name: 'Options for Classic' }));
+    fireEvent.click(scope.getByRole('menuitem', { name: 'Redraw route' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Draw "Classic" on the topo' });
+    expect(dialog.querySelector('.draw-route-line--previous')).toHaveAttribute(
+      'd',
+      'M 0.1 0.2 L 0.3 0.4',
+    );
+
+    const stage = dialog.querySelector('.draw-route-stage');
+    if (!(stage instanceof HTMLElement)) throw new Error('Missing draw stage');
+    stage.getBoundingClientRect = () => ({
+      left: 0,
+      top: 0,
+      width: 100,
+      height: 100,
+      right: 100,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    fireEvent.click(stage, { clientX: 10, clientY: 20 });
+    fireEvent.click(stage, { clientX: 80, clientY: 90 });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Draw "Classic" on the topo' })).not.toBeInTheDocument();
+    });
+    expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+      routes: [
+        {
+          ...classic,
+          images: [
+            {
+              imageFile: 'wall.jpg',
+              routeIndex: 0,
+              line: [{ x: 0.1, y: 0.2 }, { x: 0.8, y: 0.9 }],
+            },
+            {
+              imageFile: 'other.jpg',
+              routeIndex: 0,
+              line: [{ x: 0.5, y: 0.5 }, { x: 0.6, y: 0.6 }],
+            },
+          ],
+        },
+        ratedRoute.routes[1],
+      ],
+    });
+  });
+});
+
+function openDrawLines(position = 1, count = 1) {
+  fireEvent.keyDown(document, { key: 'Escape' });
+  fireEvent.click(screen.getByRole('button', { name: `Topo image ${position} of ${count} options` }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Draw lines' }));
+}
+
+function drawLine(dialog: HTMLElement) {
+  const stage = dialog.querySelector('.draw-route-stage');
+  if (!(stage instanceof HTMLElement)) throw new Error('Missing draw stage');
+  stage.getBoundingClientRect = () => ({
+    left: 0,
+    top: 0,
+    width: 100,
+    height: 100,
+    right: 100,
+    bottom: 100,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+  fireEvent.click(stage, { clientX: 10, clientY: 20 });
+  fireEvent.click(stage, { clientX: 80, clientY: 90 });
+}
+
+describe('SectorPage draw lines', () => {
+  beforeEach(() => {
+    vi.mocked(canEditCrag).mockReturnValue(true);
+    vi.mocked(deleteSector).mockReset();
+    vi.mocked(patchSectorGeo).mockReset();
+  });
+
+  it('offers draw, redraw, edit, and remove for the topo', () => {
+    renderDeletable(editableSector);
+    openDrawLines();
+
+    const dialog = screen.getByRole('dialog', { name: 'Draw lines' });
+    expect(within(dialog).getByRole('button', { name: 'Redraw Classic' })).toHaveTextContent('Redraw');
+    expect(within(dialog).getByRole('button', { name: 'Edit Classic' })).toHaveTextContent('Edit');
+    expect(within(dialog).getByRole('button', { name: 'Remove Classic' })).toHaveTextContent('Remove');
+    expect(within(dialog).queryByRole('button', { name: 'Delete Classic' })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Draw Mystery' })).toHaveTextContent('Draw');
+    expect(within(dialog).queryByRole('button', { name: 'Remove Mystery' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Delete Mystery' })).not.toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Edit Mystery' }));
+    expect(screen.getByRole('dialog', { name: 'Edit route' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Draw lines' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('dialog', { name: 'Draw lines' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Redraw Classic' }));
+    const drawing = screen.getByRole('dialog', { name: 'Draw "Classic" on the topo' });
+    fireEvent.click(within(drawing).getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('dialog', { name: 'Draw lines' })).toBeInTheDocument();
+  });
+
+  it('saves a line for a route that is not on the topo yet', async () => {
+    vi.mocked(patchSectorGeo).mockResolvedValue({ ...editableSector, version: 3 });
+    renderDeletable(editableSector);
+    openDrawLines();
+    fireEvent.click(screen.getByRole('button', { name: 'Draw Mystery' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Draw "Mystery" on the topo' });
+    drawLine(dialog);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Draw "Mystery" on the topo' })).not.toBeInTheDocument();
+    });
+    expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+      routes: [
+        editableSector.routes[0],
+        {
+          ...editableSector.routes[1],
+          images: [{
+            imageFile: 'wall.jpg',
+            routeIndex: 1,
+            line: [{ x: 0.1, y: 0.2 }, { x: 0.8, y: 0.9 }],
+          }],
+        },
+      ],
+    });
+    expect(screen.getByRole('dialog', { name: 'Draw lines' })).toBeInTheDocument();
+  });
+
+  it('removes a route from the topo image without deleting it', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    vi.mocked(patchSectorGeo).mockResolvedValue({ ...editableSector, version: 3 });
+    renderDeletable(editableSector);
+    openDrawLines();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Classic' }));
+
+    expect(confirm).toHaveBeenCalledWith('Remove the "Classic" route from this topo image?');
+    expect(patchSectorGeo).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Classic' }));
+
+    await waitFor(() => {
+      expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+        routes: [
+          { ...editableSector.routes[0], images: [] },
+          editableSector.routes[1],
+        ],
+      });
+    });
+    expect(screen.getByRole('dialog', { name: 'Draw lines' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit Classic' })).toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
+  it('opens the draw dialog after a route is added from draw lines', async () => {
+    vi.mocked(patchSectorGeo).mockImplementation(async (_cragId, _sectorId, _version, patch) => ({
+      ...editableSector,
+      version: 3,
+      routes: patch.routes ?? editableSector.routes,
+    }));
+    renderDeletable(editableSector);
+    openDrawLines();
+    fireEvent.click(screen.getByRole('button', { name: '+ Add' }));
+
+    const editor = screen.getByRole('dialog', { name: 'Add route' });
+    fireEvent.change(within(editor).getByLabelText('Name'), { target: { value: 'Arete' } });
+    fireEvent.click(within(editor).getByRole('button', { name: 'Save' }));
+
+    const drawing = await screen.findByRole('dialog', { name: 'Draw "Arete" on the topo' });
+    expect(screen.queryByRole('dialog', { name: 'Add route' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Draw lines' })).not.toBeInTheDocument();
+
+    drawLine(drawing);
+    fireEvent.click(within(drawing).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(patchSectorGeo).toHaveBeenCalledTimes(2);
+    });
+    expect(patchSectorGeo).toHaveBeenLastCalledWith(SAMPLE_CRAG_ID, 'sector-1', 3, {
+      routes: [
+        ...editableSector.routes,
+        {
+          id: expect.any(String),
+          name: 'Arete',
+          grade: '?',
+          sectorName: 'Main Wall',
+          description: '',
+          tags: [],
+          images: [{
+            imageFile: 'wall.jpg',
+            routeIndex: 1,
+            line: [{ x: 0.1, y: 0.2 }, { x: 0.8, y: 0.9 }],
+          }],
+        },
+      ],
+    });
+  });
 });
 
 const topoSector: Sector = {
@@ -876,6 +1114,7 @@ describe('SectorPage topo images', () => {
     renderDeletable(topoSector);
 
     const firstMenu = openTopoMenu(1);
+    expect(firstMenu.getByRole('menuitem', { name: 'Draw lines' })).toBeInTheDocument();
     expect(firstMenu.queryByRole('menuitem', { name: 'Move image up' })).not.toBeInTheDocument();
     expect(firstMenu.getByRole('menuitem', { name: 'Move image down' })).toBeInTheDocument();
 

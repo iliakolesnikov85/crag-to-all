@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Route } from '../types';
-import { moveRouteOnImage } from './routeOrder';
+import { moveRouteOnImage, removeRouteFromImage, setRouteLineOnImage } from './routeOrder';
 
 function route(name: string, images: Route['images']): Route {
   return {
+    id: name,
     name,
     grade: '6A',
     sectorName: 'Main Wall',
@@ -56,5 +57,44 @@ describe('moveRouteOnImage', () => {
     expect(moveRouteOnImage(routes, 'wall.jpg', 0, -1)).toBeNull();
     expect(moveRouteOnImage(routes, 'wall.jpg', 2, 1)).toBeNull();
     expect(moveRouteOnImage(routes, 'missing.jpg', 0, 1)).toBeNull();
+  });
+});
+
+describe('setRouteLineOnImage', () => {
+  const drawn = [{ x: 0.1, y: 0.2 }, { x: 0.4, y: 0.5 }];
+
+  it('replaces the line on a route already on that topo', () => {
+    const next = setRouteLineOnImage(routes, 0, 'wall.jpg', drawn);
+    expect(next?.[0].images).toEqual([
+      { imageFile: 'wall.jpg', routeIndex: 2, line: drawn },
+      { imageFile: 'other.jpg', routeIndex: 0 },
+    ]);
+    expect(next?.[1]).toBe(routes[1]);
+  });
+
+  it('appends a route that is not on the topo yet, after the current lines', () => {
+    const next = setRouteLineOnImage(routes, 3, 'wall.jpg', drawn);
+    expect(next?.[3].images).toEqual([
+      { imageFile: 'cave.jpg', routeIndex: 4 },
+      { imageFile: 'wall.jpg', routeIndex: 3, line: drawn },
+    ]);
+  });
+
+  it('refuses an unknown route', () => {
+    expect(setRouteLineOnImage(routes, 9, 'wall.jpg', drawn)).toBeNull();
+  });
+});
+
+describe('removeRouteFromImage', () => {
+  it('drops only that topo image and keeps the route', () => {
+    const next = removeRouteFromImage(routes, 0, 'wall.jpg');
+    expect(next?.map((item) => item.name)).toEqual(['Alpha', 'Bravo', 'Charlie', 'Elsewhere']);
+    expect(next?.[0].images).toEqual([{ imageFile: 'other.jpg', routeIndex: 0 }]);
+    expect(next?.[1]).toBe(routes[1]);
+  });
+
+  it('refuses a route that is not on the topo', () => {
+    expect(removeRouteFromImage(routes, 3, 'wall.jpg')).toBeNull();
+    expect(removeRouteFromImage(routes, 9, 'wall.jpg')).toBeNull();
   });
 });

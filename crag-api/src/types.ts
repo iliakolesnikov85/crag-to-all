@@ -63,7 +63,6 @@ export interface CragResponse {
   cragId: string;
   cragName: string;
   source: CragSource;
-  externalId?: string;
   protocolVersion: number;
   description: DescriptionSection[];
   trails: CragMapTrail[];

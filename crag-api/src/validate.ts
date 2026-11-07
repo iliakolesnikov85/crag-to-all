@@ -165,7 +165,6 @@ const sectorBodySchema = z.object({
   timeInSun: nonemptyString(MAX_TEXT_LENGTH).optional(),
   routes: z.array(routeSchema).default([]),
   images: z.array(imageSchema).default([]),
-  externalId: nonemptyString(128).optional(),
 });
 
 const replaceSectorBodySchema = sectorBodySchema.extend({
@@ -236,7 +235,6 @@ function toSectorWrite(body: z.infer<typeof sectorBodySchema>): SectorWriteInput
   if (body.altitude !== undefined) sector.altitude = body.altitude;
   if (body.orientation !== undefined) sector.orientation = body.orientation;
   if (body.timeInSun !== undefined) sector.timeInSun = body.timeInSun;
-  if (body.externalId !== undefined) sector.externalId = body.externalId;
   return sector;
 }
 

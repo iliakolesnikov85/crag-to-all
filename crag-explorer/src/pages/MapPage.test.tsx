@@ -73,6 +73,7 @@ describe('MapPage', () => {
   it('resets filters when a sector is created so the new pin stays on the map', () => {
     const wallRoutes: Route[] = [
       {
+        id: 'classic',
         name: 'Classic',
         grade: '6A+',
         sectorName: 'Main Wall',
@@ -81,6 +82,7 @@ describe('MapPage', () => {
         images: [],
       },
       {
+        id: 'pump',
         name: 'Pump',
         grade: '6B',
         sectorName: 'Main Wall',
@@ -89,6 +91,7 @@ describe('MapPage', () => {
         images: [],
       },
       {
+        id: 'hard',
         name: 'Hard',
         grade: '6C',
         sectorName: 'Main Wall',

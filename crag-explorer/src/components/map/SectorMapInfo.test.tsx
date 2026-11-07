@@ -30,6 +30,7 @@ const sector: Sector = {
   geo: { lat: 42.5, lon: 45.25 },
   routes: [
     {
+      id: 'pobre',
       name: 'Pobre Tortuguita',
       grade: '6C+',
       sectorName: 'Shaumian',
@@ -160,6 +161,7 @@ describe('SectorMapInfo', () => {
 
     it('shows four routes, then replaces them with a drag hint while editing', () => {
       const routes = [1, 2, 3, 4, 5].map((index) => ({
+        id: `route-${index}`,
         name: `Route ${index}`,
         grade: '6A',
         sectorName: 'Shaumian',

@@ -17,26 +17,23 @@
 .route-list-modal__row {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.35rem 0;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
   border-bottom: 1px solid #eee;
 }
 
 .route-list-modal__name {
-  flex: 1;
+  flex: 1 1 8rem;
   min-width: 0;
   overflow-wrap: anywhere;
   color: #222;
 }
 
-.route-list-modal__row .btn--icon-only.btn--sm {
-  width: 2rem;
-  height: 2rem;
-  min-width: 2rem;
-  min-height: 2rem;
-
-  svg {
-    width: 1.15rem;
-    height: 1.15rem;
-  }
+.route-list-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  margin-left: auto;
 }

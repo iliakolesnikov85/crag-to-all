@@ -9,6 +9,7 @@ interface RouteOptionsMenuProps {
   count: number;
   disabled?: boolean;
   onEditDetails: () => void;
+  onRedraw?: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
 }
@@ -19,6 +20,7 @@ function RouteOptionsMenu({
   count,
   disabled = false,
   onEditDetails,
+  onRedraw,
   onMoveUp,
   onMoveDown,
 }: RouteOptionsMenuProps) {
@@ -34,6 +36,7 @@ function RouteOptionsMenu({
       disabled={disabled}
       items={[
         { label: 'Edit route details', onSelect: onEditDetails },
+        ...(onRedraw ? [{ label: 'Redraw route', onSelect: onRedraw }] : []),
         ...moveItems.map((item, itemIndex) =>
           itemIndex === 0 ? { ...item, separatorBefore: true } : item,
         ),

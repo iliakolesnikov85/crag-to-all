@@ -6,6 +6,7 @@ interface TopoOptionsMenuProps {
   index: number;
   count: number;
   disabled?: boolean;
+  onDrawLines: () => void;
   onDelete: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -15,6 +16,7 @@ function TopoOptionsMenu({
   index,
   count,
   disabled = false,
+  onDrawLines,
   onDelete,
   onMoveUp,
   onMoveDown,
@@ -29,7 +31,8 @@ function TopoOptionsMenu({
       label={`Topo image ${position} of ${count} options`}
       disabled={disabled}
       items={[
-        { label: 'Delete topo image', onSelect: onDelete },
+        { label: 'Draw lines', onSelect: onDrawLines },
+        { label: 'Delete topo image', onSelect: onDelete, separatorBefore: true },
         ...moveItems.map((item, itemIndex) =>
           itemIndex === 0 ? { ...item, separatorBefore: true } : item,
         ),

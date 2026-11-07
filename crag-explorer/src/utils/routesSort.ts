@@ -7,6 +7,7 @@ function isNullOrEmpty(value: unknown): value is null | undefined | '' {
 
 function createEmptySectorRoute(sectorName: string): RouteListRow {
   return {
+    id: `empty:${sectorName}`,
     name: '',
     grade: '',
     sectorName,
