@@ -53,6 +53,8 @@ temp
 
 # Firebase emulator export
 emulator-data
+emulator-data-incoming
+emulator-data-previous
 
 # Service account keys
 firebase-account.json

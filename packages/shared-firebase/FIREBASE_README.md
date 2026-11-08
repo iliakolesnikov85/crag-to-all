@@ -25,6 +25,8 @@ npm run emulator:start
 
 The UI will be available at: http://localhost:4000
 
+Uploaded files are copied into `emulator-data` a few seconds after they change. Ctrl-C does not have to finish for that copy to stick. The next start imports `emulator-data` again.
+
 ### 3. Running the Scraper with Emulator
 
 #### Manual (Two terminals)
@@ -112,3 +114,6 @@ Current `storage.rules` strategy:
 - Check Firebase console in emulator UI
 - Verify `FIREBASE_SERVICE_ACCOUNT_KEY` is configured correctly
 - Check network connectivity (for production)
+
+### Files missing after an emulator restart
+`emulator-data` is only as new as the last successful snapshot. On Windows, stopping the emulator with Ctrl-C used to kill the process before `--export-on-exit` wrote anything, so files uploaded in that session were gone on the next start. Snapshots are now taken while the emulator is running. Restart `npm run emulator:start` once so that saver is the process that is running.
