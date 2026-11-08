@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { setBodyScrollLock } from '../utils/bodyScrollLock';
 import Modal from './Modal';
@@ -103,6 +103,50 @@ describe('Modal', () => {
 
     expect(closeDetails).toHaveBeenCalledTimes(1);
     expect(closeList).not.toHaveBeenCalled();
+  });
+
+  it('keeps Tab inside the top dialog', () => {
+    render(
+      <>
+        <button type="button">Outside</button>
+        <Modal open title="Routes" onClose={() => {}}>
+          <input aria-label="Filter routes" />
+        </Modal>
+        <Modal
+          open
+          title="Edit route"
+          onClose={() => {}}
+          footer={<button type="button">Save</button>}
+        >
+          <input aria-label="Route name" />
+        </Modal>
+      </>,
+    );
+
+    const edit = screen.getByRole('dialog', { name: 'Edit route' });
+    const close = within(edit).getByRole('button', { name: 'Close' });
+    const save = within(edit).getByRole('button', { name: 'Save' });
+    const outside = screen.getByRole('button', { name: 'Outside' });
+
+    save.focus();
+    fireEvent.keyDown(save, { key: 'Tab' });
+    expect(close).toHaveFocus();
+
+    fireEvent.keyDown(close, { key: 'Tab', shiftKey: true });
+    expect(save).toHaveFocus();
+
+    save.focus();
+    fireEvent.keyDown(save, { key: 'Tab', ctrlKey: true });
+    expect(save).toHaveFocus();
+
+    outside.focus();
+    fireEvent.keyDown(outside, { key: 'Tab' });
+    expect(close).toHaveFocus();
+    expect(screen.getByRole('textbox', { name: 'Filter routes' })).not.toHaveFocus();
+
+    outside.focus();
+    fireEvent.keyDown(outside, { key: 'Tab', shiftKey: true });
+    expect(save).toHaveFocus();
   });
 
   it('keeps an outer scroll lock when the dialog closes', () => {

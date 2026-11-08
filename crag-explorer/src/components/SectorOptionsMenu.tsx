@@ -5,6 +5,7 @@ import './SectorOptionsMenu.scss';
 
 interface SectorOptionsMenuProps {
   disabled?: boolean;
+  canDelete?: boolean;
   onEdit: () => void;
   onRoutes: () => void;
   onDelete: () => void;
@@ -12,6 +13,7 @@ interface SectorOptionsMenuProps {
 
 const SectorOptionsMenu: React.FC<SectorOptionsMenuProps> = ({
   disabled = false,
+  canDelete = true,
   onEdit,
   onRoutes,
   onDelete,
@@ -24,7 +26,7 @@ const SectorOptionsMenu: React.FC<SectorOptionsMenuProps> = ({
       items={[
         { label: 'Edit sector details', onSelect: onEdit },
         { label: 'Routes', onSelect: onRoutes },
-        { label: 'Delete sector', onSelect: onDelete },
+        ...(canDelete ? [{ label: 'Delete sector', onSelect: onDelete }] : []),
       ]}
       renderButton={({ open, ...buttonProps }) => (
         <button

@@ -26,7 +26,10 @@ export type ButtonProps = {
   target?: string;
   rel?: string;
   title?: string;
+  /** Dialogs use this for the action that should take focus when they open. */
+  initialFocus?: boolean;
   'aria-label'?: string;
+  'aria-describedby'?: string;
   'aria-haspopup'?: React.AriaAttributes['aria-haspopup'];
   'aria-expanded'?: boolean | 'true' | 'false';
   'aria-current'?: React.AriaAttributes['aria-current'];
@@ -82,7 +85,9 @@ const Button: React.FC<ButtonProps> = ({
   target,
   rel,
   title,
+  initialFocus = false,
   'aria-label': ariaLabel,
+  'aria-describedby': ariaDescribedBy,
   'aria-haspopup': ariaHasPopup,
   'aria-expanded': ariaExpanded,
   'aria-current': ariaCurrent,
@@ -100,6 +105,7 @@ const Button: React.FC<ButtonProps> = ({
   const sharedAria = {
     title,
     'aria-label': ariaLabel,
+    'aria-describedby': ariaDescribedBy,
     'aria-haspopup': ariaHasPopup,
     'aria-expanded': ariaExpanded,
     'aria-current': ariaCurrent,
@@ -171,6 +177,7 @@ const Button: React.FC<ButtonProps> = ({
       disabled={disabled}
       onClick={onClick}
       onMouseDown={onMouseDown}
+      data-initial-focus={initialFocus ? '' : undefined}
       {...sharedAria}
     >
       {children}

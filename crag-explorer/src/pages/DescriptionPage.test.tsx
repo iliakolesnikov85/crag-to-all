@@ -6,7 +6,7 @@ import { canEditCrag } from '../api/permissions';
 import { createAppQueryClient, queryKeys } from '../api/queryClient';
 import { CragContext } from '../context/CragContext';
 import { sampleCragData } from '../test/fixtures/cragData';
-import { withQueryClient } from '../test/helpers';
+import { chooseConfirm, withQueryClient } from '../test/helpers';
 import type { CragData, DescriptionSection } from '../types';
 import { paragraphsToHtml } from '../utils/descriptionHtml';
 import DescriptionPage from './DescriptionPage';
@@ -251,7 +251,6 @@ describe('DescriptionPage', () => {
   });
 
   it('removes a section after confirmation', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.mocked(patchCragDescription).mockImplementation(async (_cragId, _version, description) => ({
       description,
       version: 4,
@@ -259,6 +258,8 @@ describe('DescriptionPage', () => {
     const client = renderPage(sections, 3);
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove Access' }));
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    chooseConfirm('Remove section', 'Remove');
 
     await waitFor(() => {
       expect(patchCragDescription).toHaveBeenCalledWith(CRAG_ID, 3, [sections[1]]);
@@ -268,17 +269,18 @@ describe('DescriptionPage', () => {
       description: [sections[1]],
       sectors: sampleCragData.sectors,
     });
-    vi.mocked(window.confirm).mockRestore();
   });
 
   it('leaves the description unchanged when removal is cancelled', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
     renderPage(sections, 3);
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove Season' }));
+    expect(screen.getByRole('dialog', { name: 'Remove section' })).toHaveTextContent(
+      'Remove the "Season" section?',
+    );
+    chooseConfirm('Remove section', 'Cancel');
 
     expect(patchCragDescription).not.toHaveBeenCalled();
     expect(screen.getByRole('heading', { name: 'Season' })).toBeInTheDocument();
-    vi.mocked(window.confirm).mockRestore();
   });
 });

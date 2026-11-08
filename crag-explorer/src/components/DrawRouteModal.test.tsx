@@ -1,5 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { ConfirmProvider } from '../context/ConfirmContext';
+import { chooseConfirm } from '../test/helpers';
 import type { Route } from '../types';
 import DrawRouteModal from './DrawRouteModal';
 
@@ -38,16 +40,18 @@ function stageRect(): DOMRect {
 
 function renderModal(onSave = vi.fn(), onClose = vi.fn()) {
   render(
-    <DrawRouteModal
-      open
-      route={route}
-      imageFile="topo.jpg"
-      imageUrl="/topo.jpg"
-      saving={false}
-      error={null}
-      onClose={onClose}
-      onSave={onSave}
-    />,
+    <ConfirmProvider>
+      <DrawRouteModal
+        open
+        route={route}
+        imageFile="topo.jpg"
+        imageUrl="/topo.jpg"
+        saving={false}
+        error={null}
+        onClose={onClose}
+        onSave={onSave}
+      />
+    </ConfirmProvider>,
   );
   const stage = document.querySelector('.draw-route-stage');
   if (!(stage instanceof HTMLElement)) throw new Error('Missing draw stage');
@@ -97,21 +101,25 @@ describe('DrawRouteModal', () => {
     ]);
   });
 
-  it('asks before discarding a draft line', () => {
+  it('asks before discarding a draft line', async () => {
     const onClose = vi.fn();
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     const { stage } = renderModal(vi.fn(), onClose);
 
     fireEvent.click(stage, { clientX: 10, clientY: 10 });
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
-    expect(confirm).toHaveBeenCalled();
+    const leave = screen.getByRole('dialog', { name: 'Leave this drawing?' });
+    expect(leave).toHaveTextContent('Leave this drawing? Your unsaved line will be lost.');
+    expect(within(leave).getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    expect(onClose).not.toHaveBeenCalled();
+    chooseConfirm('Leave this drawing?', 'Cancel');
     expect(onClose).not.toHaveBeenCalled();
 
-    confirm.mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    chooseConfirm('Leave this drawing?', 'Leave');
 
-    expect(onClose).toHaveBeenCalledTimes(1);
-    confirm.mockRestore();
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
   });
 });

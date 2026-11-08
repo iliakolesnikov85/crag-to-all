@@ -10,6 +10,7 @@ interface RouteOptionsMenuProps {
   disabled?: boolean;
   onEditDetails: () => void;
   onRedraw?: () => void;
+  onRemoveFromTopo?: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
 }
@@ -21,6 +22,7 @@ function RouteOptionsMenu({
   disabled = false,
   onEditDetails,
   onRedraw,
+  onRemoveFromTopo,
   onMoveUp,
   onMoveDown,
 }: RouteOptionsMenuProps) {
@@ -37,6 +39,9 @@ function RouteOptionsMenu({
       items={[
         { label: 'Edit route details', onSelect: onEditDetails },
         ...(onRedraw ? [{ label: 'Redraw route', onSelect: onRedraw }] : []),
+        ...(onRemoveFromTopo
+          ? [{ label: 'Remove from topo image', onSelect: onRemoveFromTopo, separatorBefore: true }]
+          : []),
         ...moveItems.map((item, itemIndex) =>
           itemIndex === 0 ? { ...item, separatorBefore: true } : item,
         ),

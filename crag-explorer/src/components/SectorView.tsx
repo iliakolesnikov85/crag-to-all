@@ -29,6 +29,8 @@ export interface SectorViewProps {
   onEditRoute?: (index: number) => void;
   /** Redraw the line for one route on the topo image it is listed under. */
   onRedrawRoute?: (imageFile: string, sourceIndex: number) => void;
+  /** Drop one route from the topo image it is listed under. The route stays in the sector. */
+  onRemoveRouteFromImage?: (imageFile: string, sourceIndex: number) => void;
   /** Visual index of a route on one topo image. Present only when the viewer can reorder routes. */
   onMoveRoute?: (imageFile: string, index: number, direction: -1 | 1) => void;
   routeMenuDisabled?: boolean;
@@ -52,6 +54,7 @@ const SectorView: React.FC<SectorViewProps> = ({
   headerAlert,
   onEditRoute,
   onRedrawRoute,
+  onRemoveRouteFromImage,
   onMoveRoute,
   routeMenuDisabled = false,
   onDrawLines,
@@ -289,6 +292,11 @@ const SectorView: React.FC<SectorViewProps> = ({
                                     onRedraw={
                                       onRedrawRoute
                                         ? () => onRedrawRoute(image.imageFile, route!.sourceIndex)
+                                        : undefined
+                                    }
+                                    onRemoveFromTopo={
+                                      onRemoveRouteFromImage
+                                        ? () => onRemoveRouteFromImage(image.imageFile, route!.sourceIndex)
                                         : undefined
                                     }
                                     onMoveUp={

@@ -1,5 +1,5 @@
 import React, { useId, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import type { Sector } from '../types';
 import {
   MONTHS,
@@ -12,6 +12,7 @@ import {
   type SectorEditErrors,
 } from '../utils/sectorDetails';
 import { SECTOR_NAME_MAX_LENGTH } from '../utils/sectorName';
+import { confirm } from '../context/ConfirmContext';
 import Button from './Button';
 import ChoiceGroup, { type ChoiceOption } from './ChoiceGroup';
 import Modal from './Modal';
@@ -65,6 +66,7 @@ const SectorDetailsModal: React.FC<SectorDetailsModalProps> = ({
   onLocationClick,
   onSave,
 }) => {
+  const navigate = useNavigate();
   const formId = useId().replace(/:/g, '');
   const nameId = `${formId}-name`;
   const altitudeId = `${formId}-altitude`;
@@ -133,11 +135,21 @@ const SectorDetailsModal: React.FC<SectorDetailsModalProps> = ({
 
   const handleLocationClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     const dirty = !sameDraft(draft, sectorEditDraft(sector));
-    if (dirty && !window.confirm(LEAVE_CONFIRM)) {
-      event.preventDefault();
+    if (!dirty) {
+      onLocationClick();
       return;
     }
-    onLocationClick();
+    event.preventDefault();
+    void confirm({
+      title: 'Leave this edit?',
+      message: LEAVE_CONFIRM,
+      confirmLabel: 'Leave',
+      destructive: true,
+    }).then((leave) => {
+      if (!leave) return;
+      onLocationClick();
+      navigate(mapUrl);
+    });
   };
 
   return (

@@ -26,6 +26,10 @@
   width: min(72rem, 100%);
 }
 
+.modal-panel--compact {
+  width: min(28rem, 100%);
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -78,5 +82,17 @@
     border: 3px solid #1e3a5f;
     border-radius: 10px;
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+  }
+
+  .modal-backdrop--compact {
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+  }
+
+  .modal-panel--compact {
+    width: min(28rem, 100%);
+    height: auto;
+    max-height: 90svh;
   }
 }

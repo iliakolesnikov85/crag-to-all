@@ -4,6 +4,7 @@ import { usePatchCragDescription } from '../api/useCragMutations';
 import { canEditCrag } from '../api/permissions';
 import Button from '../components/Button';
 import DescriptionSectionModal from '../components/DescriptionSectionModal';
+import { confirm } from '../context/ConfirmContext';
 import { useCrag } from '../context/CragContext';
 import type { DescriptionSection } from '../types';
 import { paragraphsToHtml } from '../utils/descriptionHtml';
@@ -106,7 +107,12 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
       setActionError(PERMISSION_MESSAGE);
       return;
     }
-    const confirmed = window.confirm(`Remove the "${section.subheader}" section?`);
+    const confirmed = await confirm({
+      title: 'Remove section',
+      message: `Remove the "${section.subheader}" section?`,
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
     if (!confirmed) return;
     if (version == null) {
       setActionError(MISSING_VERSION_MESSAGE);

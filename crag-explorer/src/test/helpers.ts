@@ -1,9 +1,20 @@
+import { fireEvent, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactNode } from 'react';
 import { createAppQueryClient } from '../api/queryClient';
+import { ConfirmProvider } from '../context/ConfirmContext';
 
 export function withQueryClient(children: ReactNode, client: QueryClient = createAppQueryClient()): ReactNode {
-  return createElement(QueryClientProvider, { client }, children);
+  return createElement(
+    QueryClientProvider,
+    { client },
+    createElement(ConfirmProvider, null, children),
+  );
+}
+
+export function chooseConfirm(title: string, action: string): void {
+  const dialog = screen.getByRole('dialog', { name: title });
+  fireEvent.click(within(dialog).getByRole('button', { name: action }));
 }
 
 export function requestUrl(input: RequestInfo | URL): string {

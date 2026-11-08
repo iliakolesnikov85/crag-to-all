@@ -12,6 +12,7 @@ import {
   type RouteEditDraft,
   type RouteEditErrors,
 } from '../utils/routeEditor';
+import { confirm } from '../context/ConfirmContext';
 import Button from './Button';
 import ChoiceGroup from './ChoiceGroup';
 import Modal from './Modal';
@@ -56,8 +57,18 @@ function RouteDetailsModal({
   const requestClose = () => {
     if (saving) return;
     const dirty = !sameRouteDraft(draft, routeEditDraft(route));
-    if (dirty && !window.confirm(LEAVE_CONFIRM)) return;
-    onClose();
+    if (!dirty) {
+      onClose();
+      return;
+    }
+    void confirm({
+      title: 'Leave this edit?',
+      message: LEAVE_CONFIRM,
+      confirmLabel: 'Leave',
+      destructive: true,
+    }).then((leave) => {
+      if (leave) onClose();
+    });
   };
 
   const updateDraft = (patch: Partial<RouteEditDraft>, field?: keyof RouteEditErrors) => {

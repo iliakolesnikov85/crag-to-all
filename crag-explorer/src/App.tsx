@@ -21,6 +21,7 @@ import {
 import { SeoDynamic, Footer, LoadingScreen, Header } from './components';
 import Navigation from './components/Navigation';
 import { AppOnlineProvider } from './context/AppOnlineContext';
+import { ConfirmProvider } from './context/ConfirmContext';
 import { CragContext } from './context/CragContext';
 import { FilterContext, useFilterState } from './context/FilterContext';
 
@@ -149,9 +150,11 @@ export const AppRoutes: React.FC = () => {
 
 const App: React.FC = () => (
   <AppOnlineProvider>
-    <Router>
-      <AppRoutes />
-    </Router>
+    <ConfirmProvider>
+      <Router>
+        <AppRoutes />
+      </Router>
+    </ConfirmProvider>
   </AppOnlineProvider>
 );
 

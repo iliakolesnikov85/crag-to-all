@@ -8,6 +8,7 @@ import RouteDetailsModal from '../components/RouteDetailsModal';
 import RouteListModal from '../components/RouteListModal';
 import SectorOptionsMenu from '../components/SectorOptionsMenu';
 import SectorView from '../components/SectorView';
+import { confirm } from '../context/ConfirmContext';
 import { useCrag } from '../context/CragContext';
 import { Image, Route, Sector, type LinePoint } from '../types';
 import type { SectorDetailsPatch } from '../utils/sectorDetails';
@@ -139,9 +140,12 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
       setHeaderError(DELETE_MISSING_ID_MESSAGE);
       return;
     }
-    const confirmed = window.confirm(
-      `Delete the "${sector.name}" sector? This permanently removes the sector and all of its routes.`,
-    );
+    const confirmed = await confirm({
+      title: 'Delete sector',
+      message: `Delete the "${sector.name}" sector? This permanently removes the sector and all of its routes.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
     if (!confirmed) return;
 
     setHeaderError(null);
@@ -252,7 +256,12 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
     if (!sector || saving) return;
     const route = sector.routes[index];
     if (!route) return;
-    const confirmed = window.confirm(`Delete the "${route.name}" route?`);
+    const confirmed = await confirm({
+      title: 'Delete route',
+      message: `Delete the "${route.name}" route?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
     if (!confirmed) return;
     const routes = sector.routes.filter((_, routeIndex) => routeIndex !== index);
     await saveRoutes(routes, 'list');
@@ -262,9 +271,12 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
     if (!sector || !drawImageFile || saving) return;
     const route = sector.routes[index];
     if (!route) return;
-    const confirmed = window.confirm(
-      `Remove the "${route.name}" route from this topo image?`,
-    );
+    const confirmed = await confirm({
+      title: 'Remove route',
+      message: `Remove the "${route.name}" route from this topo image?`,
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
     if (!confirmed) return;
     const routes = removeRouteFromImage(sector.routes, index, drawImageFile);
     if (!routes) return;
@@ -337,9 +349,12 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
   const handleDeleteTopo = async (index: number) => {
     const target = requireTopoEditable();
     if (!target?.images[index]) return;
-    const confirmed = window.confirm(
-      `Delete topo image ${index + 1}/${target.images.length}?`,
-    );
+    const confirmed = await confirm({
+      title: 'Delete topo image',
+      message: `Delete topo image ${index + 1}/${target.images.length}?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
     if (!confirmed) return;
     const next = removeTopoImage(target.images, index);
     if (!next) return;
@@ -352,11 +367,41 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
     const next = moveTopoImage(target.images, index, direction);
     if (!next) return;
     const place = direction < 0 ? 'up' : 'down';
-    const confirmed = window.confirm(
-      `Move topo image ${index + 1}/${target.images.length} ${place}?`,
-    );
+    const confirmed = await confirm({
+      title: 'Move topo image',
+      message: `Move topo image ${index + 1}/${target.images.length} ${place}?`,
+      confirmLabel: 'Move',
+    });
     if (!confirmed) return;
     await saveTopoImages(target, next);
+  };
+
+  const handleRemoveRouteFromImage = async (imageFile: string, sourceIndex: number) => {
+    const target = requireTopoEditable();
+    if (!target) return;
+    const route = target.routes[sourceIndex];
+    if (!route) return;
+    const confirmed = await confirm({
+      title: 'Remove route',
+      message: `Remove the "${route.name}" route from this topo image?`,
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
+    if (!confirmed) return;
+    const next = removeRouteFromImage(target.routes, sourceIndex, imageFile);
+    if (!next) return;
+    setHeaderError(null);
+    try {
+      const saved = await patchSectorMutation.mutateAsync({
+        sectorId: target.id,
+        version: target.version,
+        patch: { routes: next },
+      });
+      rememberSavedSector(target.id, saved);
+    } catch (error) {
+      console.error('Failed to remove route from topo image:', error);
+      setHeaderError(error instanceof Error ? error.message : 'Failed to remove route from topo image');
+    }
   };
 
   const handleMoveRoute = async (imageFile: string, index: number, direction: -1 | 1) => {
@@ -368,7 +413,11 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
       route.images.some((image) => image.imageFile === imageFile),
     ).length;
     const place = direction < 0 ? 'up' : 'down';
-    const confirmed = window.confirm(`Move route ${index + 1}/${count} ${place}?`);
+    const confirmed = await confirm({
+      title: 'Move route',
+      message: `Move route ${index + 1}/${count} ${place}?`,
+      confirmLabel: 'Move',
+    });
     if (!confirmed) return;
     setHeaderError(null);
     try {
@@ -427,6 +476,7 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
           canEdit ? (
             <SectorOptionsMenu
               disabled={menusDisabled}
+              canDelete={sector.images.length === 0}
               onEdit={openEdit}
               onRoutes={openRoutes}
               onDelete={() => void handleDelete()}
@@ -436,6 +486,7 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
         headerAlert={headerError}
         onEditRoute={canEdit ? openRouteDetails : undefined}
         onRedrawRoute={canEdit ? openRedraw : undefined}
+        onRemoveRouteFromImage={canEdit ? (imageFile, sourceIndex) => void handleRemoveRouteFromImage(imageFile, sourceIndex) : undefined}
         onMoveRoute={canEdit ? (imageFile, index, direction) => void handleMoveRoute(imageFile, index, direction) : undefined}
         routeMenuDisabled={menusDisabled}
         onDrawLines={canEdit ? openDrawLines : undefined}

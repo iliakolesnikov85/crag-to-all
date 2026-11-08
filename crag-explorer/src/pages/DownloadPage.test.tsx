@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppOnlineProvider } from '../context/AppOnlineContext';
+import { ConfirmProvider } from '../context/ConfirmContext';
 import { CragContext } from '../context/CragContext';
 import { SAMPLE_CRAG_ID, sampleCragData, sampleCrags } from '../test/fixtures/cragData';
 import { setNavigatorOnLine } from '../test/helpers';
@@ -31,16 +32,18 @@ const storage = vi.mocked(estimateStorage);
 
 function renderDownloadPage() {
   return render(
-    <AppOnlineProvider>
-      <CragContext.Provider
-        value={{
-          crag: sampleCrags[0],
-          getUrl: (url: string) => url,
-        }}
-      >
-        <DownloadPage cragData={sampleCragData} />
-      </CragContext.Provider>
-    </AppOnlineProvider>,
+    <ConfirmProvider>
+      <AppOnlineProvider>
+        <CragContext.Provider
+          value={{
+            crag: sampleCrags[0],
+            getUrl: (url: string) => url,
+          }}
+        >
+          <DownloadPage cragData={sampleCragData} />
+        </CragContext.Provider>
+      </AppOnlineProvider>
+    </ConfirmProvider>,
   );
 }
 

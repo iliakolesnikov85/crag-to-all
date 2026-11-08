@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { MdPictureAsPdf } from 'react-icons/md';
 import './DownloadPage.scss';
+import { confirm } from '../context/ConfirmContext';
 import { useCrag } from '../context/CragContext';
 import Button from '../components/Button';
 import GpxDownloadButton from '../components/GpxDownloadButton';
@@ -117,9 +118,12 @@ const DownloadPage: React.FC<DownloadPageProps> = ({ cragData }) => {
 
   const handleRemove = async () => {
     if (!online) return;
-    const confirmed = window.confirm(
-      `Remove all offline data for ${cragData.name} from this device?\n\nYou will need internet to download it again.`,
-    );
+    const confirmed = await confirm({
+      title: 'Remove offline data',
+      message: `Remove all offline data for ${cragData.name} from this device?\n\nYou will need internet to download it again.`,
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
     if (!confirmed) return;
     setOp({ phase: 'running', progress: null });
     try {

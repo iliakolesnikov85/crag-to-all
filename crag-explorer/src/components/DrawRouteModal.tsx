@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { pointsToBezierPath, type LinePoint } from '@crag-to-all/shared-crag';
 import type { Route } from '../types';
+import { confirm } from '../context/ConfirmContext';
 import Button from './Button';
 import Modal from './Modal';
 import './DrawRouteModal.scss';
@@ -54,8 +55,18 @@ function DrawRouteModal({
 
   const requestClose = () => {
     if (saving) return;
-    if (points.length > 0 && !window.confirm(LEAVE_CONFIRM)) return;
-    onClose();
+    if (points.length === 0) {
+      onClose();
+      return;
+    }
+    void confirm({
+      title: 'Leave this drawing?',
+      message: LEAVE_CONFIRM,
+      confirmLabel: 'Leave',
+      destructive: true,
+    }).then((leave) => {
+      if (leave) onClose();
+    });
   };
 
   const addPoint = (event: React.MouseEvent<HTMLDivElement>) => {
