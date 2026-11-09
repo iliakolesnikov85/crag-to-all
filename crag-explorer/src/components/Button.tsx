@@ -32,6 +32,7 @@ export type ButtonProps = {
   'aria-describedby'?: string;
   'aria-haspopup'?: React.AriaAttributes['aria-haspopup'];
   'aria-expanded'?: boolean | 'true' | 'false';
+  'aria-controls'?: string;
   'aria-current'?: React.AriaAttributes['aria-current'];
 };
 
@@ -90,6 +91,7 @@ const Button: React.FC<ButtonProps> = ({
   'aria-describedby': ariaDescribedBy,
   'aria-haspopup': ariaHasPopup,
   'aria-expanded': ariaExpanded,
+  'aria-controls': ariaControls,
   'aria-current': ariaCurrent,
 }) => {
   const classes = buildClassName({
@@ -108,6 +110,7 @@ const Button: React.FC<ButtonProps> = ({
     'aria-describedby': ariaDescribedBy,
     'aria-haspopup': ariaHasPopup,
     'aria-expanded': ariaExpanded,
+    'aria-controls': ariaControls,
     'aria-current': ariaCurrent,
   };
 

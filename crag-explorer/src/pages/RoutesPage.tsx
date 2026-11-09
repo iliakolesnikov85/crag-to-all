@@ -1,24 +1,41 @@
 import React from 'react';
 import { MdArrowDownward, MdArrowUpward, MdVideocam } from 'react-icons/md';
-import { Sector, Route } from '../types';
-import './RoutesPage.scss';
 import { Link } from 'react-router';
-import { useCrag } from '../context/CragContext';
-import { useFilter } from '../context/FilterContext';
+import { canEditCrag } from '../api/permissions';
 import { Pager, RoutesFilter } from '../components';
 import RouteRating from '../components/RouteRating';
+import { useCrag } from '../context/CragContext';
+import { useFilter } from '../context/FilterContext';
+import { Sector, Route } from '../types';
 import {
   sortRouteRows,
   type RouteListRow,
   type SortField,
 } from '../utils/routesSort';
+import RoutesPageListOptionsMenu from '../components/RoutesPageListOptionsMenu';
+import useDetailsEditors from './useDetailsEditors';
+import './RoutesPage.scss';
+
+const MISSING_SECTOR_MESSAGE = 'This sector could not be found.';
+const MISSING_ROUTE_MESSAGE = 'This route could not be found.';
 
 interface RoutesPageProps {
   sectors: Sector[];
 }
 
+function sectorNamed(sectors: readonly Sector[], name: string): Sector | undefined {
+  const key = name.toLowerCase();
+  return sectors.find((sector) => sector.name.toLowerCase() === key);
+}
+
 const RoutesPage: React.FC<RoutesPageProps> = ({ sectors }) => {
-  const { getUrl } = useCrag();
+  const { crag, getUrl } = useCrag();
+  const canEdit = canEditCrag(crag);
+  const [actionError, setActionError] = React.useState<string | null>(null);
+  const editors = useDetailsEditors({
+    sectors,
+    onNotice: setActionError,
+  });
   const { sortField, setSortField, sortDirection, setSortDirection } = useFilter();
   const [filteredRoutes, setFilteredRoutes] = React.useState<Route[]>(
     () => sectors.flatMap((sector) => sector.routes)
@@ -48,6 +65,29 @@ const RoutesPage: React.FC<RoutesPageProps> = ({ sectors }) => {
       : <MdArrowDownward className="sort-icon" aria-hidden="true" />;
   };
 
+  const openSectorDetails = (row: RouteListRow) => {
+    const sector = sectorNamed(sectors, row.sectorName);
+    if (!sector) {
+      setActionError(MISSING_SECTOR_MESSAGE);
+      return;
+    }
+    editors.openSector(sector);
+  };
+
+  const openRouteDetails = (row: RouteListRow) => {
+    const sector = sectorNamed(sectors, row.sectorName);
+    if (!sector) {
+      setActionError(MISSING_SECTOR_MESSAGE);
+      return;
+    }
+    const index = sector.routes.findIndex((item) => item.id === row.id);
+    if (index < 0) {
+      setActionError(MISSING_ROUTE_MESSAGE);
+      return;
+    }
+    editors.openRoute(sector, index);
+  };
+
   return (
     <div className="routes-page page">
       {/* Route Filter Section */}
@@ -56,6 +96,10 @@ const RoutesPage: React.FC<RoutesPageProps> = ({ sectors }) => {
         onFilteredRoutesChange={setFilteredRoutes}
         onFilteredSectorsChange={setFilteredSectors}
       />
+
+      {actionError ? (
+        <p className="routes-page__alert" role="alert">{actionError}</p>
+      ) : null}
 
       <div className="routes-grid-container">
         <table className="routes-grid">
@@ -85,6 +129,7 @@ const RoutesPage: React.FC<RoutesPageProps> = ({ sectors }) => {
               >
                 Sector {getSortIcon('sectorName')}
               </th>
+              {canEdit ? <th className="options-header" aria-label="Options" /> : null}
             </tr>
           </thead>
           <tbody>
@@ -135,6 +180,20 @@ const RoutesPage: React.FC<RoutesPageProps> = ({ sectors }) => {
                   <td>{
                     <Link className='link' to={getUrl(`sector/${encodeURIComponent(route.sectorName.toLowerCase())}`)}>{route.sectorName}</Link>
                   }</td>
+                  {canEdit ? (
+                    <td className="options-cell">
+                      <RoutesPageListOptionsMenu
+                        label={
+                          isEmptySectorRow
+                            ? `Options for ${route.sectorName}`
+                            : `Options for ${route.name}`
+                        }
+                        disabled={editors.saving}
+                        onEditRoute={isEmptySectorRow ? undefined : () => openRouteDetails(route)}
+                        onEditSector={() => openSectorDetails(route)}
+                      />
+                    </td>
+                  ) : null}
                 </tr>
               );
             })}
@@ -145,6 +204,7 @@ const RoutesPage: React.FC<RoutesPageProps> = ({ sectors }) => {
         )}
         <Pager items={sortedRoutes} onPageItemsChange={setPagedRoutes} />
       </div>
+      {editors.dialogs}
     </div>
   );
 };

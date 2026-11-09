@@ -92,6 +92,22 @@
     display: none;
   }
 
+  .options-header,
+  .options-cell {
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
+  }
+
+  .options-cell {
+    padding-right: 8px;
+  }
+
+  .routes-page__alert {
+    margin: 12px 0 0;
+    color: #b42318;
+  }
+
   .error {
     text-align: center;
     padding: 40px;
