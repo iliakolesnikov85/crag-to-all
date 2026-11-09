@@ -7,6 +7,7 @@ interface SectorOptionsMenuProps {
   disabled?: boolean;
   canDelete?: boolean;
   onEdit: () => void;
+  onAddTopo: () => void;
   onRoutes: () => void;
   onDelete: () => void;
 }
@@ -15,6 +16,7 @@ const SectorOptionsMenu: React.FC<SectorOptionsMenuProps> = ({
   disabled = false,
   canDelete = true,
   onEdit,
+  onAddTopo,
   onRoutes,
   onDelete,
 }) => {
@@ -25,6 +27,7 @@ const SectorOptionsMenu: React.FC<SectorOptionsMenuProps> = ({
       className="sector-options-menu"
       items={[
         { label: 'Edit sector details', onSelect: onEdit },
+        { label: 'Add topo image', onSelect: onAddTopo },
         { label: 'Routes', onSelect: onRoutes },
         ...(canDelete ? [{ label: 'Delete sector', onSelect: onDelete }] : []),
       ]}

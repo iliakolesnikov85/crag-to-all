@@ -1,5 +1,5 @@
 import React from 'react';
-import { MdOutlineSettings } from 'react-icons/md';
+import { MdMoreVert } from 'react-icons/md';
 import Button from './Button';
 import OptionsMenu from './OptionsMenu';
 
@@ -55,7 +55,7 @@ function RouteOptionsMenu({
           active={open}
           {...buttonProps}
         >
-          <MdOutlineSettings aria-hidden="true" />
+          <MdMoreVert aria-hidden="true" />
         </Button>
       )}
     />

@@ -1,42 +1,47 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { SectorEditor } from '../../hooks/useSectorEditor';
 import type { LatLng } from '../../types';
-import { formatSectorCoordinate, parseLatitude, parseLongitude, sameSectorGeo } from '../../utils/map/sectorCoordinates';
-import type { SectorEditState } from '../../utils/map/sectorEditState';
+import { sameSectorGeo } from '../../utils/map/sectorCoordinates';
 import { TOPO_TYPE_ERROR, readTopoGps, validateTopoFile } from '../../utils/topoImage';
 
-function editedGeo(edit: SectorEditState): LatLng | null {
-  const lat = parseLatitude(edit.latText);
-  const lon = parseLongitude(edit.lonText);
-  if (!lat.ok || !lon.ok) return null;
-  return { lat: lat.value, lon: lon.value };
+interface UseTopoFileOptions {
+  file: File | null;
+  /** When false, a valid photo is kept and its GPS is not read. */
+  checkLocation: boolean;
+  /** Location compared with the photo. Read when the GPS check finishes. */
+  currentGeo: LatLng | null;
+  saving?: boolean;
+  onAccept(file: File): void;
+  onUseLocation(geo: LatLng): void;
 }
 
-export interface TopoPicker {
+export interface TopoFileState {
   previewUrl: string | null;
   error: string | null;
   /** True while a chosen file is still being checked or its location is being read. */
   pending: boolean;
-  /** Set when the chosen photo has a location different from the draft pin. */
+  /** Set when the chosen photo has a location different from `currentGeo`. */
   gpsPrompt: LatLng | null;
   chooseFile(file: File): void;
   usePhotoLocation(): void;
   dismissGpsPrompt(): void;
 }
 
-/**
- * Topo photo for a draft sector. The file lives in the editor so Save can upload
- * it; validation, preview, and the location prompt are local to the card.
- */
-export function useTopoPicker(edit: SectorEditState | null, editor: SectorEditor | null): TopoPicker {
-  const file = edit?.topoFile ?? null;
+/** Validate a topo, preview it, and offer its GPS when that should move a sector. */
+export function useTopoFile({
+  file,
+  checkLocation,
+  currentGeo,
+  saving = false,
+  onAccept,
+  onUseLocation,
+}: UseTopoFileOptions): TopoFileState {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [gpsPrompt, setGpsPrompt] = useState<LatLng | null>(null);
   const readGeneration = useRef(0);
-  const editorRef = useRef(editor);
-  editorRef.current = editor;
+  const optionsRef = useRef({ checkLocation, currentGeo, saving, onAccept, onUseLocation });
+  optionsRef.current = { checkLocation, currentGeo, saving, onAccept, onUseLocation };
 
   useEffect(() => {
     if (!file) {
@@ -71,7 +76,11 @@ export function useTopoPicker(edit: SectorEditState | null, editor: SectorEditor
         setPending(false);
         return;
       }
-      editorRef.current?.setTopoFile(chosen);
+      optionsRef.current.onAccept(chosen);
+      if (!optionsRef.current.checkLocation) {
+        if (isCurrent()) setPending(false);
+        return;
+      }
       let gps: LatLng | null;
       try {
         gps = await readTopoGps(chosen);
@@ -83,18 +92,15 @@ export function useTopoPicker(edit: SectorEditState | null, editor: SectorEditor
       if (!isCurrent()) return;
       setPending(false);
       if (!gps) return;
-      const current = editorRef.current?.state ? editedGeo(editorRef.current.state) : null;
+      const current = optionsRef.current.currentGeo;
       if (current && sameSectorGeo(current, gps)) return;
       setGpsPrompt(gps);
     })();
   }, []);
 
   const usePhotoLocation = useCallback(() => {
-    const current = editorRef.current;
-    if (!gpsPrompt || !current?.state || current.state.saving) return;
-    current.setLatText(formatSectorCoordinate(gpsPrompt.lat));
-    current.setLonText(formatSectorCoordinate(gpsPrompt.lon));
-    current.commitDraft();
+    if (!gpsPrompt || optionsRef.current.saving) return;
+    optionsRef.current.onUseLocation(gpsPrompt);
     setGpsPrompt(null);
   }, [gpsPrompt]);
 

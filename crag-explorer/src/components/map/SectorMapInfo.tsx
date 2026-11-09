@@ -3,14 +3,19 @@ import { MdEdit, MdInfoOutline, MdLocationOn } from 'react-icons/md';
 import { Link } from 'react-router';
 import { useCrag } from '../../context/CragContext';
 import type { SectorEditor } from '../../hooks/useSectorEditor';
-import type { Sector } from '../../types';
+import type { LatLng, Sector } from '../../types';
 import { getCragImageUrl } from '../../utils/firebaseStorage';
-import { formatSectorCoordinatePair } from '../../utils/map/sectorCoordinates';
+import {
+  formatSectorCoordinate,
+  formatSectorCoordinatePair,
+  parseLatitude,
+  parseLongitude,
+} from '../../utils/map/sectorCoordinates';
 import { sectorMarkerKey, type SectorEditState } from '../../utils/map/sectorEditState';
 import Button from '../Button';
-import Modal from '../Modal';
+import PhotoLocationPrompt from '../PhotoLocationPrompt';
 import SectorTopoInput from './SectorTopoInput';
-import { useTopoPicker } from './useTopoPicker';
+import { useTopoFile } from './useTopoFile';
 import './SectorMapInfo.scss';
 
 const SECTOR_MAP_INFO_MAX_ROUTES = 4;
@@ -48,6 +53,13 @@ function nameInputClass(invalid: boolean): string {
   return invalid
     ? 'sector-map-info__name-input sector-map-info__name-input--invalid'
     : 'sector-map-info__name-input';
+}
+
+function editedGeo(edit: SectorEditState): LatLng | null {
+  const lat = parseLatitude(edit.latText);
+  const lon = parseLongitude(edit.lonText);
+  if (!lat.ok || !lon.ok) return null;
+  return { lat: lat.value, lon: lon.value };
 }
 
 function SectorCoordinatesEditor({
@@ -162,7 +174,22 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
 }) => {
   const { crag, getUrl } = useCrag();
   const edit = editor?.state && editor.state.target === sectorMarkerKey(sector) ? editor.state : null;
-  const topo = useTopoPicker(isNew ? edit : null, isNew ? editor : null);
+  const draft = isNew ? edit : null;
+  const topo = useTopoFile({
+    file: draft?.topoFile ?? null,
+    checkLocation: draft != null,
+    currentGeo: draft ? editedGeo(draft) : null,
+    saving: draft?.saving ?? false,
+    onAccept(file) {
+      editor?.setTopoFile(file);
+    },
+    onUseLocation(geo) {
+      if (!editor?.state || editor.state.saving) return;
+      editor.setLatText(formatSectorCoordinate(geo.lat));
+      editor.setLonText(formatSectorCoordinate(geo.lon));
+      editor.commitDraft();
+    },
+  });
   const editing = edit != null && editor != null;
   const displayName = edit ? edit.nameText : sector.name;
   const sectorPath = getUrl(`sector/${encodeURIComponent(displayName.toLowerCase())}`);
@@ -287,32 +314,12 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
           )}
         </div>
       </div>
-      {topo.gpsPrompt ? (
-        <Modal
-          open
-          title="Use photo location?"
-          onClose={topo.dismissGpsPrompt}
-          footer={
-            <>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={topo.dismissGpsPrompt}
-              >
-                Keep map location
-              </Button>
-              <Button type="button" size="sm" variant="primary" onClick={topo.usePhotoLocation}>
-                Use photo location
-              </Button>
-            </>
-          }
-        >
-          <p className="sector-map-info__location-prompt">
-            This photo was taken at {formatSectorCoordinatePair(topo.gpsPrompt)}. Use that location for the new sector?
-          </p>
-        </Modal>
-      ) : null}
+      <PhotoLocationPrompt
+        location={topo.gpsPrompt}
+        subject="the new sector"
+        onUse={topo.usePhotoLocation}
+        onKeep={topo.dismissGpsPrompt}
+      />
     </div>
   );
 };

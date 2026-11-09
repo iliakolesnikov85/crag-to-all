@@ -108,7 +108,8 @@ const Modal: React.FC<ModalProps> = ({
     const field = dialog?.querySelector<HTMLElement>(
       '.modal-body input, .modal-body textarea, .modal-body select, .modal-body [contenteditable="true"]',
     );
-    (preferred ?? field ?? dialog)?.focus();
+    // Default focus scrolls the target into view and yanks the page to the top.
+    (preferred ?? field ?? dialog)?.focus({ preventScroll: true });
 
     const entry = { close: () => onCloseRef.current() };
     openDialogs.push(entry);
@@ -132,7 +133,7 @@ const Modal: React.FC<ModalProps> = ({
       const index = openDialogs.lastIndexOf(entry);
       if (index >= 0) openDialogs.splice(index, 1);
       setBodyScrollLock(false);
-      previouslyFocused?.focus();
+      previouslyFocused?.focus({ preventScroll: true });
     };
   }, [open]);
 

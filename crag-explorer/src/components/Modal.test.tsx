@@ -4,6 +4,19 @@ import { setBodyScrollLock } from '../utils/bodyScrollLock';
 import Modal from './Modal';
 
 describe('Modal', () => {
+  it('focuses the dialog without scrolling the page', () => {
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+    render(
+      <Modal open title="Edit section" onClose={() => {}}>
+        <input aria-label="Section name" />
+      </Modal>,
+    );
+
+    expect(screen.getByRole('textbox', { name: 'Section name' })).toHaveFocus();
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    focus.mockRestore();
+  });
+
   it('renders the dialog, title, and footer', () => {
     render(
       <Modal

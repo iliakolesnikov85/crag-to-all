@@ -1,5 +1,6 @@
 import React from 'react';
 import { MdAddPhotoAlternate } from 'react-icons/md';
+import './SectorTopoInput.scss';
 
 const TOPO_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
 
@@ -36,7 +37,7 @@ const SectorTopoInput: React.FC<SectorTopoInputProps> = ({
       ) : (
         <>
           <MdAddPhotoAlternate className="sector-map-info__topo-icon" aria-hidden="true" />
-          <span className="sector-map-info__topo-label">Add topo</span>
+          <span className="sector-map-info__topo-label">Add topo image</span>
         </>
       )}
       <input

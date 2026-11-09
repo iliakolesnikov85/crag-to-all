@@ -30,7 +30,9 @@ const MapPage: React.FC<MapPageProps> = ({ cragData, onSectorGeoSaved, onSectorC
   }, [cragData.sectors, onSectorCreated, resetFilters]);
 
   // Map fills the viewport; body scroll only causes rubber-banding / accidental pans.
+  // Start at the top so the lock freezes the map, not whatever offset the previous page had.
   React.useEffect(() => {
+    window.scrollTo(0, 0);
     setBodyScrollLock(true);
     return () => setBodyScrollLock(false);
   }, []);

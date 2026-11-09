@@ -1,7 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import { uploadCragImage } from '../api/client';
 import { useDeleteSector, usePatchSector } from '../api/useCragMutations';
 import { canEditCrag } from '../api/permissions';
+import AddTopoModal from '../components/AddTopoModal';
 import DrawRouteModal from '../components/DrawRouteModal';
 import SectorDetailsModal from '../components/SectorDetailsModal';
 import RouteDetailsModal from '../components/RouteDetailsModal';
@@ -10,7 +12,7 @@ import SectorOptionsMenu from '../components/SectorOptionsMenu';
 import SectorView from '../components/SectorView';
 import { confirm } from '../context/ConfirmContext';
 import { useCrag } from '../context/CragContext';
-import { Image, Route, Sector, type LinePoint } from '../types';
+import { Image, Route, Sector, type LatLng, type LinePoint } from '../types';
 import type { SectorDetailsPatch } from '../utils/sectorDetails';
 import { moveRouteOnImage, removeRouteFromImage, setRouteLineOnImage } from '../utils/routeOrder';
 import { moveTopoImage, removeTopoImage } from '../utils/topoImages';
@@ -79,12 +81,17 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
   const [routeListError, setRouteListError] = useState<string | null>(null);
   const [routeEditError, setRouteEditError] = useState<string | null>(null);
   const [routeDrawError, setRouteDrawError] = useState<string | null>(null);
+  const [addingTopo, setAddingTopo] = useState(false);
+  const [addTopoSectorId, setAddTopoSectorId] = useState<string | null>(null);
+  const [addTopoError, setAddTopoError] = useState<string | null>(null);
+  const [topoSaving, setTopoSaving] = useState(false);
+  const topoSavingRef = useRef(false);
   const requestedName = (sectorName || '').toLowerCase();
   const sector = sectors.find((item) => item.name.toLowerCase() === requestedName);
   const editing = editingSector !== null && sector?.id === editingSector.id;
   const canEdit = canEditCrag(crag);
   const saving = patchSectorMutation.isPending;
-  const menusDisabled = deleteSectorMutation.isPending || saving;
+  const menusDisabled = deleteSectorMutation.isPending || saving || topoSaving;
 
   const clearRouteSession = useCallback(() => {
     setRoutesOpen(false);
@@ -130,6 +137,14 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
     clearRouteSession();
   }, [clearRouteSession, routesOpen, routeEditor, routeDraw, routesSectorId, sector?.id]);
 
+  useEffect(() => {
+    if (!addingTopo) return;
+    if (sector?.id != null && sector.id === addTopoSectorId) return;
+    setAddingTopo(false);
+    setAddTopoSectorId(null);
+    setAddTopoError(null);
+  }, [addingTopo, addTopoSectorId, sector?.id]);
+
   const handleDelete = async () => {
     if (!sector || deleteSectorMutation.isPending) return;
     if (!canEdit) {
@@ -164,6 +179,15 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
     setHeaderError(null);
     setEditError(null);
     setEditingSector(target);
+  };
+
+  const openAddTopo = () => {
+    const target = requireEditable();
+    if (!target) return;
+    setHeaderError(null);
+    setAddTopoError(null);
+    setAddTopoSectorId(target.id);
+    setAddingTopo(true);
   };
 
   const captureRouteBaseline = (): boolean => {
@@ -330,6 +354,33 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
     });
   };
 
+  const handleAddTopo = async (file: File, geo: LatLng | null) => {
+    const target = requireEditable();
+    if (!target || topoSavingRef.current || saving) return;
+    topoSavingRef.current = true;
+    setTopoSaving(true);
+    setAddTopoError(null);
+    try {
+      const uploaded = await uploadCragImage(crag.cragId, file);
+      const images = [...target.images, { imageFile: uploaded.imageFile }];
+      const moveToPhoto = target.images.length === 0 && geo != null;
+      const saved = await patchSectorMutation.mutateAsync({
+        sectorId: target.id,
+        version: target.version,
+        patch: moveToPhoto ? { images, geo } : { images },
+      });
+      rememberSavedSector(target.id, saved);
+      setAddingTopo(false);
+      setAddTopoSectorId(null);
+    } catch (error) {
+      console.error('Failed to add topo image:', error);
+      setAddTopoError(error instanceof Error ? error.message : 'Failed to add topo image');
+    } finally {
+      topoSavingRef.current = false;
+      setTopoSaving(false);
+    }
+  };
+
   const saveTopoImages = async (target: EditableSector, images: Image[]) => {
     if (saving) return;
     setHeaderError(null);
@@ -478,6 +529,7 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
               disabled={menusDisabled}
               canDelete={sector.images.length === 0}
               onEdit={openEdit}
+              onAddTopo={openAddTopo}
               onRoutes={openRoutes}
               onDelete={() => void handleDelete()}
             />
@@ -505,6 +557,21 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
             {children}
           </Link>
         )}
+      />
+      <AddTopoModal
+        key={addTopoSectorId ?? 'add-topo'}
+        open={addingTopo}
+        offerPhotoLocation={sector.images.length === 0}
+        currentGeo={sector.geo}
+        saving={topoSaving || saving}
+        error={addTopoError}
+        onClose={() => {
+          if (topoSaving || saving) return;
+          setAddingTopo(false);
+          setAddTopoSectorId(null);
+          setAddTopoError(null);
+        }}
+        onSave={(file, geo) => void handleAddTopo(file, geo)}
       />
       <SectorDetailsModal
         key={editing ? 'editing' : 'idle'}

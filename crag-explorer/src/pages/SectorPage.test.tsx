@@ -2,13 +2,14 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { useState } from 'react';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { deleteSector, patchSectorGeo } from '../api/client';
+import { deleteSector, patchSectorGeo, uploadCragImage } from '../api/client';
 import { canEditCrag } from '../api/permissions';
 import { createAppQueryClient, queryKeys } from '../api/queryClient';
 import { CragContext } from '../context/CragContext';
 import { chooseConfirm, withQueryClient } from '../test/helpers';
 import { SAMPLE_CRAG_ID, sampleCragData } from '../test/fixtures/cragData';
 import type { CragData, Sector } from '../types';
+import { readTopoGps } from '../utils/topoImage';
 import SectorPage from './SectorPage';
 
 vi.mock('../api/permissions', () => ({
@@ -18,7 +19,16 @@ vi.mock('../api/permissions', () => ({
 vi.mock('../api/client', () => ({
   deleteSector: vi.fn(),
   patchSectorGeo: vi.fn(),
+  uploadCragImage: vi.fn(),
 }));
+
+vi.mock('../utils/topoImage', async () => {
+  const actual = await vi.importActual<typeof import('../utils/topoImage')>('../utils/topoImage');
+  return {
+    ...actual,
+    readTopoGps: vi.fn(async () => null),
+  };
+});
 
 const cragValue = {
   crag: { cragId: SAMPLE_CRAG_ID, cragName: 'Test Crag' },
@@ -715,7 +725,7 @@ describe('SectorPage routes', () => {
     );
   });
 
-  it('opens route details from the route gear menu and saves them', async () => {
+  it('opens route details from the route options menu and saves them', async () => {
     vi.mocked(patchSectorGeo).mockResolvedValue({ ...ratedRoute, version: 3 });
     renderDeletable(ratedRoute);
 
@@ -841,7 +851,7 @@ describe('SectorPage routes', () => {
     );
   });
 
-  it('redraws a route line from the gear menu and saves that topo only', async () => {
+  it('redraws a route line from the options menu and saves that topo only', async () => {
     const classic = {
       ...ratedRoute.routes[0],
       images: [
@@ -920,7 +930,7 @@ describe('SectorPage routes', () => {
     });
   });
 
-  it('removes a route from one topo image from the gear menu', async () => {
+  it('removes a route from one topo image from the options menu', async () => {
     const classic = {
       ...ratedRoute.routes[0],
       images: [
@@ -1225,5 +1235,99 @@ describe('SectorPage topo images', () => {
         images: [topoSector.images[0], topoSector.images[2], topoSector.images[1]],
       });
     });
+  });
+});
+
+function jpegFile(): File {
+  const bytes = new Uint8Array(12);
+  bytes[0] = 0xff;
+  bytes[1] = 0xd8;
+  bytes[2] = 0xff;
+  return new File([bytes], 'topo.jpg', { type: 'image/jpeg' });
+}
+
+function openAddTopo(): void {
+  fireEvent.click(screen.getByRole('button', { name: 'Sector options' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Add topo image' }));
+}
+
+describe('SectorPage add topo', () => {
+  beforeEach(() => {
+    vi.mocked(canEditCrag).mockReturnValue(true);
+    vi.mocked(deleteSector).mockReset();
+    vi.mocked(patchSectorGeo).mockReset();
+    vi.mocked(uploadCragImage).mockReset();
+    vi.mocked(readTopoGps).mockReset();
+    vi.mocked(readTopoGps).mockResolvedValue(null);
+  });
+
+  it('adds another topo without asking about the photo location', async () => {
+    vi.mocked(readTopoGps).mockResolvedValue({ lat: 41.1, lon: 44.2 });
+    vi.mocked(uploadCragImage).mockResolvedValue({ imageFile: 'new-topo.jpg' });
+    vi.mocked(patchSectorGeo).mockResolvedValue({ ...editableSector, version: 3 });
+    renderDeletable(editableSector);
+
+    openAddTopo();
+    expect(screen.getByRole('dialog', { name: 'Add topo image' })).toBeInTheDocument();
+    const file = jpegFile();
+    fireEvent.change(screen.getByLabelText('Topo image'), { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+    });
+    expect(readTopoGps).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: 'Use photo location?' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(uploadCragImage).toHaveBeenCalledWith(SAMPLE_CRAG_ID, file);
+    });
+    expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+      images: [...editableSector.images, { imageFile: 'new-topo.jpg' }],
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Add topo image' })).not.toBeInTheDocument();
+    });
+  });
+
+  it('moves a sector with no topos when the photo location is used', async () => {
+    const photo = { lat: 41.1, lon: 44.2 };
+    vi.mocked(readTopoGps).mockResolvedValue(photo);
+    vi.mocked(uploadCragImage).mockResolvedValue({ imageFile: 'new-topo.jpg' });
+    vi.mocked(patchSectorGeo).mockResolvedValue({ ...editableSector, images: [], version: 3 });
+    renderDeletable({ ...editableSector, images: [] });
+
+    openAddTopo();
+    fireEvent.change(screen.getByLabelText('Topo image'), { target: { files: [jpegFile()] } });
+    expect(await screen.findByRole('dialog', { name: 'Use photo location?' })).toHaveTextContent(
+      'Use that location for this sector?',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use photo location' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+        images: [{ imageFile: 'new-topo.jpg' }],
+        geo: photo,
+      });
+    });
+  });
+
+  it('keeps the dialog open when the upload fails', async () => {
+    vi.mocked(uploadCragImage).mockRejectedValue(new Error('Failed to upload image (500)'));
+    renderDeletable({ ...editableSector, images: [] });
+
+    openAddTopo();
+    fireEvent.change(screen.getByLabelText('Topo image'), { target: { files: [jpegFile()] } });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Failed to upload image (500)');
+    expect(screen.getByRole('dialog', { name: 'Add topo image' })).toBeInTheDocument();
+    expect(patchSectorGeo).not.toHaveBeenCalled();
   });
 });
