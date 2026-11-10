@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { patchSectorGeo } from '../api/client';
+import { patchSector } from '../api/client';
 import { CragContext } from '../context/CragContext';
 import { withQueryClient } from '../test/helpers';
 import { SAMPLE_CRAG_ID, sampleCragData } from '../test/fixtures/cragData';
@@ -50,7 +50,7 @@ function renderEditors() {
 
 describe('useDetailsEditors saveRoute', () => {
   beforeEach(() => {
-    vi.mocked(patchSectorGeo).mockReset();
+    vi.mocked(patchSector).mockReset();
   });
 
   it('refuses to add a route when the sector is no longer loaded', () => {
@@ -62,7 +62,7 @@ describe('useDetailsEditors saveRoute', () => {
 
     expect(screen.getByRole('dialog', { name: 'Add route' })).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(MISSING_SECTOR_MESSAGE);
-    expect(patchSectorGeo).not.toHaveBeenCalled();
+    expect(patchSector).not.toHaveBeenCalled();
   });
 
   it('refuses to edit a route when the sector is no longer loaded', () => {
@@ -73,6 +73,6 @@ describe('useDetailsEditors saveRoute', () => {
 
     expect(screen.getByRole('dialog', { name: 'Edit route' })).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(MISSING_SECTOR_MESSAGE);
-    expect(patchSectorGeo).not.toHaveBeenCalled();
+    expect(patchSector).not.toHaveBeenCalled();
   });
 });

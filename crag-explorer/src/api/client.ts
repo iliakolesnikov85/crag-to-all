@@ -1,4 +1,4 @@
-import type { Crag, CragData, DescriptionSection, Image, LatLng, Route, Sector } from '../types';
+import type { Crag, CragData, CragMapMarker, DescriptionSection, Image, LatLng, Route, Sector } from '../types';
 import { getAccessToken } from './auth';
 
 const CRAGS_PATH = '/api/crags';
@@ -37,6 +37,17 @@ function isSectorGeo(geo: unknown): geo is LatLng | null {
   return typeof point.lat === 'number' && typeof point.lon === 'number';
 }
 
+function isCragMapMarker(value: unknown): value is CragMapMarker {
+  if (!value || typeof value !== 'object') return false;
+  const marker = value as Partial<CragMapMarker>;
+  const geo = marker.geo;
+  return typeof marker.type === 'string'
+    && typeof marker.info === 'string'
+    && geo != null
+    && typeof geo.lat === 'number'
+    && typeof geo.lon === 'number';
+}
+
 async function readSectorResponse(response: Response): Promise<Sector> {
   const body = (await response.json()) as Partial<Sector>;
   if (
@@ -48,6 +59,39 @@ async function readSectorResponse(response: Response): Promise<Sector> {
     throw new Error('Sector save returned an unexpected response');
   }
   return body as Sector;
+}
+
+export interface CragPatch {
+  description?: DescriptionSection[];
+  markers?: readonly CragMapMarker[];
+}
+
+export interface CragPatchResult {
+  description?: DescriptionSection[];
+  markers?: CragMapMarker[];
+  version: number;
+}
+
+export interface SectorPatch {
+  name?: string;
+  geo?: LatLng;
+  season?: string | null;
+  approachTime?: string | null;
+  altitude?: string | null;
+  orientation?: string | null;
+  timeInSun?: string | null;
+  routes?: Route[];
+  /**
+   * Full replacement of the sector's topo images, in display order.
+   * The server drops route image refs for a file that no longer appears here.
+   */
+  images?: Image[];
+}
+
+export interface CreateSectorInput {
+  name: string;
+  geo: LatLng;
+  images?: Array<{ imageFile: string }>;
 }
 
 /** Resolve an API path. An empty VITE_API_BASE_URL keeps the path relative so the dev proxy can forward it. */
@@ -92,53 +136,46 @@ export async function getCrag(cragId: string, init?: RequestInit): Promise<CragD
   return response.json() as Promise<CragData>;
 }
 
-export interface DescriptionPatchResult {
-  description: DescriptionSection[];
-  version: number;
-}
-
-export async function patchCragDescription(
+export async function patchCrag(
   cragId: string,
   version: number,
-  description: DescriptionSection[],
-): Promise<DescriptionPatchResult> {
+  patch: CragPatch,
+): Promise<CragPatchResult> {
   const response = await apiFetch(cragDocumentPath(cragId), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ version, description }),
+    body: JSON.stringify({ version, ...patch }),
   });
   if (!response.ok) {
     throw new Error(
-      await readErrorMessage(response, `Failed to save description (${response.status})`),
+      await readErrorMessage(response, `Failed to save crag (${response.status})`),
     );
   }
-  const body = (await response.json()) as { description?: unknown; version?: unknown };
-  if (!Array.isArray(body.description) || typeof body.version !== 'number') {
-    throw new Error('Description save returned an unexpected response');
-  }
-  return {
-    description: body.description as DescriptionSection[],
-    version: body.version,
+  const body = (await response.json()) as {
+    description?: unknown;
+    markers?: unknown;
+    version?: unknown;
   };
+  if (typeof body.version !== 'number') {
+    throw new Error('Crag save returned an unexpected response');
+  }
+  const saved: CragPatchResult = { version: body.version };
+  if (patch.description !== undefined) {
+    if (!Array.isArray(body.description)) {
+      throw new Error('Crag save returned an unexpected response');
+    }
+    saved.description = body.description as DescriptionSection[];
+  }
+  if (patch.markers !== undefined) {
+    if (!Array.isArray(body.markers) || !body.markers.every(isCragMapMarker)) {
+      throw new Error('Crag save returned an unexpected response');
+    }
+    saved.markers = body.markers;
+  }
+  return saved;
 }
 
-export interface SectorPatch {
-  name?: string;
-  geo?: LatLng;
-  season?: string | null;
-  approachTime?: string | null;
-  altitude?: string | null;
-  orientation?: string | null;
-  timeInSun?: string | null;
-  routes?: Route[];
-  /**
-   * Full replacement of the sector's topo images, in display order.
-   * The server drops route image refs for a file that no longer appears here.
-   */
-  images?: Image[];
-}
-
-export async function patchSectorGeo(
+export async function patchSector(
   cragId: string,
   sectorId: string,
   version: number,
@@ -162,12 +199,6 @@ export async function patchSectorGeo(
     );
   }
   return readSectorResponse(response);
-}
-
-export interface CreateSectorInput {
-  name: string;
-  geo: LatLng;
-  images?: Array<{ imageFile: string }>;
 }
 
 export async function uploadCragImage(

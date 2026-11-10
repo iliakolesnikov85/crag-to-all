@@ -1,10 +1,12 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import type { CragData, DescriptionSection, Sector } from '../types';
+import type { CragData, Sector } from '../types';
 import {
   createSector,
   deleteSector,
-  patchCragDescription,
-  patchSectorGeo,
+  patchCrag,
+  patchSector,
+  type CragPatch,
+  type CragPatchResult,
   type CreateSectorInput,
   type SectorPatch,
 } from './client';
@@ -28,13 +30,17 @@ function writeCragData(
   );
 }
 
-function replaceCragDescription(
+function applyCragPatch(
   queryClient: QueryClient,
   cragId: string,
-  description: DescriptionSection[],
-  version: number,
+  saved: CragPatchResult,
 ): void {
-  writeCragData(queryClient, cragId, (current) => ({ ...current, description, version }));
+  writeCragData(queryClient, cragId, (current) => ({
+    ...current,
+    ...(saved.description !== undefined ? { description: saved.description } : {}),
+    ...(saved.markers !== undefined ? { markers: saved.markers } : {}),
+    version: saved.version,
+  }));
 }
 
 function replaceSector(queryClient: QueryClient, cragId: string, sector: Sector): void {
@@ -61,14 +67,14 @@ function removeSector(queryClient: QueryClient, cragId: string, sectorId: string
   }));
 }
 
-export function usePatchCragDescription(cragId: string) {
+export function usePatchCrag(cragId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { version: number; description: DescriptionSection[] }) =>
-      patchCragDescription(cragId, input.version, input.description),
+    mutationFn: ({ version, ...patch }: { version: number } & CragPatch) =>
+      patchCrag(cragId, version, patch),
     onMutate: () => cancelInFlightCragFetch(queryClient, cragId),
     onSuccess: (saved) => {
-      replaceCragDescription(queryClient, cragId, saved.description, saved.version);
+      applyCragPatch(queryClient, cragId, saved);
     },
   });
 }
@@ -80,7 +86,7 @@ export function usePatchSector(cragId: string) {
       sectorId: string;
       version: number;
       patch: SectorPatch;
-    }) => patchSectorGeo(cragId, input.sectorId, input.version, input.patch),
+    }) => patchSector(cragId, input.sectorId, input.version, input.patch),
     onMutate: () => cancelInFlightCragFetch(queryClient, cragId),
     onSuccess: (sector) => {
       replaceSector(queryClient, cragId, sector);

@@ -35,6 +35,10 @@ function hashedImageFileName(buffer: Buffer, ext: string): string {
 
 export { IMAGE_FIELD_NAME, MAX_IMAGE_BYTES };
 
+export const imageUploadMiddleware: RequestHandler = (req, res, next) => {
+  upload.single(IMAGE_FIELD_NAME)(req, res, next);
+};
+
 export interface ParsedImageUpload {
   buffer: Buffer;
   imageFile: string;
@@ -59,7 +63,3 @@ export function parseUploadedImage(file: Express.Multer.File | undefined): Parse
     contentType: detected.contentType,
   };
 }
-
-export const imageUploadMiddleware: RequestHandler = (req, res, next) => {
-  upload.single(IMAGE_FIELD_NAME)(req, res, next);
-};

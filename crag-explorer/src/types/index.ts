@@ -1,4 +1,4 @@
-export { CRAG_DATA_PROTOCOL, ROUTE_TYPES } from '@crag-to-all/shared-crag';
+export { CRAG_DATA_PROTOCOL, CRAG_MAP_MARKER_TYPES, ROUTE_TYPES } from '@crag-to-all/shared-crag';
 export type {
   LatLng,
   Sector,

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MdDelete, MdEdit } from 'react-icons/md';
-import { usePatchCragDescription } from '../api/useCragMutations';
+import { usePatchCrag } from '../api/useCragMutations';
 import { canEditCrag } from '../api/permissions';
 import Button from '../components/Button';
 import DescriptionSectionModal from '../components/DescriptionSectionModal';
@@ -38,14 +38,14 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
   version,
 }) => {
   const { crag } = useCrag();
-  const patchDescription = usePatchCragDescription(crag.cragId);
+  const patchCrag = usePatchCrag(crag.cragId);
   const [editor, setEditor] = useState<SectionEditor | null>(null);
   const [baseline, setBaseline] = useState<DescriptionBaseline | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const canEdit = canEditCrag(crag);
-  const pending = patchDescription.isPending;
+  const pending = patchCrag.isPending;
   const editingSection = editor?.mode === 'edit'
     ? (baseline?.description ?? description)[editor.index]
     : undefined;
@@ -91,7 +91,7 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
 
     setSaveError(null);
     try {
-      await patchDescription.mutateAsync({ version: baseline.version, description: next });
+      await patchCrag.mutateAsync({ version: baseline.version, description: next });
       setEditor(null);
       setBaseline(null);
     } catch (error) {
@@ -122,7 +122,7 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
     setActionError(null);
     try {
       const next = description.filter((_, itemIndex) => itemIndex !== index);
-      await patchDescription.mutateAsync({ version, description: next });
+      await patchCrag.mutateAsync({ version, description: next });
     } catch (error) {
       console.error('Failed to remove description section:', error);
       setActionError(

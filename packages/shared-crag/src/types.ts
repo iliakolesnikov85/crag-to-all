@@ -2,6 +2,7 @@ export const CRAG_MAP_MARKER_TYPES = [
   'parking_space',
   'water_tap',
   'camping',
+  'wc',
   'unknown',
 ] as const;
 

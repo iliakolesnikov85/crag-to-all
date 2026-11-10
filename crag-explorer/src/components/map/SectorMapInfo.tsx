@@ -1,5 +1,5 @@
 import React from 'react';
-import { MdEdit, MdInfoOutline, MdLocationOn } from 'react-icons/md';
+import { MdInfoOutline } from 'react-icons/md';
 import { Link } from 'react-router';
 import { useCrag } from '../../context/CragContext';
 import type { SectorEditor } from '../../hooks/useSectorEditor';
@@ -7,47 +7,19 @@ import type { LatLng, Sector } from '../../types';
 import { getCragImageUrl } from '../../utils/firebaseStorage';
 import {
   formatSectorCoordinate,
-  formatSectorCoordinatePair,
   parseLatitude,
   parseLongitude,
 } from '../../utils/map/sectorCoordinates';
 import { sectorMarkerKey, type SectorEditState } from '../../utils/map/sectorEditState';
 import Button from '../Button';
 import PhotoLocationPrompt from '../PhotoLocationPrompt';
+import { keepPinEditFocus, MapCoordinates, MapCoordinatesEditor, onPinEditKeyDown } from './MapCoordinatesEditor';
 import SectorTopoInput from './SectorTopoInput';
 import { useTopoFile } from './useTopoFile';
 import './SectorMapInfo.scss';
 
 const SECTOR_MAP_INFO_MAX_ROUTES = 4;
 const SECTOR_MARKER_DRAG_HINT = 'You can drag the marker on the map to move it.';
-
-/** Blur would commit the draft and re-render before click, so the button can move
- * out from under the pointer. Keeping focus lets Apply and Cancel receive the click. */
-function keepFocus(event: React.MouseEvent<HTMLElement>): void {
-  event.preventDefault();
-}
-
-function onEditKeyDown(
-  event: React.KeyboardEvent<HTMLDivElement>,
-  editor: SectorEditor,
-  blockApply = false,
-): void {
-  // Esc must cancel the edit without also leaving map fullscreen.
-  event.stopPropagation();
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    if (!blockApply) editor.apply();
-  } else if (event.key === 'Escape') {
-    event.preventDefault();
-    editor.cancel();
-  }
-}
-
-function coordinateInputClass(invalid: boolean): string {
-  return invalid
-    ? 'sector-map-info__coord-input sector-map-info__coord-input--invalid'
-    : 'sector-map-info__coord-input';
-}
 
 function nameInputClass(invalid: boolean): string {
   return invalid
@@ -60,98 +32,6 @@ function editedGeo(edit: SectorEditState): LatLng | null {
   const lon = parseLongitude(edit.lonText);
   if (!lat.ok || !lon.ok) return null;
   return { lat: lat.value, lon: lon.value };
-}
-
-function SectorCoordinatesEditor({
-  edit,
-  editor,
-  blockApply,
-}: {
-  edit: SectorEditState;
-  editor: SectorEditor;
-  blockApply: boolean;
-}) {
-  const disabled = edit.saving;
-  return (
-    <div
-      className="sector-map-info__coords sector-map-info__coords--editing"
-      aria-busy={disabled || undefined}
-      onKeyDown={(event) => onEditKeyDown(event, editor, blockApply)}
-    >
-      <MdLocationOn className="sector-map-info__coords-pin" aria-hidden="true" />
-      <div className="sector-map-info__coords-fields">
-        <label className="sector-map-info__coord">
-          <span className="sector-map-info__coord-label">Latitude</span>
-          <input
-            className={coordinateInputClass(edit.latError != null)}
-            aria-label="Latitude"
-            inputMode="decimal"
-            autoComplete="off"
-            spellCheck={false}
-            disabled={disabled}
-            value={edit.latText}
-            onChange={(event) => editor.setLatText(event.target.value)}
-            onBlur={() => editor.commitDraft()}
-          />
-        </label>
-        <label className="sector-map-info__coord">
-          <span className="sector-map-info__coord-label">Longitude</span>
-          <input
-            className={coordinateInputClass(edit.lonError != null)}
-            aria-label="Longitude"
-            inputMode="decimal"
-            autoComplete="off"
-            spellCheck={false}
-            disabled={disabled}
-            value={edit.lonText}
-            onChange={(event) => editor.setLonText(event.target.value)}
-            onBlur={() => editor.commitDraft()}
-          />
-        </label>
-      </div>
-      {(edit.latError || edit.lonError || edit.saveError) ? (
-        <div className="sector-map-info__coords-errors" role="alert">
-          {edit.latError ? <p>{edit.latError}</p> : null}
-          {edit.lonError ? <p>{edit.lonError}</p> : null}
-          {edit.saveError ? <p>{edit.saveError}</p> : null}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function SectorCoordinates({
-  sector,
-  onEdit,
-}: {
-  sector: Sector;
-  /** Present when this sector's pin can be moved. */
-  onEdit: (() => void) | null;
-}) {
-  if (!sector.geo) return null;
-
-  return (
-    <div className="sector-map-info__coords">
-      <MdLocationOn className="sector-map-info__coords-pin" aria-hidden="true" />
-      <span className="sector-map-info__coords-value">{formatSectorCoordinatePair(sector.geo)}</span>
-      {onEdit ? (
-        <div className="sector-map-info__coords-actions">
-          <Button
-            type="button"
-            iconOnly
-            size="sm"
-            variant="ghost"
-            aria-label={`Edit sector ${sector.name}`}
-            title="Edit sector"
-            onMouseDown={keepFocus}
-            onClick={onEdit}
-          >
-            <MdEdit />
-          </Button>
-        </div>
-      ) : null}
-    </div>
-  );
 }
 
 export interface SectorMapInfoProps {
@@ -208,7 +88,7 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
       {editing ? (
         <div
           className="sector-map-info__name-edit"
-          onKeyDown={(event) => onEditKeyDown(event, editor, waitForPhotoLocation)}
+          onKeyDown={(event) => onPinEditKeyDown(event, editor, waitForPhotoLocation)}
         >
           <label className="sector-map-info__name-field">
             <span className="sector-map-info__name-label">Name</span>
@@ -259,7 +139,7 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
         <div className="sector-map-info__details">
           {editing ? (
             <>
-              <SectorCoordinatesEditor edit={edit} editor={editor} blockApply={waitForPhotoLocation} />
+              <MapCoordinatesEditor edit={edit} actions={editor} blockApply={waitForPhotoLocation} />
               <p className="sector-map-info__hint">
                 <MdInfoOutline className="sector-map-info__hint-icon" aria-hidden="true" />
                 <span>{SECTOR_MARKER_DRAG_HINT}</span>
@@ -271,7 +151,7 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
                   variant="primary"
                   aria-label={isNew ? 'Create sector' : `Save sector ${displayName}`}
                   disabled={edit.saving || waitForPhotoLocation}
-                  onMouseDown={keepFocus}
+                  onMouseDown={keepPinEditFocus}
                   onClick={() => {
                     if (waitForPhotoLocation) return;
                     editor.apply();
@@ -285,7 +165,7 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
                   variant="secondary"
                   aria-label={isNew ? 'Discard new sector' : `Cancel sector edit for ${displayName}`}
                   disabled={edit.saving}
-                  onMouseDown={keepFocus}
+                  onMouseDown={keepPinEditFocus}
                   onClick={() => editor.cancel()}
                 >
                   Cancel
@@ -294,10 +174,14 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
             </>
           ) : (
             <>
-              <SectorCoordinates
-                sector={sector}
-                onEdit={canStartEdit ? () => editor.startEdit(sector) : null}
-              />
+              {sector.geo ? (
+                <MapCoordinates
+                  geo={sector.geo}
+                  editLabel={`Edit sector ${sector.name}`}
+                  editTitle="Edit sector"
+                  onEdit={canStartEdit ? () => editor.startEdit(sector) : null}
+                />
+              ) : null}
               <div className="sector-map-info__routes">
                 {visible.map((route) => (
                   <div key={`${route.name}-${route.grade}`} className="sector-map-info__route">

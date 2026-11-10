@@ -22,6 +22,7 @@ describe('generateGPX', () => {
     ];
     const markers: CragMapMarker[] = [
       { type: 'parking_space', info: 'Lot A', geo: { lat: 44.0, lon: 6.0 } },
+      { type: 'wc', info: 'By the barn', geo: { lat: 44.02, lon: 6.02 } },
     ];
     const gpx = generateGPX(
       [sector('Cave', { lat: 44.1, lon: 6.2 })],
@@ -41,6 +42,9 @@ describe('generateGPX', () => {
     expect(gpx).toContain('<type>crag-map:parking_space</type>');
     expect(gpx).toContain('<name>Parking: Lot A</name>');
     expect(gpx).toContain('<sym>Parking Area</sym>');
+    expect(gpx).toContain('<type>crag-map:wc</type>');
+    expect(gpx).toContain('<name>WC: By the barn</name>');
+    expect(gpx).toContain('<sym>Restroom</sym>');
     expect(gpx).toContain('<name>Trail: Approach</name>');
     expect(gpx).toContain('<type>crag-trail</type>');
     expect(gpx).toContain('<trkpt lat="44.1" lon="6.2"></trkpt>');

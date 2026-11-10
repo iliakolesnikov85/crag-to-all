@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { patchCragDescription } from '../api/client';
+import { patchCrag } from '../api/client';
 import { canEditCrag } from '../api/permissions';
 import { createAppQueryClient, queryKeys } from '../api/queryClient';
 import { CragContext } from '../context/CragContext';
@@ -16,7 +16,7 @@ vi.mock('../api/permissions', () => ({
 }));
 
 vi.mock('../api/client', () => ({
-  patchCragDescription: vi.fn(),
+  patchCrag: vi.fn(),
 }));
 
 vi.mock('../components/RichTextInput', () => ({
@@ -74,7 +74,7 @@ function renderPage(description: DescriptionSection[] = sections, version?: numb
 describe('DescriptionPage', () => {
   beforeEach(() => {
     vi.mocked(canEditCrag).mockReturnValue(true);
-    vi.mocked(patchCragDescription).mockReset();
+    vi.mocked(patchCrag).mockReset();
   });
 
   it('renders every section and HTML paragraph', () => {
@@ -119,8 +119,8 @@ describe('DescriptionPage', () => {
   });
 
   it('saves an edited section through the API', async () => {
-    vi.mocked(patchCragDescription).mockImplementation(async (_cragId, _version, description) => ({
-      description,
+    vi.mocked(patchCrag).mockImplementation(async (_cragId, _version, patch) => ({
+      description: patch.description,
       version: 4,
     }));
     const client = renderPage(sections, 3);
@@ -136,7 +136,7 @@ describe('DescriptionPage', () => {
       sections[1],
     ];
     await waitFor(() => {
-      expect(patchCragDescription).toHaveBeenCalledWith(CRAG_ID, 3, saved);
+      expect(patchCrag).toHaveBeenCalledWith(CRAG_ID, 3, { description: saved });
     });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(client.getQueryData<CragData>(queryKeys.crag(CRAG_ID))).toMatchObject({
@@ -168,8 +168,8 @@ describe('DescriptionPage', () => {
       );
     }
 
-    vi.mocked(patchCragDescription).mockImplementation(async (_cragId, _version, description) => ({
-      description,
+    vi.mocked(patchCrag).mockImplementation(async (_cragId, _version, patch) => ({
+      description: patch.description,
       version: 4,
     }));
     render(
@@ -188,10 +188,12 @@ describe('DescriptionPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
-      expect(patchCragDescription).toHaveBeenCalledWith(CRAG_ID, 3, [
-        { subheader: 'Approach', paragraphs: [paragraphsToHtml(sections[0].paragraphs)] },
-        sections[1],
-      ]);
+      expect(patchCrag).toHaveBeenCalledWith(CRAG_ID, 3, {
+        description: [
+          { subheader: 'Approach', paragraphs: [paragraphsToHtml(sections[0].paragraphs)] },
+          sections[1],
+        ],
+      });
     });
   });
 
@@ -207,7 +209,7 @@ describe('DescriptionPage', () => {
     });
     expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled();
 
-    vi.mocked(patchCragDescription).mockRejectedValue(new Error('version conflict'));
+    vi.mocked(patchCrag).mockRejectedValue(new Error('version conflict'));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('version conflict');
@@ -228,7 +230,7 @@ describe('DescriptionPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     expect(within(dialog).getByRole('alert')).toHaveTextContent('20000 characters or fewer');
-    expect(patchCragDescription).not.toHaveBeenCalled();
+    expect(patchCrag).not.toHaveBeenCalled();
   });
 
   it('refuses to save when the guard returns false', () => {
@@ -238,7 +240,7 @@ describe('DescriptionPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('permission');
-    expect(patchCragDescription).not.toHaveBeenCalled();
+    expect(patchCrag).not.toHaveBeenCalled();
   });
 
   it('shows an error instead of saving when the crag has no version', () => {
@@ -247,12 +249,12 @@ describe('DescriptionPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('no version');
-    expect(patchCragDescription).not.toHaveBeenCalled();
+    expect(patchCrag).not.toHaveBeenCalled();
   });
 
   it('removes a section after confirmation', async () => {
-    vi.mocked(patchCragDescription).mockImplementation(async (_cragId, _version, description) => ({
-      description,
+    vi.mocked(patchCrag).mockImplementation(async (_cragId, _version, patch) => ({
+      description: patch.description,
       version: 4,
     }));
     const client = renderPage(sections, 3);
@@ -262,7 +264,7 @@ describe('DescriptionPage', () => {
     chooseConfirm('Remove section', 'Remove');
 
     await waitFor(() => {
-      expect(patchCragDescription).toHaveBeenCalledWith(CRAG_ID, 3, [sections[1]]);
+      expect(patchCrag).toHaveBeenCalledWith(CRAG_ID, 3, { description: [sections[1]] });
     });
     expect(client.getQueryData<CragData>(queryKeys.crag(CRAG_ID))).toMatchObject({
       version: 4,
@@ -280,7 +282,7 @@ describe('DescriptionPage', () => {
     );
     chooseConfirm('Remove section', 'Cancel');
 
-    expect(patchCragDescription).not.toHaveBeenCalled();
+    expect(patchCrag).not.toHaveBeenCalled();
     expect(screen.getByRole('heading', { name: 'Season' })).toBeInTheDocument();
   });
 });

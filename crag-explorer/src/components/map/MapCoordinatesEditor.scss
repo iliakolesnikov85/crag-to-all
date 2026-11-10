@@ -1,0 +1,142 @@
+.map-coordinates {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.35rem;
+}
+
+.map-coordinates__pin {
+  display: block;
+  flex-shrink: 0;
+  width: 1.05rem;
+  height: 1.05rem;
+  color: #555;
+}
+
+.map-coordinates--editing {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  grid-template-rows: auto auto;
+  justify-content: start;
+  column-gap: 0.35rem;
+  row-gap: 0.1rem;
+  align-items: center;
+}
+
+.map-coordinates--editing .map-coordinates__pin {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.map-coordinates--editing .map-coordinates__fields {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-template-columns: 7.25rem 7.25rem;
+  column-gap: 0.35rem;
+}
+
+.map-coordinates--editing .map-coordinates__field {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: 1 / span 2;
+  width: auto;
+  gap: 0;
+}
+
+.map-coordinates--editing .map-coordinates__errors {
+  grid-column: 1 / -1;
+  grid-row: 3;
+}
+
+.map-coordinates__value {
+  font-variant-numeric: tabular-nums;
+  color: #333;
+}
+
+.map-coordinates__fields {
+  display: flex;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.map-coordinates__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  width: 7.25rem;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.map-coordinates__label {
+  font-size: 0.7rem;
+  line-height: 1.1;
+  color: #666;
+}
+
+.map-coordinates__input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  color: #222;
+  background: #fff;
+}
+
+.map-coordinates__input:focus {
+  outline: 2px solid #1976d2;
+  border-color: #1976d2;
+}
+
+.map-coordinates__input--invalid {
+  border-color: #c62828;
+}
+
+.map-coordinates__actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.25rem;
+}
+
+.map-coordinates__errors {
+  flex-basis: 100%;
+  margin: 0;
+  color: #c62828;
+  font-size: 0.8rem;
+}
+
+.map-coordinates__errors p {
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .map-coordinates {
+    min-width: 0;
+  }
+
+  .map-coordinates--editing .map-coordinates__pin {
+    display: none;
+  }
+
+  .map-coordinates--editing {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .map-coordinates--editing .map-coordinates__fields {
+    grid-column: 1;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .map-coordinates--editing .map-coordinates__field {
+    min-width: 0;
+  }
+}

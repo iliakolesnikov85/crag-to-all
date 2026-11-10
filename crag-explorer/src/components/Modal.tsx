@@ -117,7 +117,10 @@ const Modal: React.FC<ModalProps> = ({
     const onKeyDown = (event: KeyboardEvent) => {
       if (openDialogs[openDialogs.length - 1] !== entry) return;
       if (event.key === 'Escape') {
+        // Capture and stop the event so other document listeners, such as
+        // map fullscreen, do not also treat Escape as theirs.
         event.preventDefault();
+        event.stopImmediatePropagation();
         entry.close();
         return;
       }
@@ -126,10 +129,10 @@ const Modal: React.FC<ModalProps> = ({
       if (!dialogNode) return;
       keepTabInside(dialogNode, event);
     };
-    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keydown', onKeyDown, true);
 
     return () => {
-      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keydown', onKeyDown, true);
       const index = openDialogs.lastIndexOf(entry);
       if (index >= 0) openDialogs.splice(index, 1);
       setBodyScrollLock(false);

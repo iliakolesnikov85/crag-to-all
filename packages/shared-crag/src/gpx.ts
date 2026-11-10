@@ -15,6 +15,8 @@ function garminSymForMapMarker(type: CragMapMarkerType): string {
       return 'Drinking Water';
     case 'camping':
       return 'Campground';
+    case 'wc':
+      return 'Restroom';
     default:
       return 'Information';
   }
@@ -28,6 +30,8 @@ function markerTitle(type: CragMapMarkerType): string {
       return 'Water Tap';
     case 'camping':
       return 'Camping';
+    case 'wc':
+      return 'WC';
     default:
       return 'Map point';
   }

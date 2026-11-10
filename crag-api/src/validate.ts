@@ -264,7 +264,7 @@ function parseSectorWrite(body: unknown): SectorWriteInput {
   return toSectorWrite(parseWith(sectorBodySchema, body));
 }
 
-function parseSectorGeoPatch(body: unknown): SectorPatch & { version: number } {
+function parseSectorPatch(body: unknown): SectorPatch & { version: number } {
   const parsed = parseWith(sectorGeoPatchSchema, body);
   const patch: SectorPatch & { version: number } = { version: parsed.version };
   if (parsed.geo !== undefined) patch.geo = parsed.geo;
@@ -290,7 +290,7 @@ export {
   parseCragPatch,
   parseCreateCrag,
   parseReplaceSector,
-  parseSectorGeoPatch,
+  parseSectorPatch,
   parseSectorId,
   parseSectorWrite,
   slugifyCragId,

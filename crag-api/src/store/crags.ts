@@ -1,7 +1,7 @@
 import { CRAG_DATA_PROTOCOL, type CragData } from '@crag-to-all/shared-crag';
 import type { Db, UpdateFilter } from 'mongodb';
 import { toCrag, toCragData, toCragResponse } from '../convertors';
-import { alreadyExists, isDuplicateKeyError, notFound, versionConflict } from '../http';
+import { alreadyExists, isDuplicateKeyError, notFound, readOnly, versionConflict } from '../http';
 import type {
   CragCreateInput,
   CragDocument,
@@ -59,9 +59,18 @@ export async function assertCragExists(db: Db, cragId: string): Promise<void> {
   if (!crag) throw notFound('crag');
 }
 
+/** The crag exists and may be changed. Authorization checks belong here. */
+export async function requireWritableCrag(db: Db, cragId: string): Promise<CragDocument> {
+  const crag = await cragsCol(db).findOne({ _id: cragId });
+  if (!crag) throw notFound('crag');
+  if (crag.source === 'external') {
+    throw readOnly('An extracted crag is read-only');
+  }
+  return crag;
+}
+
 export async function patchCrag(db: Db, cragId: string, patch: CragPatchInput): Promise<CragResponse> {
-  const existing = await cragsCol(db).findOne({ _id: cragId });
-  if (!existing) throw notFound('crag');
+  const existing = await requireWritableCrag(db, cragId);
   if (existing.version !== patch.version) {
     throw versionConflict(existing.version);
   }

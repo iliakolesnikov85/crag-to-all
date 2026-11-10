@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  MdAddLocation,
   MdErrorOutline,
   MdFullscreen,
   MdFullscreenExit,
@@ -8,8 +9,8 @@ import {
   MdLocationSearching,
   MdOutlineMyLocation,
 } from 'react-icons/md';
-import { createPieChartSVG } from '../../utils/grades';
 import type { LocationTrackingStatus } from '../../hooks/useLocationTracking';
+import { createPieChartSVG } from '../../utils/grades';
 
 const ADD_SECTOR_PIE_SVG = createPieChartSVG({ '6A': 1, '6B': 1, '6C': 1, '7A': 1 }, 20);
 
@@ -20,16 +21,18 @@ const LOCATION_TITLES: Record<LocationTrackingStatus, string> = {
   error: 'Location unavailable',
 };
 
+type MapPlacementMode = 'sector' | 'marker';
+
 interface MapToolbarProps {
   fullscreen: boolean;
   onToggleFullscreen(): void;
   locationStatus: LocationTrackingStatus;
   onLocate(): void;
   onResetBounds(): void;
-  /** Show the add-sector toggle. */
-  canAddSector: boolean;
-  placing: boolean;
-  onTogglePlacing(): void;
+  /** Show the add-sector and add-marker toggles. */
+  canAdd: boolean;
+  placing: MapPlacementMode | null;
+  onTogglePlacing(mode: MapPlacementMode): void;
 }
 
 function LocationIcon({ status }: { status: LocationTrackingStatus }) {
@@ -45,14 +48,14 @@ function LocationIcon({ status }: { status: LocationTrackingStatus }) {
   }
 }
 
-/** Buttons stacked under the zoom control: fullscreen, my location, reset bounds, add sector. */
+/** Buttons stacked under the zoom control: fullscreen, my location, reset bounds, add sector, add marker. */
 const MapToolbar: React.FC<MapToolbarProps> = ({
   fullscreen,
   onToggleFullscreen,
   locationStatus,
   onLocate,
   onResetBounds,
-  canAddSector,
+  canAdd,
   placing,
   onTogglePlacing,
 }) => (
@@ -85,14 +88,14 @@ const MapToolbar: React.FC<MapToolbarProps> = ({
     >
       <MdHome size={18} />
     </button>
-    {canAddSector && (
+    {canAdd && (
       <button
         type="button"
-        className={`map-toolbar__button${placing ? ' map-toolbar__button--active' : ''}`}
-        title={placing ? 'Cancel adding sector' : 'Add sector'}
-        aria-label={placing ? 'Cancel adding sector' : 'Add sector'}
-        aria-pressed={placing}
-        onClick={onTogglePlacing}
+        className={`map-toolbar__button${placing === 'sector' ? ' map-toolbar__button--active' : ''}`}
+        title={placing === 'sector' ? 'Cancel adding sector' : 'Add sector'}
+        aria-label={placing === 'sector' ? 'Cancel adding sector' : 'Add sector'}
+        aria-pressed={placing === 'sector'}
+        onClick={() => onTogglePlacing('sector')}
       >
         <span className="add-sector-icon" aria-hidden="true">
           <span dangerouslySetInnerHTML={{ __html: ADD_SECTOR_PIE_SVG }} />
@@ -103,7 +106,21 @@ const MapToolbar: React.FC<MapToolbarProps> = ({
         </span>
       </button>
     )}
+    {canAdd && (
+      <button
+        type="button"
+        className={`map-toolbar__button${placing === 'marker' ? ' map-toolbar__button--active' : ''}`}
+        title={placing === 'marker' ? 'Cancel adding marker' : 'Add marker'}
+        aria-label={placing === 'marker' ? 'Cancel adding marker' : 'Add marker'}
+        aria-pressed={placing === 'marker'}
+        onClick={() => onTogglePlacing('marker')}
+      >
+        <MdAddLocation size={18} />
+      </button>
+    )}
   </>
 );
+
+export type { MapPlacementMode };
 
 export default MapToolbar;

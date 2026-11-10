@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { useState } from 'react';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { deleteSector, patchSectorGeo, uploadCragImage } from '../api/client';
+import { deleteSector, patchSector, uploadCragImage } from '../api/client';
 import { canEditCrag } from '../api/permissions';
 import { createAppQueryClient, queryKeys } from '../api/queryClient';
 import { CragContext } from '../context/CragContext';
@@ -101,7 +101,7 @@ describe('SectorPage lookup', () => {
   beforeEach(() => {
     vi.mocked(canEditCrag).mockReturnValue(true);
     vi.mocked(deleteSector).mockReset();
-    vi.mocked(patchSectorGeo).mockReset();
+    vi.mocked(patchSector).mockReset();
   });
 
   it('finds a sector by case-insensitive name', () => {
@@ -136,7 +136,7 @@ describe('SectorPage delete', () => {
   beforeEach(() => {
     vi.mocked(canEditCrag).mockReturnValue(true);
     vi.mocked(deleteSector).mockReset();
-    vi.mocked(patchSectorGeo).mockReset();
+    vi.mocked(patchSector).mockReset();
   });
 
   it('hides the options menu when the crag cannot be edited', () => {
@@ -273,7 +273,7 @@ describe('SectorPage edit', () => {
   beforeEach(() => {
     vi.mocked(canEditCrag).mockReturnValue(true);
     vi.mocked(deleteSector).mockReset();
-    vi.mocked(patchSectorGeo).mockReset();
+    vi.mocked(patchSector).mockReset();
   });
 
   it('opens an edit dialog with the sector details and a map hint', () => {
@@ -322,7 +322,7 @@ describe('SectorPage edit', () => {
     chooseConfirm('Leave this edit?', 'Leave');
 
     expect(await screen.findByRole('heading', { name: 'Map' })).toBeInTheDocument();
-    expect(patchSectorGeo).not.toHaveBeenCalled();
+    expect(patchSector).not.toHaveBeenCalled();
   });
 
   it('opens the map without confirmation when the edit is unchanged', () => {
@@ -335,7 +335,7 @@ describe('SectorPage edit', () => {
   });
 
   it('saves changed details', async () => {
-    vi.mocked(patchSectorGeo).mockResolvedValue({
+    vi.mocked(patchSector).mockResolvedValue({
       ...editableSector,
       version: 3,
       altitude: '2100m',
@@ -358,7 +358,7 @@ describe('SectorPage edit', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
-    expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+    expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
       altitude: '2100m',
       season: 'Apr; Jul - Aug',
       orientation: 'N, NW,',
@@ -368,7 +368,7 @@ describe('SectorPage edit', () => {
 
   it('renames the sector and opens the new sector address', async () => {
     const renamed: Sector = { ...editableSector, name: 'North Wall', version: 3 };
-    vi.mocked(patchSectorGeo).mockResolvedValue(renamed);
+    vi.mocked(patchSector).mockResolvedValue(renamed);
     const client = createAppQueryClient();
     client.setQueryData<CragData>(queryKeys.crag(SAMPLE_CRAG_ID), {
       ...sampleCragData,
@@ -402,7 +402,7 @@ describe('SectorPage edit', () => {
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent('/sector/north%20wall');
     });
-    expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+    expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
       name: 'North Wall',
     });
     expect(client.getQueryData<CragData>(queryKeys.crag(SAMPLE_CRAG_ID))?.sectors[0]).toEqual(renamed);
@@ -424,7 +424,7 @@ describe('SectorPage edit', () => {
       );
     }
 
-    vi.mocked(patchSectorGeo).mockImplementation(async () => ({
+    vi.mocked(patchSector).mockImplementation(async () => ({
       ...editableSector,
       version: 3,
       altitude: '2100m',
@@ -448,7 +448,7 @@ describe('SectorPage edit', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
-      expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+      expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
         altitude: '2100m',
       });
     });
@@ -484,17 +484,17 @@ describe('SectorPage edit', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Empty Sector' })).toBeInTheDocument();
-    expect(patchSectorGeo).not.toHaveBeenCalled();
+    expect(patchSector).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Forward' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Main Wall' })).toBeInTheDocument();
-    expect(patchSectorGeo).not.toHaveBeenCalled();
+    expect(patchSector).not.toHaveBeenCalled();
   });
 
   it('shows an error in the dialog when saving fails', async () => {
-    vi.mocked(patchSectorGeo).mockRejectedValue(new Error('Failed to save sector (500)'));
+    vi.mocked(patchSector).mockRejectedValue(new Error('Failed to save sector (500)'));
     renderDeletable(editableSector);
     openEditItem();
 
@@ -513,7 +513,7 @@ describe('SectorPage edit', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'This sector cannot be edited because it has no id.',
     );
-    expect(patchSectorGeo).not.toHaveBeenCalled();
+    expect(patchSector).not.toHaveBeenCalled();
   });
 
   it('shows an error when the sector has no version', () => {
@@ -524,7 +524,7 @@ describe('SectorPage edit', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'This sector cannot be edited because it has no version.',
     );
-    expect(patchSectorGeo).not.toHaveBeenCalled();
+    expect(patchSector).not.toHaveBeenCalled();
   });
 });
 
@@ -551,7 +551,7 @@ describe('SectorPage routes', () => {
   beforeEach(() => {
     vi.mocked(canEditCrag).mockReturnValue(true);
     vi.mocked(deleteSector).mockReset();
-    vi.mocked(patchSectorGeo).mockReset();
+    vi.mocked(patchSector).mockReset();
   });
 
   it('hides a stored Boulder tag without removing it', async () => {
@@ -562,7 +562,7 @@ describe('SectorPage routes', () => {
         ratedRoute.routes[1],
       ],
     };
-    vi.mocked(patchSectorGeo).mockResolvedValue({ ...withBoulder, version: 3 });
+    vi.mocked(patchSector).mockResolvedValue({ ...withBoulder, version: 3 });
     renderDeletable(withBoulder);
     openRoutesItem();
     fireEvent.click(screen.getByRole('button', { name: 'Edit Classic' }));
@@ -576,7 +576,7 @@ describe('SectorPage routes', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
-      expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+      expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
         routes: [
           expect.objectContaining({
             tags: ['Boulder', 'Video beta'],
@@ -585,12 +585,12 @@ describe('SectorPage routes', () => {
         ],
       });
     });
-    const saved = vi.mocked(patchSectorGeo).mock.calls[0]?.[3].routes[0];
+    const saved = vi.mocked(patchSector).mock.calls[0]?.[3].routes[0];
     expect(saved.type).toBeUndefined();
   });
 
   it('edits a route and keeps its images, videos, and id', async () => {
-    vi.mocked(patchSectorGeo).mockResolvedValue({ ...ratedRoute, version: 3 });
+    vi.mocked(patchSector).mockResolvedValue({ ...ratedRoute, version: 3 });
     renderDeletable(ratedRoute);
     openRoutesItem();
 
@@ -610,7 +610,7 @@ describe('SectorPage routes', () => {
       expect(screen.queryByRole('dialog', { name: 'Edit route' })).not.toBeInTheDocument();
     });
     expect(screen.getByRole('dialog', { name: 'Routes' })).toBeInTheDocument();
-    expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+    expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
       routes: [
         {
           id: 'route-1',
@@ -631,7 +631,7 @@ describe('SectorPage routes', () => {
   });
 
   it('adds a route', async () => {
-    vi.mocked(patchSectorGeo).mockResolvedValue({ ...editableSector, version: 3 });
+    vi.mocked(patchSector).mockResolvedValue({ ...editableSector, version: 3 });
     renderDeletable(editableSector);
     openRoutesItem();
     fireEvent.click(screen.getByRole('button', { name: '+ Add' }));
@@ -650,7 +650,7 @@ describe('SectorPage routes', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
-      expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+      expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
         routes: [
           ...editableSector.routes,
           {
@@ -672,7 +672,7 @@ describe('SectorPage routes', () => {
   });
 
   it('deletes a route after confirmation and leaves it when cancelled', async () => {
-    vi.mocked(patchSectorGeo).mockResolvedValue({ ...ratedRoute, version: 3, routes: [ratedRoute.routes[1]] });
+    vi.mocked(patchSector).mockResolvedValue({ ...ratedRoute, version: 3, routes: [ratedRoute.routes[1]] });
     renderDeletable(ratedRoute);
     openRoutesItem();
     fireEvent.click(screen.getByRole('button', { name: 'Delete Classic' }));
@@ -681,14 +681,14 @@ describe('SectorPage routes', () => {
       'Delete the "Classic" route?',
     );
     expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
-    expect(patchSectorGeo).not.toHaveBeenCalled();
+    expect(patchSector).not.toHaveBeenCalled();
     chooseConfirm('Delete route', 'Cancel');
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete Classic' }));
     chooseConfirm('Delete route', 'Delete');
 
     await waitFor(() => {
-      expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+      expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
         routes: [ratedRoute.routes[1]],
       });
     });
@@ -702,7 +702,7 @@ describe('SectorPage routes', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(screen.getByText('A route with this name already exists.')).toBeInTheDocument();
-    expect(patchSectorGeo).not.toHaveBeenCalled();
+    expect(patchSector).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog', { name: 'Edit route' })).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'Routes' })).not.toBeInTheDocument();
 
@@ -726,7 +726,7 @@ describe('SectorPage routes', () => {
   });
 
   it('opens route details from the route options menu and saves them', async () => {
-    vi.mocked(patchSectorGeo).mockResolvedValue({ ...ratedRoute, version: 3 });
+    vi.mocked(patchSector).mockResolvedValue({ ...ratedRoute, version: 3 });
     renderDeletable(ratedRoute);
 
     expect(screen.queryByRole('menuitem', { name: 'Edit route details' })).not.toBeInTheDocument();
@@ -743,7 +743,7 @@ describe('SectorPage routes', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'Edit route' })).not.toBeInTheDocument();
     });
-    expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+    expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
       routes: [
         expect.objectContaining({ id: 'route-1', name: 'Direct' }),
         ratedRoute.routes[1],
@@ -787,7 +787,7 @@ describe('SectorPage routes', () => {
       images: [{ imageFile: 'wall.jpg' }, { imageFile: 'other.jpg' }],
       routes: [alpha, bravo, charlie],
     };
-    vi.mocked(patchSectorGeo).mockResolvedValue({ ...ordered, version: 3 });
+    vi.mocked(patchSector).mockResolvedValue({ ...ordered, version: 3 });
     renderDeletable(ordered);
 
     const openRouteMenu = (topoLabel: string, routeName: string) => {
@@ -814,14 +814,14 @@ describe('SectorPage routes', () => {
 
     fireEvent.click(openRouteMenu('1/2', 'Charlie').getByRole('menuitem', { name: 'Move route down' }));
     expect(screen.getByRole('dialog', { name: 'Move route' })).toHaveTextContent('Move route 2/3 down?');
-    expect(patchSectorGeo).not.toHaveBeenCalled();
+    expect(patchSector).not.toHaveBeenCalled();
     chooseConfirm('Move route', 'Cancel');
 
     fireEvent.click(openRouteMenu('1/2', 'Charlie').getByRole('menuitem', { name: 'Move route down' }));
     chooseConfirm('Move route', 'Move');
 
     await waitFor(() => {
-      expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+      expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
         routes: [
           {
             ...alpha,
@@ -872,7 +872,7 @@ describe('SectorPage routes', () => {
       images: [{ imageFile: 'wall.jpg' }, { imageFile: 'other.jpg' }],
       routes: [classic, ratedRoute.routes[1]],
     };
-    vi.mocked(patchSectorGeo).mockResolvedValue({ ...sector, version: 3 });
+    vi.mocked(patchSector).mockResolvedValue({ ...sector, version: 3 });
     renderDeletable(sector);
 
     const heading = screen.getByRole('heading', { level: 4, name: '1/2' });
@@ -908,7 +908,7 @@ describe('SectorPage routes', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'Draw "Classic" on the topo' })).not.toBeInTheDocument();
     });
-    expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+    expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
       routes: [
         {
           ...classic,
@@ -951,7 +951,7 @@ describe('SectorPage routes', () => {
       images: [{ imageFile: 'wall.jpg' }, { imageFile: 'other.jpg' }],
       routes: [classic, ratedRoute.routes[1]],
     };
-    vi.mocked(patchSectorGeo).mockResolvedValue({ ...sector, version: 3 });
+    vi.mocked(patchSector).mockResolvedValue({ ...sector, version: 3 });
     renderDeletable(sector);
 
     const heading = screen.getByRole('heading', { level: 4, name: '1/2' });
@@ -964,7 +964,7 @@ describe('SectorPage routes', () => {
     expect(screen.getByRole('dialog', { name: 'Remove route' })).toHaveTextContent(
       'Remove the "Classic" route from this topo image?',
     );
-    expect(patchSectorGeo).not.toHaveBeenCalled();
+    expect(patchSector).not.toHaveBeenCalled();
     expect(scope.getByText('Classic')).toBeInTheDocument();
     chooseConfirm('Remove route', 'Cancel');
 
@@ -973,7 +973,7 @@ describe('SectorPage routes', () => {
     chooseConfirm('Remove route', 'Remove');
 
     await waitFor(() => {
-      expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+      expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
         routes: [
           {
             ...classic,
@@ -1018,7 +1018,7 @@ describe('SectorPage draw lines', () => {
   beforeEach(() => {
     vi.mocked(canEditCrag).mockReturnValue(true);
     vi.mocked(deleteSector).mockReset();
-    vi.mocked(patchSectorGeo).mockReset();
+    vi.mocked(patchSector).mockReset();
   });
 
   it('offers draw, redraw, edit, and remove for the topo', () => {
@@ -1047,7 +1047,7 @@ describe('SectorPage draw lines', () => {
   });
 
   it('saves a line for a route that is not on the topo yet', async () => {
-    vi.mocked(patchSectorGeo).mockResolvedValue({ ...editableSector, version: 3 });
+    vi.mocked(patchSector).mockResolvedValue({ ...editableSector, version: 3 });
     renderDeletable(editableSector);
     openDrawLines();
     fireEvent.click(screen.getByRole('button', { name: 'Draw Mystery' }));
@@ -1059,7 +1059,7 @@ describe('SectorPage draw lines', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'Draw "Mystery" on the topo' })).not.toBeInTheDocument();
     });
-    expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+    expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
       routes: [
         editableSector.routes[0],
         {
@@ -1076,7 +1076,7 @@ describe('SectorPage draw lines', () => {
   });
 
   it('removes a route from the topo image without deleting it', async () => {
-    vi.mocked(patchSectorGeo).mockResolvedValue({ ...editableSector, version: 3 });
+    vi.mocked(patchSector).mockResolvedValue({ ...editableSector, version: 3 });
     renderDeletable(editableSector);
     openDrawLines();
     fireEvent.click(screen.getByRole('button', { name: 'Remove Classic' }));
@@ -1084,14 +1084,14 @@ describe('SectorPage draw lines', () => {
     expect(screen.getByRole('dialog', { name: 'Remove route' })).toHaveTextContent(
       'Remove the "Classic" route from this topo image?',
     );
-    expect(patchSectorGeo).not.toHaveBeenCalled();
+    expect(patchSector).not.toHaveBeenCalled();
     chooseConfirm('Remove route', 'Cancel');
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove Classic' }));
     chooseConfirm('Remove route', 'Remove');
 
     await waitFor(() => {
-      expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+      expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
         routes: [
           { ...editableSector.routes[0], images: [] },
           editableSector.routes[1],
@@ -1103,7 +1103,7 @@ describe('SectorPage draw lines', () => {
   });
 
   it('opens the draw dialog after a route is added from draw lines', async () => {
-    vi.mocked(patchSectorGeo).mockImplementation(async (_cragId, _sectorId, _version, patch) => ({
+    vi.mocked(patchSector).mockImplementation(async (_cragId, _sectorId, _version, patch) => ({
       ...editableSector,
       version: 3,
       routes: patch.routes ?? editableSector.routes,
@@ -1124,9 +1124,9 @@ describe('SectorPage draw lines', () => {
     fireEvent.click(within(drawing).getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
-      expect(patchSectorGeo).toHaveBeenCalledTimes(2);
+      expect(patchSector).toHaveBeenCalledTimes(2);
     });
-    expect(patchSectorGeo).toHaveBeenLastCalledWith(SAMPLE_CRAG_ID, 'sector-1', 3, {
+    expect(patchSector).toHaveBeenLastCalledWith(SAMPLE_CRAG_ID, 'sector-1', 3, {
       routes: [
         ...editableSector.routes,
         {
@@ -1176,7 +1176,7 @@ describe('SectorPage topo images', () => {
   beforeEach(() => {
     vi.mocked(canEditCrag).mockReturnValue(true);
     vi.mocked(deleteSector).mockReset();
-    vi.mocked(patchSectorGeo).mockReset();
+    vi.mocked(patchSector).mockReset();
   });
 
   it('shows each topo position and hides the menu without permission', () => {
@@ -1190,7 +1190,7 @@ describe('SectorPage topo images', () => {
   });
 
   it('deletes a topo image after confirmation', async () => {
-    vi.mocked(patchSectorGeo).mockResolvedValue({ ...topoSector, version: 3 });
+    vi.mocked(patchSector).mockResolvedValue({ ...topoSector, version: 3 });
     renderDeletable(topoSector);
 
     const firstMenu = openTopoMenu(1);
@@ -1207,21 +1207,21 @@ describe('SectorPage topo images', () => {
       'Delete topo image 2/3?',
     );
     expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
-    expect(patchSectorGeo).not.toHaveBeenCalled();
+    expect(patchSector).not.toHaveBeenCalled();
     chooseConfirm('Delete topo image', 'Cancel');
 
     fireEvent.click(openTopoMenu(2).getByRole('menuitem', { name: 'Delete topo image' }));
     chooseConfirm('Delete topo image', 'Delete');
 
     await waitFor(() => {
-      expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+      expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
         images: [topoSector.images[0], topoSector.images[2]],
       });
     });
   });
 
   it('moves a topo image down after confirmation', async () => {
-    vi.mocked(patchSectorGeo).mockResolvedValue({ ...topoSector, version: 3 });
+    vi.mocked(patchSector).mockResolvedValue({ ...topoSector, version: 3 });
     renderDeletable(topoSector);
 
     fireEvent.click(openTopoMenu(2).getByRole('menuitem', { name: 'Move image down' }));
@@ -1231,7 +1231,7 @@ describe('SectorPage topo images', () => {
     expect(screen.getByRole('button', { name: 'Move' })).toHaveFocus();
     chooseConfirm('Move topo image', 'Move');
     await waitFor(() => {
-      expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+      expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
         images: [topoSector.images[0], topoSector.images[2], topoSector.images[1]],
       });
     });
@@ -1255,7 +1255,7 @@ describe('SectorPage add topo', () => {
   beforeEach(() => {
     vi.mocked(canEditCrag).mockReturnValue(true);
     vi.mocked(deleteSector).mockReset();
-    vi.mocked(patchSectorGeo).mockReset();
+    vi.mocked(patchSector).mockReset();
     vi.mocked(uploadCragImage).mockReset();
     vi.mocked(readTopoGps).mockReset();
     vi.mocked(readTopoGps).mockResolvedValue(null);
@@ -1264,7 +1264,7 @@ describe('SectorPage add topo', () => {
   it('adds another topo without asking about the photo location', async () => {
     vi.mocked(readTopoGps).mockResolvedValue({ lat: 41.1, lon: 44.2 });
     vi.mocked(uploadCragImage).mockResolvedValue({ imageFile: 'new-topo.jpg' });
-    vi.mocked(patchSectorGeo).mockResolvedValue({ ...editableSector, version: 3 });
+    vi.mocked(patchSector).mockResolvedValue({ ...editableSector, version: 3 });
     renderDeletable(editableSector);
 
     openAddTopo();
@@ -1283,7 +1283,7 @@ describe('SectorPage add topo', () => {
     await waitFor(() => {
       expect(uploadCragImage).toHaveBeenCalledWith(SAMPLE_CRAG_ID, file);
     });
-    expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+    expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
       images: [...editableSector.images, { imageFile: 'new-topo.jpg' }],
     });
     await waitFor(() => {
@@ -1295,7 +1295,7 @@ describe('SectorPage add topo', () => {
     const photo = { lat: 41.1, lon: 44.2 };
     vi.mocked(readTopoGps).mockResolvedValue(photo);
     vi.mocked(uploadCragImage).mockResolvedValue({ imageFile: 'new-topo.jpg' });
-    vi.mocked(patchSectorGeo).mockResolvedValue({ ...editableSector, images: [], version: 3 });
+    vi.mocked(patchSector).mockResolvedValue({ ...editableSector, images: [], version: 3 });
     renderDeletable({ ...editableSector, images: [] });
 
     openAddTopo();
@@ -1308,7 +1308,7 @@ describe('SectorPage add topo', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
-      expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+      expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
         images: [{ imageFile: 'new-topo.jpg' }],
         geo: photo,
       });
@@ -1328,6 +1328,6 @@ describe('SectorPage add topo', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Failed to upload image (500)');
     expect(screen.getByRole('dialog', { name: 'Add topo image' })).toBeInTheDocument();
-    expect(patchSectorGeo).not.toHaveBeenCalled();
+    expect(patchSector).not.toHaveBeenCalled();
   });
 });

@@ -98,6 +98,29 @@ describe('Modal', () => {
     expect(document.documentElement.classList.contains('scroll-locked')).toBe(false);
   });
 
+  it('keeps Escape from reaching other document listeners', () => {
+    const onClose = vi.fn();
+    const onDocumentEscape = vi.fn();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onDocumentEscape();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    try {
+      render(
+        <Modal open title="Delete marker" onClose={onClose}>
+          <p>Delete the marker?</p>
+        </Modal>,
+      );
+
+      fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onDocumentEscape).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener('keydown', handleKeyDown);
+    }
+  });
+
   it('closes only the top dialog when Escape is pressed', () => {
     const closeList = vi.fn();
     const closeDetails = vi.fn();

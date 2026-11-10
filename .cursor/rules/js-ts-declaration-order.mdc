@@ -1,6 +1,6 @@
 ---
 description: JS/TS declaration order — private first, then exports
-globs: **/*.{ts,tsx}
+globs: "**/*.ts,**/*.tsx"
 alwaysApply: false
 ---
 

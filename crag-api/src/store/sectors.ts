@@ -2,22 +2,15 @@ import { randomUUID } from 'node:crypto';
 import type { Image, LatLng, Sector, StoredRoute } from '@crag-to-all/shared-crag';
 import type { Db } from 'mongodb';
 import { sectorNameKey, toSector, toSectorDocument } from '../convertors';
-import { alreadyExists, isDuplicateKeyError, notFound, readOnly, versionConflict } from '../http';
+import { alreadyExists, isDuplicateKeyError, notFound, versionConflict } from '../http';
 import type { SectorDocument, SectorPatch, SectorWriteInput } from '../types';
-import { cragsCol, now, sectorsCol } from './collections';
+import { now, sectorsCol } from './collections';
+import { requireWritableCrag } from './crags';
 
 const SECTOR_NAME_TAKEN = 'A sector with this name already exists.';
 const DETAIL_FIELDS = ['season', 'approachTime', 'altitude', 'orientation', 'timeInSun'] as const;
 
 type DetailField = (typeof DETAIL_FIELDS)[number];
-
-async function requireWritableCrag(db: Db, cragId: string): Promise<void> {
-  const crag = await cragsCol(db).findOne({ _id: cragId });
-  if (!crag) throw notFound('crag');
-  if (crag.source === 'external') {
-    throw readOnly('Sectors on an extracted crag are read-only');
-  }
-}
 
 async function sectorNameTaken(
   db: Db,
@@ -168,7 +161,7 @@ export async function replaceSector(
   return toSector(next);
 }
 
-export async function patchSectorGeo(
+export async function patchSector(
   db: Db,
   cragId: string,
   sectorId: string,

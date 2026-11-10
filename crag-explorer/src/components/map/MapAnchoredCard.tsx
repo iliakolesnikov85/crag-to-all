@@ -11,6 +11,9 @@ interface MapAnchoredCardProps {
   geo: LatLng;
   /** Keep the card mounted but out of sight, e.g. while its pin is dragged. */
   hidden?: boolean;
+  /** Accessible name for the dialog. */
+  label?: string;
+  className?: string;
   onClose(): void;
   children: React.ReactNode;
 }
@@ -31,7 +34,15 @@ function panCardIntoView(map: L.Map, card: HTMLElement): void {
 }
 
 /** Card pinned above a map location. Follows the point on pan and zoom. */
-const MapAnchoredCard: React.FC<MapAnchoredCardProps> = ({ map, geo, hidden = false, onClose, children }) => {
+const MapAnchoredCard: React.FC<MapAnchoredCardProps> = ({
+  map,
+  geo,
+  hidden = false,
+  label = 'Sector details',
+  className,
+  onClose,
+  children,
+}) => {
   const ref = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
@@ -71,9 +82,9 @@ const MapAnchoredCard: React.FC<MapAnchoredCardProps> = ({ map, geo, hidden = fa
   return (
     <div
       ref={ref}
-      className={`sector-map-card${hidden ? ' sector-map-card--hidden' : ''}`}
+      className={['sector-map-card', className, hidden ? 'sector-map-card--hidden' : ''].filter(Boolean).join(' ')}
       role="dialog"
-      aria-label="Sector details"
+      aria-label={label}
     >
       <Button
         type="button"

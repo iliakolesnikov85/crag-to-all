@@ -716,7 +716,7 @@ describe('crag-api', () => {
     expect(created.status).toBe(403);
     expect(created.body).toEqual({
       error: 'read_only',
-      message: 'Sectors on an extracted crag are read-only',
+      message: 'An extracted crag is read-only',
     });
 
     const replaced = await request(app).put('/api/crags/roshka/sectors/cave-1').send({
@@ -738,8 +738,22 @@ describe('crag-api', () => {
     expect(patched.status).toBe(403);
     expect(patched.body.error).toBe('read_only');
 
+    const cragPatch = await request(app).patch('/api/crags/roshka').send({
+      version: 1,
+      name: 'Renamed',
+      markers: [{ type: 'parking_space', info: 'Lot', geo: { lat: 44, lon: 6 } }],
+    });
+    expect(cragPatch.status).toBe(403);
+    expect(cragPatch.body).toEqual({
+      error: 'read_only',
+      message: 'An extracted crag is read-only',
+    });
+
     const assembled = await request(app).get('/api/crags/roshka');
     expect(assembled.status).toBe(200);
+    expect(assembled.body.name).toBe('Roshka');
+    expect(assembled.body.version).toBe(1);
+    expect(assembled.body.markers).toEqual([]);
     expect(assembled.body.externalId).toBeUndefined();
     expect(assembled.body.sectors).toMatchObject([{ id: 'cave-1', name: 'Cave', version: 3 }]);
     expect(assembled.body.sectors[0].externalId).toBeUndefined();

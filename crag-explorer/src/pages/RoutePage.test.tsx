@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { patchSectorGeo } from '../api/client';
+import { patchSector } from '../api/client';
 import { CragContext } from '../context/CragContext';
 import { chooseConfirm, withQueryClient } from '../test/helpers';
 import { SAMPLE_CRAG_ID, sampleCragData } from '../test/fixtures/cragData';
@@ -51,7 +51,7 @@ function openRouteOptions() {
 
 describe('RoutePage lookup', () => {
   beforeEach(() => {
-    vi.mocked(patchSectorGeo).mockReset();
+    vi.mocked(patchSector).mockReset();
   });
 
   it('finds a sector and route by case-insensitive names', () => {
@@ -66,13 +66,13 @@ describe('RoutePage lookup', () => {
     const sectors = sampleCragData.sectors.map((sector) => (
       sector.name === 'Main Wall'
         ? {
-            ...sector,
-            routes: sector.routes.map((route) => (
-              route.name === 'Classic'
-                ? { ...route, description: 'A steep start', height: 12 }
-                : route
-            )),
-          }
+          ...sector,
+          routes: sector.routes.map((route) => (
+            route.name === 'Classic'
+              ? { ...route, description: 'A steep start', height: 12 }
+              : route
+          )),
+        }
         : sector
     ));
     renderRoute(`/sector/${encodeURIComponent('main wall')}/classic`, sectors);
@@ -95,7 +95,7 @@ describe('RoutePage lookup', () => {
 
 describe('RoutePage options', () => {
   beforeEach(() => {
-    vi.mocked(patchSectorGeo).mockReset();
+    vi.mocked(patchSector).mockReset();
   });
 
   it('hides the options menu when the crag cannot be edited', () => {
@@ -132,7 +132,7 @@ describe('RoutePage options', () => {
   });
 
   it('opens route details and saves them', async () => {
-    vi.mocked(patchSectorGeo).mockResolvedValue({ ...editableSector, version: 3 });
+    vi.mocked(patchSector).mockResolvedValue({ ...editableSector, version: 3 });
     renderRoute('/sector/main%20wall/classic', [editableSector]);
     openRouteOptions();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Edit route details' }));
@@ -145,7 +145,7 @@ describe('RoutePage options', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'Edit route' })).not.toBeInTheDocument();
     });
-    expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+    expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
       routes: [
         expect.objectContaining({ id: 'Classic', name: 'Direct' }),
         editableSector.routes[1],
@@ -154,7 +154,7 @@ describe('RoutePage options', () => {
   });
 
   it('opens the new route address after a rename', async () => {
-    vi.mocked(patchSectorGeo).mockResolvedValue({ ...editableSector, version: 3 });
+    vi.mocked(patchSector).mockResolvedValue({ ...editableSector, version: 3 });
     render(
       withQueryClient(
         <MemoryRouter initialEntries={['/sector/main%20wall/classic']}>
@@ -195,12 +195,12 @@ describe('RoutePage options', () => {
     );
     expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
     chooseConfirm('Delete route', 'Cancel');
-    expect(patchSectorGeo).not.toHaveBeenCalled();
+    expect(patchSector).not.toHaveBeenCalled();
     expect(screen.getByRole('heading', { name: 'Classic' })).toBeInTheDocument();
   });
 
   it('deletes the route after confirmation and leaves the page', async () => {
-    vi.mocked(patchSectorGeo).mockResolvedValue({
+    vi.mocked(patchSector).mockResolvedValue({
       ...editableSector,
       version: 3,
       routes: [editableSector.routes[1]],
@@ -228,7 +228,7 @@ describe('RoutePage options', () => {
     await waitFor(() => {
       expect(screen.getByText('Sector page')).toBeInTheDocument();
     });
-    expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+    expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
       routes: [editableSector.routes[1]],
     });
   });
@@ -242,11 +242,11 @@ describe('RoutePage options', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'This sector cannot be edited because it has no id.',
     );
-    expect(patchSectorGeo).not.toHaveBeenCalled();
+    expect(patchSector).not.toHaveBeenCalled();
   });
 
   it('shows an error when deletion fails', async () => {
-    vi.mocked(patchSectorGeo).mockRejectedValue(new Error('Failed to delete route (500)'));
+    vi.mocked(patchSector).mockRejectedValue(new Error('Failed to delete route (500)'));
     renderRoute('/sector/main%20wall/classic', [editableSector]);
     openRouteOptions();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Delete route' }));

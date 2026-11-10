@@ -22,6 +22,8 @@ describe('markerLabelFromType', () => {
     expect(markerLabelFromType('parking_space')).toBe('Parking');
     expect(markerLabelFromType('water_tap')).toBe('Water tap');
     expect(markerLabelFromType('camping')).toBe('Camping');
+    expect(markerLabelFromType('wc')).toBe('WC');
+    expect(markerLabelFromType('unknown')).toBe('Unknown');
   });
 
   it('returns a generic label for empty or legacy types so rendering never throws', () => {
@@ -63,10 +65,21 @@ describe('layer factories', () => {
     expect(marker.getElement()?.querySelector('.label b')).toBeNull();
   });
 
-  it('gives a map marker a popup with its label and info', () => {
-    const marker = createMapMarker({ type: 'parking_space', info: 'Free', geo: { lat: 1, lon: 2 } });
-    expect(marker.getPopup()?.getContent()).toContain('<strong>Parking</strong>');
-    expect(marker.getPopup()?.getContent()).toContain('Free');
+  it('gives each marker type its own icon', () => {
+    const iconHtml = (type: 'parking_space' | 'water_tap' | 'camping' | 'wc' | 'unknown') => {
+      const html = (createMapMarker({ type, info: 'Free', geo: { lat: 1, lon: 2 } }).getIcon() as L.DivIcon).options.html;
+      return typeof html === 'string' ? html : '';
+    };
+
+    expect(iconHtml('parking_space')).toContain('map-marker--parking');
+    expect(iconHtml('parking_space')).toContain('>P<');
+    expect(iconHtml('water_tap')).toContain('map-marker--water');
+    expect(iconHtml('camping')).toContain('map-marker--camping');
+    expect(iconHtml('camping')).toContain('M212.7 43');
+    expect(iconHtml('wc')).toContain('map-marker--wc');
+    expect(iconHtml('wc')).toContain('>WC<');
+    expect(iconHtml('unknown')).toContain('map-marker--unknown');
+    expect(iconHtml('unknown')).toContain('>?</text>');
   });
 
   it('draws a trail only when it has at least two points', () => {

@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createSector } from '../api/client';
+import { createSector, patchCrag } from '../api/client';
 import { CragContext } from '../context/CragContext';
 import { SAMPLE_CRAG_ID, sampleCragData } from '../test/fixtures/cragData';
 import { withQueryClient } from '../test/helpers';
@@ -14,6 +14,7 @@ vi.mock('../api/client', async () => {
   return {
     ...actual,
     createSector: vi.fn(),
+    patchCrag: vi.fn(),
     patchSectorGeo: vi.fn(),
     uploadCragImage: vi.fn(),
   };
@@ -76,16 +77,27 @@ function clickMapBackground(): void {
   fireEvent.click(container);
 }
 
-async function startPlacing(): Promise<void> {
-  fireEvent.click(screen.getByRole('button', { name: 'Add sector' }));
-  expect(screen.getByRole('status')).toHaveTextContent('Click the map where the new sector should be');
+async function startPlacing(name: 'Add sector' | 'Add marker'): Promise<void> {
+  fireEvent.click(screen.getByRole('button', { name }));
+  const subject = name === 'Add marker' ? 'marker' : 'sector';
+  expect(screen.getByRole('status')).toHaveTextContent(`Click the map where the new ${subject} should be`);
   // Placement ignores the activating click; wait until the map listener is armed.
   await new Promise((resolve) => window.setTimeout(resolve, 0));
+}
+
+/** A promise that stays pending until the test rejects it. */
+function holdRejection(): { promise: Promise<never>; reject: (error: Error) => void } {
+  let reject = (_error: Error) => {};
+  const promise = new Promise<never>((_resolve, rejectPromise) => {
+    reject = rejectPromise;
+  });
+  return { promise, reject: (error) => reject(error) };
 }
 
 describe('MapWidget', () => {
   beforeEach(() => {
     vi.mocked(createSector).mockReset();
+    vi.mocked(patchCrag).mockReset();
   });
 
   function renderMap(initial?: CragData) {
@@ -129,7 +141,7 @@ describe('MapWidget', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Add sector' })).toBeInTheDocument();
     });
-    await startPlacing();
+    await startPlacing('Add sector');
     expect(document.querySelectorAll('.custom-marker .label')).toHaveLength(1);
 
     clickMapBackground();
@@ -146,7 +158,7 @@ describe('MapWidget', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Add sector' })).toBeInTheDocument();
     });
-    await startPlacing();
+    await startPlacing('Add sector');
     clickMapBackground();
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Discard new sector' })).toBeInTheDocument();
@@ -175,7 +187,7 @@ describe('MapWidget', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Add sector' })).toBeInTheDocument();
     });
-    await startPlacing();
+    await startPlacing('Add sector');
     clickMapBackground();
     await waitFor(() => {
       expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument();
@@ -194,5 +206,40 @@ describe('MapWidget', () => {
     });
     expect(screen.queryByRole('textbox', { name: 'Name' })).not.toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: 'Sector details' })).toBeInTheDocument();
+  });
+
+  it('drops a marker edit when the card was closed and the save then fails', async () => {
+    const pending = holdRejection();
+    vi.mocked(patchCrag).mockReturnValue(pending.promise);
+    renderMap({ ...INITIAL, version: 1, markers: [] });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Add marker' })).toBeInTheDocument();
+    });
+    await startPlacing('Add marker');
+    clickMapBackground();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Create marker' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create marker' }));
+    await waitFor(() => {
+      expect(patchCrag).toHaveBeenCalled();
+    });
+    expect(document.querySelector('.custom-marker--editing')).toBeTruthy();
+
+    clickMapBackground();
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Map marker' })).not.toBeInTheDocument();
+    });
+    expect(document.querySelector('.custom-marker--editing')).toBeTruthy();
+
+    pending.reject(new Error('Could not save marker'));
+
+    await waitFor(() => {
+      expect(document.querySelector('.custom-marker--editing')).toBeNull();
+    });
+    expect(document.querySelector('.map-marker')).toBeNull();
+    expect(screen.queryByRole('dialog', { name: 'Map marker' })).not.toBeInTheDocument();
   });
 });

@@ -1,19 +1,15 @@
 import { useEffect, useRef } from 'react';
 import * as L from 'leaflet';
 import type { LatLng, Sector } from '../types';
+import { bindPinDrag } from '../utils/map/bindPinDrag';
 import { createSectorMarkerIcon } from '../utils/map/overlayLayers';
 import { sectorMarkerKey } from '../utils/map/sectorEditState';
 
-const DRAGGING_CLASS = 'custom-marker--dragging';
 const EDITING_CLASS = 'custom-marker--editing';
 
 interface MarkerEntry {
   marker: L.Marker;
   iconSignature: string;
-}
-
-function toLatLng(latLng: L.LatLng): LatLng {
-  return { lat: latLng.lat, lon: latLng.lng };
 }
 
 /** Name, routes, and images — not coordinates. Geo is applied with setLatLng. */
@@ -86,14 +82,10 @@ export function useSectorMarkers(
           bubblingMouseEvents: false,
         });
         marker.on('click', () => callbacksRef.current.onSelect(key));
-        marker.on('dragstart', () => {
-          marker.getElement()?.classList.add(DRAGGING_CLASS);
-          callbacksRef.current.onDragStart();
-        });
-        marker.on('drag', () => callbacksRef.current.onDrag(toLatLng(marker.getLatLng())));
-        marker.on('dragend', () => {
-          marker.getElement()?.classList.remove(DRAGGING_CLASS);
-          callbacksRef.current.onDragEnd(toLatLng(marker.getLatLng()));
+        bindPinDrag(marker, {
+          onDragStart: () => callbacksRef.current.onDragStart(),
+          onDrag: (geo) => callbacksRef.current.onDrag(geo),
+          onDragEnd: (geo) => callbacksRef.current.onDragEnd(geo),
         });
         group.addLayer(marker);
         entry = { marker, iconSignature };

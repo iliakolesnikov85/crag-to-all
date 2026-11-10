@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { patchSectorGeo } from '../api/client';
+import { patchSector } from '../api/client';
 import { CragContext } from '../context/CragContext';
 import { FilterContext, useFilterState } from '../context/FilterContext';
 import { SAMPLE_CRAG_ID, sampleCragData } from '../test/fixtures/cragData';
@@ -25,9 +25,9 @@ function withClassicVideo(): Sector[] {
     routes: sector.routes.map((route) =>
       route.name === 'Classic'
         ? {
-            ...route,
-            videos: [{ url: 'https://www.youtube.com/embed/abc', addedBy: 'Ada' }],
-          }
+          ...route,
+          videos: [{ url: 'https://www.youtube.com/embed/abc', addedBy: 'Ada' }],
+        }
         : route,
     ),
   }));
@@ -123,7 +123,7 @@ describe('RoutesPage', () => {
 
 describe('RoutesPage options', () => {
   beforeEach(() => {
-    vi.mocked(patchSectorGeo).mockReset();
+    vi.mocked(patchSector).mockReset();
   });
 
   it('offers route and sector edits from the last column', () => {
@@ -171,7 +171,7 @@ describe('RoutesPage options', () => {
 
   it('saves route details from the list', async () => {
     const sectors = withIds(sampleCragData.sectors);
-    vi.mocked(patchSectorGeo).mockResolvedValue({ ...sectors[0], version: 3 });
+    vi.mocked(patchSector).mockResolvedValue({ ...sectors[0], version: 3 });
     renderRoutes(sectors);
 
     fireEvent.click(screen.getByRole('button', { name: 'Options for Classic' }));
@@ -185,7 +185,7 @@ describe('RoutesPage options', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'Edit route' })).not.toBeInTheDocument();
     });
-    expect(patchSectorGeo).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
+    expect(patchSector).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 'sector-1', 2, {
       routes: [
         expect.objectContaining({ id: 'Classic', name: 'Direct', grade: '6A+' }),
         sectors[0].routes[1],

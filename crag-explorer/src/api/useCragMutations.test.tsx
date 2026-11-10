@@ -4,18 +4,18 @@ import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SAMPLE_CRAG_ID, sampleCragData } from '../test/fixtures/cragData';
 import type { CragData, DescriptionSection, Sector } from '../types';
-import { createSector, deleteSector, patchCragDescription, patchSectorGeo } from './client';
+import { createSector, deleteSector, patchCrag, patchSector } from './client';
 import { createAppQueryClient, queryKeys } from './queryClient';
 import {
   useCreateSector,
   useDeleteSector,
-  usePatchCragDescription,
+  usePatchCrag,
   usePatchSector,
 } from './useCragMutations';
 
 vi.mock('./client', () => ({
-  patchCragDescription: vi.fn(),
-  patchSectorGeo: vi.fn(),
+  patchCrag: vi.fn(),
+  patchSector: vi.fn(),
   createSector: vi.fn(),
   deleteSector: vi.fn(),
 }));
@@ -54,12 +54,12 @@ function renderMutation<T>(client: QueryClient, useHook: () => T) {
   });
 }
 
-function renderDescriptionMutation(client: QueryClient) {
-  return renderMutation(client, () => usePatchCragDescription(SAMPLE_CRAG_ID));
+function renderCragMutation(client: QueryClient) {
+  return renderMutation(client, () => usePatchCrag(SAMPLE_CRAG_ID));
 }
 
 function startStaleCragFetch(client: QueryClient, stale: CragData): () => void {
-  let finish = (): void => {};
+  let finish = (): void => { };
   const pending = new Promise<CragData>((resolve) => {
     finish = () => resolve(stale);
   });
@@ -89,14 +89,14 @@ function expectSavedDescription(client: QueryClient): void {
   });
 }
 
-describe('usePatchCragDescription', () => {
+describe('usePatchCrag', () => {
   beforeEach(() => {
-    vi.mocked(patchCragDescription).mockReset();
+    vi.mocked(patchCrag).mockReset();
   });
 
   it('keeps the save when an earlier crag fetch resolves afterwards', async () => {
     const stale = cragDocument(3, [{ subheader: 'Access', paragraphs: ['Old approach'] }]);
-    vi.mocked(patchCragDescription).mockResolvedValue({
+    vi.mocked(patchCrag).mockResolvedValue({
       description: nextDescription,
       version: 4,
     });
@@ -105,7 +105,7 @@ describe('usePatchCragDescription', () => {
     const finishStaleFetch = startStaleCragFetch(client, stale);
     expect(client.isFetching({ queryKey: queryKeys.crag(SAMPLE_CRAG_ID) })).toBe(1);
 
-    const { result } = renderDescriptionMutation(client);
+    const { result } = renderCragMutation(client);
     await result.current.mutateAsync({ version: 3, description: nextDescription });
     await settleStaleFetch(finishStaleFetch);
 
@@ -114,19 +114,19 @@ describe('usePatchCragDescription', () => {
 
   it('keeps the save when a crag fetch starts while the save is in flight', async () => {
     const stale = cragDocument(3, [{ subheader: 'Access', paragraphs: ['Old approach'] }]);
-    let resolvePatch: (saved: { description: DescriptionSection[]; version: number }) => void = () => {};
-    vi.mocked(patchCragDescription).mockImplementation(
+    let resolvePatch: (saved: { description: DescriptionSection[]; version: number }) => void = () => { };
+    vi.mocked(patchCrag).mockImplementation(
       () => new Promise((resolve) => {
         resolvePatch = resolve;
       }),
     );
     const client = createAppQueryClient();
     client.setQueryData(queryKeys.crag(SAMPLE_CRAG_ID), stale);
-    const { result } = renderDescriptionMutation(client);
+    const { result } = renderCragMutation(client);
 
     const saving = result.current.mutateAsync({ version: 3, description: nextDescription });
     await waitFor(() => {
-      expect(patchCragDescription).toHaveBeenCalled();
+      expect(patchCrag).toHaveBeenCalled();
     });
     const finishStaleFetch = startStaleCragFetch(client, stale);
     resolvePatch({ description: nextDescription, version: 4 });
@@ -139,26 +139,43 @@ describe('usePatchCragDescription', () => {
 
 describe('crag cache updates', () => {
   beforeEach(() => {
-    vi.mocked(patchCragDescription).mockReset();
-    vi.mocked(patchSectorGeo).mockReset();
+    vi.mocked(patchCrag).mockReset();
+    vi.mocked(patchSector).mockReset();
     vi.mocked(createSector).mockReset();
     vi.mocked(deleteSector).mockReset();
   });
 
   it('replaces the description and version and keeps the sectors', async () => {
-    vi.mocked(patchCragDescription).mockResolvedValue({
+    vi.mocked(patchCrag).mockResolvedValue({
       description: nextDescription,
       version: 4,
     });
     const client = createAppQueryClient();
     client.setQueryData(queryKeys.crag(SAMPLE_CRAG_ID), loadedCrag);
 
-    const { result } = renderDescriptionMutation(client);
+    const { result } = renderCragMutation(client);
     await result.current.mutateAsync({ version: 3, description: nextDescription });
 
     expect(client.getQueryData<CragData>(queryKeys.crag(SAMPLE_CRAG_ID))).toEqual({
       ...loadedCrag,
       description: nextDescription,
+      version: 4,
+    });
+  });
+
+  it('replaces the markers and version and keeps the sectors', async () => {
+    const markers = [{ type: 'wc' as const, info: 'By the barn', geo: { lat: 1, lon: 2 } }];
+    vi.mocked(patchCrag).mockResolvedValue({ markers, version: 4 });
+    const client = createAppQueryClient();
+    client.setQueryData(queryKeys.crag(SAMPLE_CRAG_ID), loadedCrag);
+
+    const { result } = renderCragMutation(client);
+    await result.current.mutateAsync({ version: 3, markers });
+
+    expect(patchCrag).toHaveBeenCalledWith(SAMPLE_CRAG_ID, 3, { markers });
+    expect(client.getQueryData<CragData>(queryKeys.crag(SAMPLE_CRAG_ID))).toEqual({
+      ...loadedCrag,
+      markers,
       version: 4,
     });
   });
@@ -170,7 +187,7 @@ describe('crag cache updates', () => {
       version: 2,
       geo: { lat: 1, lon: 2 },
     };
-    vi.mocked(patchSectorGeo).mockResolvedValue(moved);
+    vi.mocked(patchSector).mockResolvedValue(moved);
     const client = createAppQueryClient();
     client.setQueryData(queryKeys.crag(SAMPLE_CRAG_ID), loadedCrag);
 
@@ -224,7 +241,7 @@ describe('crag cache updates', () => {
   });
 
   it('updates the crag that was saved and leaves a different crag cached', async () => {
-    vi.mocked(patchCragDescription).mockResolvedValue({
+    vi.mocked(patchCrag).mockResolvedValue({
       description: nextDescription,
       version: 4,
     });
@@ -233,7 +250,7 @@ describe('crag cache updates', () => {
     client.setQueryData(queryKeys.crag(SAMPLE_CRAG_ID), loadedCrag);
     client.setQueryData(queryKeys.crag('other'), otherCrag);
 
-    const { result } = renderMutation(client, () => usePatchCragDescription('other'));
+    const { result } = renderMutation(client, () => usePatchCrag('other'));
     await result.current.mutateAsync({ version: 3, description: nextDescription });
 
     expect(client.getQueryData(queryKeys.crag(SAMPLE_CRAG_ID))).toEqual(loadedCrag);

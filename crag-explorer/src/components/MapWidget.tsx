@@ -1,33 +1,61 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { uploadCragImage } from '../api/client';
 import { canEditCrag } from '../api/permissions';
-import { useCreateSector, usePatchSector } from '../api/useCragMutations';
+import { useCreateSector, usePatchCrag, usePatchSector } from '../api/useCragMutations';
 import { useCrag } from '../context/CragContext';
 import { useIsMobileLayout } from '../hooks/useIsMobileLayout';
 import { useLeafletMap } from '../hooks/useLeafletMap';
 import { useLocationTracking } from '../hooks/useLocationTracking';
 import { useMapFullscreen } from '../hooks/useMapFullscreen';
+import { useMapMarkers, type MapMarkerEdit } from '../hooks/useMapMarkers';
+import { useMarkerEditor } from '../hooks/useMarkerEditor';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { usePlacementMode } from '../hooks/usePlacementMode';
 import { useSectorEditor } from '../hooks/useSectorEditor';
 import { useSectorMarkers, type SectorMarkerEdit } from '../hooks/useSectorMarkers';
 import { useStaticOverlays } from '../hooks/useStaticOverlays';
-import { CragData, Sector } from '../types';
+import { CragData, type CragMapMarker, type LatLng, Sector } from '../types';
 import {
+  DRAFT_MARKER_KEY,
   DRAFT_SECTOR_ID,
   DRAFT_SECTOR_LABEL,
   fitMapToCragBounds,
+  markerKeyFromIndex,
   sectorMarkerKey,
 } from '../utils/map';
 import MapAnchoredCard from './map/MapAnchoredCard';
 import MapControlPortal from './map/MapControlPortal';
-import MapToolbar from './map/MapToolbar';
+import MapToolbar, { type MapPlacementMode } from './map/MapToolbar';
+import MarkerMapInfo from './map/MarkerMapInfo';
 import SectorMapInfo from './map/SectorMapInfo';
+
+const EMPTY_MARKERS: CragMapMarker[] = [];
 
 interface MapWidgetProps {
   cragData: CragData;
   onSectorGeoSaved?: (sector: Sector) => void;
   onSectorCreated?: (sector: Sector) => void;
+}
+
+type OpenCard =
+  | { kind: 'sector'; id: string }
+  | { kind: 'marker'; key: string };
+
+interface LivePin {
+  target: string;
+  currentGeo: LatLng;
+  dragging: boolean;
+}
+
+/** Where the open card sits. A drag keeps the resting point so the hidden card does not follow the pointer. */
+function cardPlacement(
+  live: LivePin | null,
+  openKey: string | null,
+  restingGeo: LatLng | null,
+): { geo: LatLng | null; hidden: boolean } {
+  if (live == null || live.target !== openKey) return { geo: restingGeo, hidden: false };
+  if (live.dragging) return { geo: restingGeo, hidden: true };
+  return { geo: live.currentGeo, hidden: false };
 }
 
 const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSectorCreated }) => {
@@ -36,24 +64,22 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSec
   const isMobile = useIsMobileLayout();
   const patchSector = usePatchSector(crag.cragId);
   const createSectorMutation = useCreateSector(crag.cragId);
+  const patchCrag = usePatchCrag(crag.cragId);
   const mapRef = useRef<HTMLDivElement>(null);
   const map = useLeafletMap(mapRef, { cragId: crag.cragId, cragData, online });
   const { fullscreen, toggleFullscreen } = useMapFullscreen(crag.cragId, map);
   const location = useLocationTracking(map);
-  /** Marker key of the sector whose card is open. */
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [placing, setPlacing] = useState(false);
-  const placingRef = useRef(placing);
-  placingRef.current = placing;
-  const onSectorGeoSavedRef = useRef(onSectorGeoSaved);
-  const onSectorCreatedRef = useRef(onSectorCreated);
-  onSectorGeoSavedRef.current = onSectorGeoSaved;
-  onSectorCreatedRef.current = onSectorCreated;
+  const [openCard, setOpenCard] = useState<OpenCard | null>(null);
+  const selectedId = openCard?.kind === 'sector' ? openCard.id : null;
+  const selectedMarkerKey = openCard?.kind === 'marker' ? openCard.key : null;
+  const [placement, setPlacement] = useState<MapPlacementMode | null>(null);
+  const placing = placement != null;
 
   const canEdit = canEditCrag({
     cragId: crag.cragId,
     source: cragData.source ?? crag.source,
   });
+  const markers = cragData.markers ?? EMPTY_MARKERS;
 
   const editor = useSectorEditor({
     map,
@@ -68,16 +94,35 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSec
       const images = topo ? [await uploadCragImage(crag.cragId, topo)] : undefined;
       return createSectorMutation.mutateAsync({ ...input, ...(images ? { images } : {}) });
     },
-    onSaved: (sector) => onSectorGeoSavedRef.current?.(sector),
+    onSaved: (sector) => onSectorGeoSaved?.(sector),
     onCreated: (sector) => {
-      setSelectedId(sector.id ?? null);
-      onSectorCreatedRef.current?.(sector);
+      setOpenCard(sector.id != null ? { kind: 'sector', id: sector.id } : null);
+      onSectorCreated?.(sector);
     },
   });
   const edit = editor.state;
 
-  // Position comes from `markerEdit`, not this object, so the reference can stay
-  // stable while the pin is dragged (rebuilding it would replace the icon).
+  const markerEditor = useMarkerEditor({
+    map,
+    markers,
+    version: cragData.version,
+    saveMarkers: (next) => {
+      if (typeof cragData.version !== 'number') {
+        return Promise.reject(new Error('This crag cannot be saved because it has no version.'));
+      }
+      return patchCrag.mutateAsync({ version: cragData.version, markers: next }).then((saved) => {
+        if (!saved.markers) {
+          throw new Error('Marker save returned an unexpected response');
+        }
+        return saved.markers;
+      });
+    },
+    onSaved: (key) => setOpenCard({ kind: 'marker', key }),
+    onDeleted: () => setOpenCard(null),
+  });
+  const markerEdit = markerEditor.state;
+
+  // Draft pins omit the live position so typing or dragging does not rebuild the marker list.
   const draftSector = useMemo<Sector | null>(() => {
     if (edit?.target !== DRAFT_SECTOR_ID) return null;
     return { id: DRAFT_SECTOR_ID, name: DRAFT_SECTOR_LABEL, geo: edit.originalGeo, routes: [], images: [] };
@@ -86,58 +131,98 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSec
     () => (draftSector ? [...cragData.sectors, draftSector] : cragData.sectors),
     [cragData.sectors, draftSector],
   );
-  const markerEdit = useMemo<SectorMarkerEdit | null>(
-    () => (edit ? { key: edit.target, geo: edit.currentGeo, dragging: edit.dragging } : null),
-    [edit?.target, edit?.currentGeo, edit?.dragging],
-  );
+  const draftMarker = useMemo<CragMapMarker | null>(() => {
+    if (markerEdit?.target !== DRAFT_MARKER_KEY) return null;
+    return { type: markerEdit.markerType, info: '', geo: markerEdit.originalGeo };
+  }, [markerEdit?.target, markerEdit?.markerType, markerEdit?.originalGeo]);
 
-  useSectorMarkers(map, markerSectors, markerEdit, {
-    onSelect: setSelectedId,
+  // Position is omitted while dragging: Leaflet owns the pin until the drop.
+  const sectorPinGeo = edit != null && !edit.dragging ? edit.currentGeo : null;
+  const sectorPinEdit = useMemo<SectorMarkerEdit | null>(() => {
+    if (!edit) return null;
+    return { key: edit.target, geo: edit.currentGeo, dragging: edit.dragging };
+  }, [edit?.target, edit?.dragging, sectorPinGeo]);
+  const markerPinGeo = markerEdit != null && !markerEdit.dragging ? markerEdit.currentGeo : null;
+  const mapMarkerEdit = useMemo<MapMarkerEdit | null>(() => {
+    if (!markerEdit) return null;
+    return {
+      key: markerEdit.target,
+      geo: markerEdit.currentGeo,
+      type: markerEdit.markerType,
+      dragging: markerEdit.dragging,
+    };
+  }, [markerEdit?.target, markerEdit?.dragging, markerEdit?.markerType, markerPinGeo]);
+
+  const selectSector = useCallback((id: string) => {
+    setOpenCard({ kind: 'sector', id });
+  }, []);
+  const selectMarker = useCallback((key: string) => {
+    setOpenCard({ kind: 'marker', key });
+  }, []);
+
+  useSectorMarkers(map, markerSectors, sectorPinEdit, {
+    onSelect: selectSector,
     onDragStart: editor.beginDrag,
     onDrag: editor.moveTo,
     onDragEnd: editor.endDrag,
   });
-  useStaticOverlays(map, cragData.markers, cragData.trails);
+  useMapMarkers(map, markers, draftMarker, mapMarkerEdit, {
+    onSelect: selectMarker,
+    onDragStart: markerEditor.beginDrag,
+    onDrag: markerEditor.moveTo,
+    onDragEnd: markerEditor.endDrag,
+  });
+  useStaticOverlays(map, cragData.trails);
   usePlacementMode(map, placing, {
     onPlace(geo) {
-      setPlacing(false);
+      setPlacement(null);
+      if (placement === 'marker') {
+        markerEditor.startDraft(geo);
+        setOpenCard({ kind: 'marker', key: DRAFT_MARKER_KEY });
+        return;
+      }
       editor.startDraft(geo);
-      setSelectedId(DRAFT_SECTOR_ID);
+      setOpenCard({ kind: 'sector', id: DRAFT_SECTOR_ID });
     },
     onCancel() {
-      setPlacing(false);
+      setPlacement(null);
     },
   });
 
   // A click on the map background closes the card. While placing, that click drops the draft instead.
   useEffect(() => {
-    if (!map) return;
-    const handleMapClick = () => {
-      if (placingRef.current) return;
-      setSelectedId(null);
-    };
+    if (!map || placing) return;
+    const handleMapClick = () => setOpenCard(null);
     map.on('click', handleMapClick);
     return () => {
       map.off('click', handleMapClick);
     };
-  }, [map]);
+  }, [map, placing]);
 
-  // The card hosts the edit. Closing it, or opening another sector, ends the edit.
+  // The card hosts the edit. Closing it, or opening another pin, ends the edit.
+  // A dismiss during a save is ignored until the save finishes, then retried,
+  // so a failure cannot leave a pin editable with no card.
   const editTarget = edit?.target ?? null;
+  const sectorSaving = edit?.saving ?? false;
   const editorRef = useRef(editor);
   editorRef.current = editor;
   useEffect(() => {
     if (editTarget != null && editTarget !== selectedId) editorRef.current.dismiss();
-  }, [editTarget, selectedId]);
+    if (selectedId === DRAFT_SECTOR_ID && editTarget !== DRAFT_SECTOR_ID) setOpenCard(null);
+  }, [editTarget, selectedId, sectorSaving]);
 
-  // The draft disappears when its edit ends (saved, cancelled, or dismissed).
+  const markerEditTarget = markerEdit?.target ?? null;
+  const markerSaving = markerEdit?.saving ?? false;
+  const markerEditorRef = useRef(markerEditor);
+  markerEditorRef.current = markerEditor;
   useEffect(() => {
-    if (selectedId === DRAFT_SECTOR_ID && editTarget !== DRAFT_SECTOR_ID) setSelectedId(null);
-  }, [selectedId, editTarget]);
+    if (markerEditTarget != null && markerEditTarget !== selectedMarkerKey) markerEditorRef.current.dismiss();
+    if (selectedMarkerKey === DRAFT_MARKER_KEY && markerEditTarget !== DRAFT_MARKER_KEY) setOpenCard(null);
+  }, [markerEditTarget, selectedMarkerKey, markerSaving]);
 
-  const togglePlacing = useCallback(() => {
-    if (!placingRef.current) setSelectedId(null);
-    setPlacing(!placingRef.current);
+  const togglePlacing = useCallback((mode: MapPlacementMode) => {
+    setPlacement((current) => (current === mode ? null : mode));
+    setOpenCard(null);
   }, []);
 
   const selectedSector = useMemo(() => {
@@ -145,11 +230,33 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSec
     if (selectedId === DRAFT_SECTOR_ID) return draftSector;
     return cragData.sectors.find((sector) => sectorMarkerKey(sector) === selectedId) ?? null;
   }, [selectedId, draftSector, cragData.sectors]);
+  const selectedMarker = useMemo(() => {
+    if (selectedMarkerKey == null) return null;
+    if (selectedMarkerKey === DRAFT_MARKER_KEY) {
+      if (!draftMarker) return null;
+      return { key: DRAFT_MARKER_KEY, index: null, isNew: true, marker: draftMarker };
+    }
+    const index = markers.findIndex((_, itemIndex) => markerKeyFromIndex(itemIndex) === selectedMarkerKey);
+    const marker = markers[index];
+    if (index < 0 || !marker) return null;
+    return { key: selectedMarkerKey, index, isNew: false, marker };
+  }, [selectedMarkerKey, draftMarker, markers]);
   const selectedIsDraft = selectedSector?.id === DRAFT_SECTOR_ID;
-  const cardGeo = edit && selectedId === edit.target ? edit.currentGeo : selectedSector?.geo ?? null;
-  const cardHidden = edit != null && edit.dragging && edit.target === selectedId;
+  const markerCard = cardPlacement(markerEdit, selectedMarkerKey, selectedMarker?.marker.geo ?? null);
+  const sectorCard = cardPlacement(edit, selectedId, selectedSector?.geo ?? null);
+  const cardGeo = selectedMarker ? markerCard.geo : sectorCard.geo;
+  const cardHidden = selectedMarker ? markerCard.hidden : sectorCard.hidden;
 
-  const card = selectedSector && (
+  const card = selectedMarker ? (
+    <MarkerMapInfo
+      markerKey={selectedMarker.key}
+      marker={selectedMarker.marker}
+      index={selectedMarker.index}
+      editor={markerEditor}
+      editable={canEdit}
+      isNew={selectedMarker.isNew}
+    />
+  ) : selectedSector && (
     <SectorMapInfo
       sector={selectedSector}
       editor={editor}
@@ -157,6 +264,10 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSec
       isNew={selectedIsDraft}
     />
   );
+
+  const closeCard = useCallback(() => setOpenCard(null), []);
+
+  const placementSubject = placement === 'marker' ? 'marker' : 'sector';
 
   return (
     <div className={`map-widget${fullscreen ? ' map-widget--fullscreen' : ''}`}>
@@ -170,8 +281,8 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSec
           onResetBounds={() => {
             if (map) fitMapToCragBounds(map, cragData);
           }}
-          canAddSector={canEdit}
-          placing={placing}
+          canAdd={canEdit}
+          placing={placement}
           onTogglePlacing={togglePlacing}
         />
       </MapControlPortal>
@@ -179,13 +290,13 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSec
         <div className="map-placement-hint" role="status">
           <span className="map-placement-hint__text">
             {isMobile
-              ? 'Tap the map where the new sector should be'
-              : 'Click the map where the new sector should be'}
+              ? `Tap the map where the new ${placementSubject} should be`
+              : `Click the map where the new ${placementSubject} should be`}
           </span>
           <button
             type="button"
             className="map-placement-hint__cancel"
-            onClick={() => setPlacing(false)}
+            onClick={() => setPlacement(null)}
           >
             Cancel
           </button>
@@ -197,7 +308,14 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSec
         </div>
       )}
       {card && !isMobile && map && cardGeo && (
-        <MapAnchoredCard map={map} geo={cardGeo} hidden={cardHidden} onClose={() => setSelectedId(null)}>
+        <MapAnchoredCard
+          map={map}
+          geo={cardGeo}
+          hidden={cardHidden}
+          label={selectedMarker ? 'Map marker' : 'Sector details'}
+          className={selectedMarker ? 'sector-map-card--marker' : undefined}
+          onClose={closeCard}
+        >
           {card}
         </MapAnchoredCard>
       )}
