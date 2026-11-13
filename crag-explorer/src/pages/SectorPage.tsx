@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { uploadCragImage } from '../api/client';
 import { useDeleteSector } from '../api/useCragMutations';
-import { canEditCrag } from '../api/permissions';
+import { useCanEditCrag } from '../auth/useAuthSession';
 import AddTopoModal from '../components/AddTopoModal';
 import DrawRouteModal from '../components/DrawRouteModal';
 import RouteListModal from '../components/RouteListModal';
@@ -79,7 +79,7 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
       setRouteDraw({ index, route: savedRoute, imageFile: drawImageFile });
     },
   });
-  const canEdit = canEditCrag(crag);
+  const canEdit = useCanEditCrag(crag);
   const saving = editors.saving;
   const menusDisabled = deleteSectorMutation.isPending || saving || topoSaving;
 

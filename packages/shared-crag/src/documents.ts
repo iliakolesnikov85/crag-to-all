@@ -50,3 +50,13 @@ export interface SectorDocument {
   version: number;
   updatedAt: Date;
 }
+
+export type CragMemberRole = 'owner' | 'admin';
+
+/** Mongo `crag_members` document. One row per user on a crag. */
+export interface CragMemberDocument {
+  cragId: string;
+  /** Firebase Auth uid. */
+  userId: string;
+  role: CragMemberRole;
+}

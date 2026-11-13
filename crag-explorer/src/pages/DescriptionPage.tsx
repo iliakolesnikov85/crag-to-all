@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { MdDelete, MdEdit } from 'react-icons/md';
 import { usePatchCrag } from '../api/useCragMutations';
 import { canEditCrag } from '../api/permissions';
+import { useCanEditCrag } from '../auth/useAuthSession';
 import Button from '../components/Button';
 import DescriptionSectionModal from '../components/DescriptionSectionModal';
 import { confirm } from '../context/ConfirmContext';
@@ -44,7 +45,7 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const canEdit = canEditCrag(crag);
+  const canEdit = useCanEditCrag(crag);
   const pending = patchCrag.isPending;
   const editingSection = editor?.mode === 'edit'
     ? (baseline?.description ?? description)[editor.index]

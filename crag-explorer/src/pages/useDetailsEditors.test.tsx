@@ -1,7 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { patchSector } from '../api/client';
+import { setAuthAccount } from '../auth/session';
+import { signInTestUser } from '../test/authAccount';
 import { CragContext } from '../context/CragContext';
 import { withQueryClient } from '../test/helpers';
 import { SAMPLE_CRAG_ID, sampleCragData } from '../test/fixtures/cragData';
@@ -9,7 +11,7 @@ import type { Sector } from '../types';
 import useDetailsEditors from './useDetailsEditors';
 
 vi.mock('../api/client', () => ({
-  patchSectorGeo: vi.fn(),
+  patchSector: vi.fn(),
 }));
 
 const cragValue = {
@@ -50,7 +52,22 @@ function renderEditors() {
 
 describe('useDetailsEditors saveRoute', () => {
   beforeEach(() => {
+    signInTestUser();
     vi.mocked(patchSector).mockReset();
+  });
+
+  it('opens the route editor after sign-in', () => {
+    setAuthAccount(null);
+    renderEditors();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit route' }));
+    expect(screen.queryByRole('dialog', { name: 'Edit route' })).not.toBeInTheDocument();
+
+    act(() => {
+      signInTestUser();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit route' }));
+
+    expect(screen.getByRole('dialog', { name: 'Edit route' })).toBeInTheDocument();
   });
 
   it('refuses to add a route when the sector is no longer loaded', () => {

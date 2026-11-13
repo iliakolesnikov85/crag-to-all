@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HttpError } from './http';
-import { parseCragId, parseCragPatch, parseCreateCrag, parseSectorGeoPatch, parseSectorWrite } from './validate';
+import { parseCragId, parseCragPatch, parseCreateCrag, parseSectorPatch, parseSectorWrite } from './validate';
 
 describe('validate', () => {
   it('slugifies the crag name when cragId is omitted', () => {
@@ -43,13 +43,13 @@ describe('validate', () => {
   });
 
   it('parses a sector coordinate patch and rejects latitudes outside range', () => {
-    expect(parseSectorGeoPatch({ version: 1, geo: { lat: 42.5, lon: 45.2 } })).toEqual({
+    expect(parseSectorPatch({ version: 1, geo: { lat: 42.5, lon: 45.2 } })).toEqual({
       version: 1,
       geo: { lat: 42.5, lon: 45.2 },
     });
     try {
-      parseSectorGeoPatch({ version: 1, geo: { lat: 91, lon: 0 } });
-      throw new Error('expected parseSectorGeoPatch to throw');
+      parseSectorPatch({ version: 1, geo: { lat: 91, lon: 0 } });
+      throw new Error('expected parseSectorPatch to throw');
     } catch (error) {
       expect(error).toBeInstanceOf(HttpError);
       expect((error as HttpError).status).toBe(400);
@@ -57,13 +57,13 @@ describe('validate', () => {
   });
 
   it('parses a sector name patch and rejects a body with only a version', () => {
-    expect(parseSectorGeoPatch({ version: 2, name: ' North Wall ' })).toEqual({
+    expect(parseSectorPatch({ version: 2, name: ' North Wall ' })).toEqual({
       version: 2,
       name: 'North Wall',
     });
     try {
-      parseSectorGeoPatch({ version: 1 });
-      throw new Error('expected parseSectorGeoPatch to throw');
+      parseSectorPatch({ version: 1 });
+      throw new Error('expected parseSectorPatch to throw');
     } catch (error) {
       expect(error).toBeInstanceOf(HttpError);
       expect((error as HttpError).status).toBe(400);
@@ -71,14 +71,14 @@ describe('validate', () => {
         'PATCH body must include at least one sector field besides version',
       );
     }
-    expect(parseSectorGeoPatch({ version: 1, name: 'Loaf 6*(^&%&$^%' })).toEqual({
+    expect(parseSectorPatch({ version: 1, name: 'Loaf 6*(^&%&$^%' })).toEqual({
       version: 1,
       name: 'Loaf 6*(^&%&$^%',
     });
   });
 
   it('parses sector detail fields and null clears', () => {
-    expect(parseSectorGeoPatch({
+    expect(parseSectorPatch({
       version: 3,
       altitude: ' 2000m ',
       approachTime: '30min',
@@ -93,14 +93,14 @@ describe('validate', () => {
       orientation: 'N, NW,',
       timeInSun: '02:30 -',
     });
-    expect(parseSectorGeoPatch({ version: 4, season: null, timeInSun: null })).toEqual({
+    expect(parseSectorPatch({ version: 4, season: null, timeInSun: null })).toEqual({
       version: 4,
       season: null,
       timeInSun: null,
     });
     try {
-      parseSectorGeoPatch({ version: 1, altitude: '   ' });
-      throw new Error('expected parseSectorGeoPatch to throw');
+      parseSectorPatch({ version: 1, altitude: '   ' });
+      throw new Error('expected parseSectorPatch to throw');
     } catch (error) {
       expect(error).toBeInstanceOf(HttpError);
       expect((error as HttpError).status).toBe(400);
@@ -108,7 +108,7 @@ describe('validate', () => {
   });
 
   it('parses a routes patch, assigns ids, and keeps an empty grade and a duplicate name', () => {
-    const parsed = parseSectorGeoPatch({
+    const parsed = parseSectorPatch({
       version: 2,
       routes: [{ id: 'route-1', name: ' Classic ', grade: '6A', height: 5, type: 'Boulder', tags: ['Crimpers'] }],
     });
@@ -124,13 +124,13 @@ describe('validate', () => {
       }),
     ]);
 
-    const created = parseSectorGeoPatch({
+    const created = parseSectorPatch({
       version: 1,
       routes: [{ name: 'Direct', grade: '7A' }],
     });
     expect(created.routes?.[0]?.id).toEqual(expect.any(String));
 
-    const kept = parseSectorGeoPatch({
+    const kept = parseSectorPatch({
       version: 1,
       routes: [
         { name: 'Classic', grade: '6A' },
@@ -144,7 +144,7 @@ describe('validate', () => {
       { name: 'Ungraded', grade: '' },
     ]);
 
-    const typed = parseSectorGeoPatch({
+    const typed = parseSectorPatch({
       version: 1,
       routes: [
         { name: 'Classic', grade: '6A', type: '' },
@@ -155,7 +155,7 @@ describe('validate', () => {
     });
     expect(typed.routes?.map((route) => route.type)).toEqual([undefined, undefined, undefined, 'Sport']);
 
-    expect(parseSectorGeoPatch({
+    expect(parseSectorPatch({
       version: 2,
       images: [
         { imageFile: ' b.jpg ' },
@@ -169,7 +169,7 @@ describe('validate', () => {
       ],
     });
 
-    const withLine = parseSectorGeoPatch({
+    const withLine = parseSectorPatch({
       version: 2,
       routes: [{
         name: 'Classic',
@@ -187,11 +187,11 @@ describe('validate', () => {
     }]);
 
     try {
-      parseSectorGeoPatch({
+      parseSectorPatch({
         version: 1,
         routes: [{ name: 'Classic', grade: '6A', height: 0 }],
       });
-      throw new Error('expected parseSectorGeoPatch to throw');
+      throw new Error('expected parseSectorPatch to throw');
     } catch (error) {
       expect(error).toBeInstanceOf(HttpError);
       expect((error as HttpError).status).toBe(400);

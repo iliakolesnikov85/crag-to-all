@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { CRAG_DATA_PROTOCOL } from '@crag-to-all/shared-crag';
+import type { Express } from 'express';
 import { MongoClient, type Db } from 'mongodb';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import request from 'supertest';
@@ -7,7 +8,24 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app';
 import { IMAGE_FIELD_NAME } from './images';
 import { ensureIndexes } from './store';
-import type { ImageStorage } from './types';
+import type { AuthCaller, IdTokenVerifier, ImageStorage } from './types';
+
+const TEST_TOKEN = 'test-token';
+const TEST_EMAIL = 'editor@example.com';
+
+const auth: IdTokenVerifier = {
+  async verifyIdToken(idToken) {
+    if (idToken !== TEST_TOKEN) {
+      throw new Error('invalid token');
+    }
+    return {
+      uid: 'test-user',
+      email: TEST_EMAIL,
+      emailVerified: true,
+      superadmin: true,
+    };
+  },
+};
 
 const PNG_1X1 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
@@ -26,13 +44,37 @@ describe('crag-api', () => {
     },
   };
 
+  function write(target: Express = app) {
+    const authorization = { Authorization: `Bearer ${TEST_TOKEN}` };
+    return {
+      get: (path: string) => request(target).get(path).set(authorization),
+      post: (path: string) => request(target).post(path).set(authorization),
+      put: (path: string) => request(target).put(path).set(authorization),
+      patch: (path: string) => request(target).patch(path).set(authorization),
+      delete: (path: string) => request(target).delete(path).set(authorization),
+    };
+  }
+
+  function appFor(caller: AuthCaller) {
+    return createApp(db, {
+      auth: {
+        async verifyIdToken() {
+          return caller;
+        },
+      },
+    });
+  }
+
   beforeAll(async () => {
     mongod = await MongoMemoryServer.create();
     client = new MongoClient(mongod.getUri());
     await client.connect();
     db = client.db('crag-api-test');
     await ensureIndexes(db);
-    app = createApp(db, { storage });
+    app = createApp(db, {
+      storage,
+      auth,
+    });
   });
 
   afterAll(async () => {
@@ -55,6 +97,7 @@ describe('crag-api', () => {
   beforeEach(async () => {
     await db.collection('crags').deleteMany({});
     await db.collection('sectors').deleteMany({});
+    await db.collection('crag_members').deleteMany({});
     uploaded.clear();
   });
 
@@ -65,7 +108,7 @@ describe('crag-api', () => {
   });
 
   it('creates an explorer crag via POST and assembles it on GET', async () => {
-    const created = await request(app).post('/api/crags').send({ name: 'Roshka' });
+    const created = await write().post('/api/crags').send({ name: 'Roshka' });
     expect(created.status).toBe(201);
     expect(created.body).toMatchObject({
       id: 'roshka',
@@ -91,22 +134,22 @@ describe('crag-api', () => {
   });
 
   it('rejects a duplicate crag id with 409', async () => {
-    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
-    const res = await request(app).post('/api/crags').send({ name: 'Other', cragId: 'roshka' });
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    const res = await write().post('/api/crags').send({ name: 'Other', cragId: 'roshka' });
     expect(res.status).toBe(409);
     expect(res.body.error).toBe('already_exists');
   });
 
   it('patches crag-level fields and returns 409 on a stale version', async () => {
-    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
 
-    const stale = await request(app)
+    const stale = await write()
       .patch('/api/crags/roshka')
       .send({ version: 99, name: 'Nope' });
     expect(stale.status).toBe(409);
     expect(stale.body).toEqual({ error: 'version_conflict', currentVersion: 1 });
 
-    const patched = await request(app)
+    const patched = await write()
       .patch('/api/crags/roshka')
       .send({
         version: 1,
@@ -122,9 +165,9 @@ describe('crag-api', () => {
   });
 
   it('adds, replaces, and deletes sectors without touching other documents', async () => {
-    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
 
-    const created = await request(app)
+    const created = await write()
       .post('/api/crags/roshka/sectors')
       .send({
         name: 'Main Wall',
@@ -141,20 +184,20 @@ describe('crag-api', () => {
     expect(assembled.body.sectors).toHaveLength(1);
     expect(assembled.body.sectors[0].id).toBe(sectorId);
 
-    const replaced = await request(app)
+    const replaced = await write()
       .put(`/api/crags/roshka/sectors/${sectorId}`)
       .send({ version: 1, name: 'Cave', geo: null });
     expect(replaced.status).toBe(200);
     expect(replaced.body.version).toBe(2);
     expect(replaced.body.name).toBe('Cave');
 
-    const conflict = await request(app)
+    const conflict = await write()
       .put(`/api/crags/roshka/sectors/${sectorId}`)
       .send({ version: 1, name: 'Old name', geo: null });
     expect(conflict.status).toBe(409);
     expect(conflict.body).toEqual({ error: 'version_conflict', currentVersion: 2 });
 
-    const removed = await request(app).delete(`/api/crags/roshka/sectors/${sectorId}`);
+    const removed = await write().delete(`/api/crags/roshka/sectors/${sectorId}`);
     expect(removed.status).toBe(204);
 
     const afterDelete = await request(app).get('/api/crags/roshka');
@@ -163,8 +206,8 @@ describe('crag-api', () => {
   });
 
   it('patches sector coordinates without replacing routes', async () => {
-    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
-    const created = await request(app)
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    const created = await write()
       .post('/api/crags/roshka/sectors')
       .send({
         name: 'Main Wall',
@@ -175,7 +218,7 @@ describe('crag-api', () => {
     const sectorId = created.body.id as string;
     const routeId = created.body.routes[0].id as string;
 
-    const patched = await request(app)
+    const patched = await write()
       .patch(`/api/crags/roshka/sectors/${sectorId}`)
       .send({ version: 1, geo: { lat: 42.6, lon: 45.3 } });
     expect(patched.status).toBe(200);
@@ -186,18 +229,18 @@ describe('crag-api', () => {
       expect.objectContaining({ id: routeId, name: 'Classic', grade: '6a' }),
     ]);
 
-    const conflict = await request(app)
+    const conflict = await write()
       .patch(`/api/crags/roshka/sectors/${sectorId}`)
       .send({ version: 1, geo: { lat: 1, lon: 2 } });
     expect(conflict.status).toBe(409);
     expect(conflict.body).toEqual({ error: 'version_conflict', currentVersion: 2 });
 
-    const invalid = await request(app)
+    const invalid = await write()
       .patch(`/api/crags/roshka/sectors/${sectorId}`)
       .send({ version: 2, geo: { lat: 120, lon: 45.3 } });
     expect(invalid.status).toBe(400);
 
-    const missing = await request(app)
+    const missing = await write()
       .patch('/api/crags/roshka/sectors/missing-sector')
       .send({ version: 1, geo: { lat: 1, lon: 2 } });
     expect(missing.status).toBe(404);
@@ -208,8 +251,8 @@ describe('crag-api', () => {
   });
 
   it('renames a sector, updates route names, and rejects a duplicate', async () => {
-    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
-    const created = await request(app)
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    const created = await write()
       .post('/api/crags/roshka/sectors')
       .send({
         name: 'Main Wall',
@@ -217,14 +260,14 @@ describe('crag-api', () => {
         routes: [{ name: 'Classic', grade: '6a' }],
       });
     expect(created.status).toBe(201);
-    const other = await request(app)
+    const other = await write()
       .post('/api/crags/roshka/sectors')
       .send({ name: 'Cave', geo: { lat: 42.4, lon: 45.1 } });
     expect(other.status).toBe(201);
 
     const sectorId = created.body.id as string;
     const routeId = created.body.routes[0].id as string;
-    const renamed = await request(app)
+    const renamed = await write()
       .patch(`/api/crags/roshka/sectors/${sectorId}`)
       .send({ version: 1, name: 'North Wall' });
     expect(renamed.status).toBe(200);
@@ -239,14 +282,14 @@ describe('crag-api', () => {
       }),
     ]);
 
-    const recased = await request(app)
+    const recased = await write()
       .patch(`/api/crags/roshka/sectors/${sectorId}`)
       .send({ version: 2, name: 'north wall' });
     expect(recased.status).toBe(200);
     expect(recased.body.name).toBe('north wall');
     expect(recased.body.routes[0].sectorName).toBe('north wall');
 
-    const duplicate = await request(app)
+    const duplicate = await write()
       .patch(`/api/crags/roshka/sectors/${sectorId}`)
       .send({ version: 3, name: 'cave' });
     expect(duplicate.status).toBe(409);
@@ -255,7 +298,7 @@ describe('crag-api', () => {
       message: 'A sector with this name already exists.',
     });
 
-    const versionOnly = await request(app)
+    const versionOnly = await write()
       .patch(`/api/crags/roshka/sectors/${sectorId}`)
       .send({ version: 3 });
     expect(versionOnly.status).toBe(400);
@@ -267,8 +310,8 @@ describe('crag-api', () => {
   });
 
   it('patches sector details and clears fields that are set to null', async () => {
-    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
-    const created = await request(app)
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    const created = await write()
       .post('/api/crags/roshka/sectors')
       .send({
         name: 'Main Wall',
@@ -279,7 +322,7 @@ describe('crag-api', () => {
     const sectorId = created.body.id as string;
     const routeId = created.body.routes[0].id as string;
 
-    const patched = await request(app)
+    const patched = await write()
       .patch(`/api/crags/roshka/sectors/${sectorId}`)
       .send({
         version: 1,
@@ -304,7 +347,7 @@ describe('crag-api', () => {
       expect.objectContaining({ id: routeId, name: 'Classic', sectorName: 'Main Wall' }),
     ]);
 
-    const cleared = await request(app)
+    const cleared = await write()
       .patch(`/api/crags/roshka/sectors/${sectorId}`)
       .send({ version: 2, season: null, timeInSun: null });
     expect(cleared.status).toBe(200);
@@ -314,7 +357,7 @@ describe('crag-api', () => {
     expect(cleared.body.altitude).toBe('2000m');
     expect(cleared.body.orientation).toBe('N, NW,');
 
-    const blank = await request(app)
+    const blank = await write()
       .patch(`/api/crags/roshka/sectors/${sectorId}`)
       .send({ version: 3, altitude: '   ' });
     expect(blank.status).toBe(400);
@@ -327,8 +370,8 @@ describe('crag-api', () => {
   });
 
   it('replaces sector routes, assigns ids, and keeps a duplicate name', async () => {
-    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
-    const created = await request(app)
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    const created = await write()
       .post('/api/crags/roshka/sectors')
       .send({
         name: 'Main Wall',
@@ -345,7 +388,7 @@ describe('crag-api', () => {
     const sectorId = created.body.id as string;
     const routeId = created.body.routes[0].id as string;
 
-    const patched = await request(app)
+    const patched = await write()
       .patch(`/api/crags/roshka/sectors/${sectorId}`)
       .send({
         version: 1,
@@ -395,7 +438,7 @@ describe('crag-api', () => {
     expect(patched.body.routes[1].id).toEqual(expect.any(String));
     expect(patched.body.routes[1].id).not.toBe(routeId);
 
-    const renamed = await request(app)
+    const renamed = await write()
       .patch(`/api/crags/roshka/sectors/${sectorId}`)
       .send({
         version: 2,
@@ -414,7 +457,7 @@ describe('crag-api', () => {
       expect.objectContaining({ id: routeId, sectorName: 'North Wall', height: 5 }),
     ]);
 
-    const invalidHeight = await request(app)
+    const invalidHeight = await write()
       .patch(`/api/crags/roshka/sectors/${sectorId}`)
       .send({
         version: 3,
@@ -422,7 +465,7 @@ describe('crag-api', () => {
       });
     expect(invalidHeight.status).toBe(400);
 
-    const duplicate = await request(app)
+    const duplicate = await write()
       .patch(`/api/crags/roshka/sectors/${sectorId}`)
       .send({
         version: 3,
@@ -452,10 +495,10 @@ describe('crag-api', () => {
   });
 
   it('rejects a case-insensitive duplicate sector name on create and replace', async () => {
-    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
-    await request(app).post('/api/crags').send({ name: 'Other', cragId: 'other' });
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await write().post('/api/crags').send({ name: 'Other', cragId: 'other' });
 
-    const created = await request(app)
+    const created = await write()
       .post('/api/crags/roshka/sectors')
       .send({
         name: 'Main Wall',
@@ -468,7 +511,7 @@ describe('crag-api', () => {
     const sectorId = created.body.id as string;
     const routeId = created.body.routes[0].id as string;
 
-    const sameCrag = await request(app)
+    const sameCrag = await write()
       .post('/api/crags/roshka/sectors')
       .send({ name: 'main wall', geo: { lat: 42.4, lon: 45.1 } });
     expect(sameCrag.status).toBe(409);
@@ -477,12 +520,12 @@ describe('crag-api', () => {
       message: 'A sector with this name already exists.',
     });
 
-    const otherCrag = await request(app)
+    const otherCrag = await write()
       .post('/api/crags/other/sectors')
       .send({ name: 'Main Wall', geo: { lat: 1, lon: 2 } });
     expect(otherCrag.status).toBe(201);
 
-    const cave = await request(app)
+    const cave = await write()
       .post('/api/crags/roshka/sectors')
       .send({
         name: 'Cave',
@@ -492,7 +535,7 @@ describe('crag-api', () => {
     expect(cave.status).toBe(201);
     const caveId = cave.body.id as string;
 
-    const taken = await request(app)
+    const taken = await write()
       .put(`/api/crags/roshka/sectors/${caveId}`)
       .send({
         version: 1,
@@ -506,7 +549,7 @@ describe('crag-api', () => {
       message: 'A sector with this name already exists.',
     });
 
-    const recased = await request(app)
+    const recased = await write()
       .put(`/api/crags/roshka/sectors/${caveId}`)
       .send({
         version: 1,
@@ -518,7 +561,7 @@ describe('crag-api', () => {
     expect(recased.body.name).toBe('cave');
     expect(recased.body.routes[0].sectorName).toBe('cave');
 
-    const renamed = await request(app)
+    const renamed = await write()
       .put(`/api/crags/roshka/sectors/${sectorId}`)
       .send({
         version: 1,
@@ -534,8 +577,8 @@ describe('crag-api', () => {
   });
 
   it('replaces topo images in display order', async () => {
-    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
-    const created = await request(app)
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    const created = await write()
       .post('/api/crags/roshka/sectors')
       .send({
         name: 'Main Wall',
@@ -556,7 +599,7 @@ describe('crag-api', () => {
     expect(created.status).toBe(201);
     const sectorId = created.body.id as string;
 
-    const moved = await request(app)
+    const moved = await write()
       .patch(`/api/crags/roshka/sectors/${sectorId}`)
       .send({
         version: 1,
@@ -577,7 +620,7 @@ describe('crag-api', () => {
       line: [{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }],
     }]);
 
-    const removed = await request(app)
+    const removed = await write()
       .patch(`/api/crags/roshka/sectors/${sectorId}`)
       .send({
         version: 2,
@@ -592,7 +635,7 @@ describe('crag-api', () => {
   });
 
   it('drops route links for a removed topo file and leaves the rest of the route', async () => {
-    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
     const longVotes = 'Average rating 2.5 from 120 climbers';
     const route = {
       name: ' Classic ',
@@ -624,7 +667,7 @@ describe('crag-api', () => {
       updatedAt: new Date(),
     });
 
-    const keptDuplicate = await request(app)
+    const keptDuplicate = await write()
       .patch('/api/crags/roshka/sectors/wall-1')
       .send({
         version: 4,
@@ -637,7 +680,7 @@ describe('crag-api', () => {
     expect(keptDuplicate.body.routes[0]).toEqual(route);
     expect(keptDuplicate.body.routes[1].name).toBe('Direct');
 
-    const removed = await request(app)
+    const removed = await write()
       .patch('/api/crags/roshka/sectors/wall-1')
       .send({
         version: 5,
@@ -657,10 +700,10 @@ describe('crag-api', () => {
   });
 
   it('keeps one sector when two creates race for the same name', async () => {
-    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
     const [first, second] = await Promise.all([
-      request(app).post('/api/crags/roshka/sectors').send({ name: 'Cave', geo: { lat: 1, lon: 2 } }),
-      request(app).post('/api/crags/roshka/sectors').send({ name: 'cave', geo: { lat: 3, lon: 4 } }),
+      write().post('/api/crags/roshka/sectors').send({ name: 'Cave', geo: { lat: 1, lon: 2 } }),
+      write().post('/api/crags/roshka/sectors').send({ name: 'cave', geo: { lat: 3, lon: 4 } }),
     ]);
     const statuses = [first.status, second.status].sort();
     expect(statuses).toEqual([201, 409]);
@@ -709,7 +752,7 @@ describe('crag-api', () => {
       updatedAt: new Date(),
     });
 
-    const created = await request(app).post('/api/crags/roshka/sectors').send({
+    const created = await write().post('/api/crags/roshka/sectors').send({
       name: 'New',
       geo: { lat: 44.2, lon: 6.3 },
     });
@@ -719,7 +762,7 @@ describe('crag-api', () => {
       message: 'An extracted crag is read-only',
     });
 
-    const replaced = await request(app).put('/api/crags/roshka/sectors/cave-1').send({
+    const replaced = await write().put('/api/crags/roshka/sectors/cave-1').send({
       version: 3,
       name: 'Renamed',
       geo: { lat: 44.1, lon: 6.2 },
@@ -727,18 +770,18 @@ describe('crag-api', () => {
     expect(replaced.status).toBe(403);
     expect(replaced.body.error).toBe('read_only');
 
-    const removed = await request(app).delete('/api/crags/roshka/sectors/cave-1');
+    const removed = await write().delete('/api/crags/roshka/sectors/cave-1');
     expect(removed.status).toBe(403);
     expect(removed.body.error).toBe('read_only');
 
-    const patched = await request(app).patch('/api/crags/roshka/sectors/cave-1').send({
+    const patched = await write().patch('/api/crags/roshka/sectors/cave-1').send({
       version: 3,
       geo: { lat: 44.2, lon: 6.3 },
     });
     expect(patched.status).toBe(403);
     expect(patched.body.error).toBe('read_only');
 
-    const cragPatch = await request(app).patch('/api/crags/roshka').send({
+    const cragPatch = await write().patch('/api/crags/roshka').send({
       version: 1,
       name: 'Renamed',
       markers: [{ type: 'parking_space', info: 'Lot', geo: { lat: 44, lon: 6 } }],
@@ -769,8 +812,540 @@ describe('crag-api', () => {
     ]);
   });
 
+  it('stores one membership per crag and user', async () => {
+    const members = db.collection('crag_members');
+    await members.insertOne({ cragId: 'roshka', userId: 'user-a', role: 'owner' });
+    await members.insertOne({ cragId: 'roshka', userId: 'user-b', role: 'admin' });
+    await expect(
+      members.insertOne({ cragId: 'roshka', userId: 'user-a', role: 'admin' }),
+    ).rejects.toMatchObject({ code: 11000 });
+  });
+
+  it.each(['owner', 'admin'] as const)(
+    'lets a crag %s edit an explorer crag',
+    async (role) => {
+      await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+      await db.collection('crag_members').insertOne({
+        cragId: 'roshka',
+        userId: 'member-user',
+        role,
+      });
+      const memberApp = appFor({
+        uid: 'member-user',
+        email: 'member@example.com',
+        emailVerified: true,
+        superadmin: false,
+      });
+      const res = await request(memberApp)
+        .patch('/api/crags/roshka')
+        .set('Authorization', 'Bearer member-token')
+        .send({ version: 1, name: 'Roshka Valley' });
+      expect(res.status).toBe(200);
+      expect(res.body.cragName).toBe('Roshka Valley');
+    },
+  );
+
+  it('rejects an explorer edit from a signed-in user with no membership', async () => {
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    const stranger = appFor({
+      uid: 'stranger',
+      email: 'stranger@example.com',
+      emailVerified: true,
+      superadmin: false,
+    });
+    const res = await request(stranger)
+      .patch('/api/crags/roshka')
+      .set('Authorization', 'Bearer stranger-token')
+      .send({ version: 1, name: 'Nope' });
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ error: 'forbidden' });
+  });
+
+  it('rejects an explorer edit when the membership is for another crag', async () => {
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await db.collection('crag_members').insertOne({
+      cragId: 'other',
+      userId: 'member-user',
+      role: 'admin',
+    });
+    const memberApp = appFor({
+      uid: 'member-user',
+      email: 'member@example.com',
+      emailVerified: true,
+      superadmin: false,
+    });
+    const res = await request(memberApp)
+      .patch('/api/crags/roshka')
+      .set('Authorization', 'Bearer member-token')
+      .send({ version: 1, name: 'Nope' });
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ error: 'forbidden' });
+  });
+
+  it('lets only a superadmin create a crag and does not insert an owner', async () => {
+    const created = await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    expect(created.status).toBe(201);
+    expect(await db.collection('crag_members').countDocuments({ cragId: 'roshka' })).toBe(0);
+
+    await db.collection('crag_members').insertOne({
+      cragId: 'roshka',
+      userId: 'owner-user',
+      role: 'owner',
+    });
+    const ownerApp = appFor({
+      uid: 'owner-user',
+      email: 'owner@example.com',
+      emailVerified: true,
+      superadmin: false,
+    });
+    const rejected = await request(ownerApp)
+      .post('/api/crags')
+      .set('Authorization', 'Bearer owner-token')
+      .send({ name: 'Other', cragId: 'other' });
+    expect(rejected.status).toBe(403);
+    expect(rejected.body).toEqual({ error: 'forbidden' });
+
+    const catalog = await request(app).get('/api/crags');
+    expect(catalog.body).toEqual([
+      { id: 'roshka', cragId: 'roshka', cragName: 'Roshka', source: 'explorer' },
+    ]);
+  });
+
+  it.each(['owner', 'admin'] as const)(
+    'lets a crag %s upload an image',
+    async (role) => {
+      await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+      await db.collection('crag_members').insertOne({
+        cragId: 'roshka',
+        userId: 'member-user',
+        role,
+      });
+      const memberApp = createApp(db, {
+        storage,
+        auth: {
+          async verifyIdToken() {
+            return {
+              uid: 'member-user',
+              email: 'member@example.com',
+              emailVerified: true,
+              superadmin: false,
+            };
+          },
+        },
+      });
+      const res = await request(memberApp)
+        .post('/api/crags/roshka/images')
+        .set('Authorization', 'Bearer member-token')
+        .attach(IMAGE_FIELD_NAME, PNG_1X1, { filename: 'wall.jpg', contentType: 'image/jpeg' });
+      expect(res.status).toBe(201);
+      expect(res.body.storagePath).toBe(`roshka/images/${res.body.imageFile}`);
+    },
+  );
+
+  it('rejects an image upload from a signed-in user with no membership', async () => {
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    uploaded.clear();
+    const stranger = appFor({
+      uid: 'stranger',
+      email: 'stranger@example.com',
+      emailVerified: true,
+      superadmin: false,
+    });
+    const res = await request(stranger)
+      .post('/api/crags/roshka/images')
+      .set('Authorization', 'Bearer stranger-token')
+      .attach(IMAGE_FIELD_NAME, PNG_1X1, { filename: 'wall.jpg', contentType: 'image/jpeg' });
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ error: 'forbidden' });
+    expect(uploaded.size).toBe(0);
+  });
+
+  it('keeps image upload read-only on an extracted crag', async () => {
+    await db.collection('crags').insertOne({
+      _id: 'roshka',
+      name: 'Roshka',
+      source: 'external',
+      protocolVersion: 1,
+      description: [],
+      trails: [],
+      markers: [],
+      version: 1,
+      updatedAt: new Date(),
+    });
+    const res = await write()
+      .post('/api/crags/roshka/images')
+      .attach(IMAGE_FIELD_NAME, PNG_1X1, { filename: 'wall.jpg', contentType: 'image/jpeg' });
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({
+      error: 'read_only',
+      message: 'An extracted crag is read-only',
+    });
+    expect(uploaded.size).toBe(0);
+  });
+
+  it('keeps an extracted crag read-only for its owner', async () => {
+    await db.collection('crags').insertOne({
+      _id: 'roshka',
+      name: 'Roshka',
+      source: 'external',
+      protocolVersion: 1,
+      description: [],
+      trails: [],
+      markers: [],
+      version: 1,
+      updatedAt: new Date(),
+    });
+    await db.collection('crag_members').insertOne({
+      cragId: 'roshka',
+      userId: 'owner-user',
+      role: 'owner',
+    });
+    const ownerApp = appFor({
+      uid: 'owner-user',
+      email: 'owner@example.com',
+      emailVerified: true,
+      superadmin: false,
+    });
+    const res = await request(ownerApp)
+      .patch('/api/crags/roshka')
+      .set('Authorization', 'Bearer owner-token')
+      .send({ version: 1, name: 'Renamed' });
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({
+      error: 'read_only',
+      message: 'An extracted crag is read-only',
+    });
+  });
+
+  it('lets a superadmin grant owners and admins and remove the last owner', async () => {
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await db.collection('crag_members').insertOne({
+      cragId: 'other',
+      userId: 'elsewhere',
+      role: 'owner',
+    });
+
+    const empty = await write().get('/api/crags/roshka/members');
+    expect(empty.status).toBe(200);
+    expect(empty.body).toEqual([]);
+
+    const owner = await write().put('/api/crags/roshka/members/owner-a').send({ role: 'owner' });
+    expect(owner.status).toBe(200);
+    expect(owner.body).toEqual({ userId: 'owner-a', role: 'owner' });
+
+    const secondOwner = await write()
+      .put('/api/crags/roshka/members/owner-b')
+      .send({ role: 'owner' });
+    expect(secondOwner.status).toBe(200);
+    expect(secondOwner.body).toEqual({ userId: 'owner-b', role: 'owner' });
+
+    const admin = await write().put('/api/crags/roshka/members/admin-user').send({ role: 'admin' });
+    expect(admin.status).toBe(200);
+    expect(admin.body).toEqual({ userId: 'admin-user', role: 'admin' });
+
+    const demoted = await write().put('/api/crags/roshka/members/owner-a').send({ role: 'admin' });
+    expect(demoted.status).toBe(200);
+    expect(demoted.body).toEqual({ userId: 'owner-a', role: 'admin' });
+    expect(await db.collection('crag_members').countDocuments({ cragId: 'roshka', userId: 'owner-a' })).toBe(1);
+
+    const listed = await write().get('/api/crags/roshka/members');
+    expect(listed.status).toBe(200);
+    expect(listed.body).toEqual([
+      { userId: 'admin-user', role: 'admin' },
+      { userId: 'owner-a', role: 'admin' },
+      { userId: 'owner-b', role: 'owner' },
+    ]);
+
+    const removedAdmin = await write().delete('/api/crags/roshka/members/admin-user');
+    expect(removedAdmin.status).toBe(204);
+    const removedOwner = await write().delete('/api/crags/roshka/members/owner-b');
+    expect(removedOwner.status).toBe(204);
+    const removedLast = await write().delete('/api/crags/roshka/members/owner-a');
+    expect(removedLast.status).toBe(204);
+
+    const after = await write().get('/api/crags/roshka/members');
+    expect(after.status).toBe(200);
+    expect(after.body).toEqual([]);
+    expect(await db.collection('crag_members').countDocuments({ cragId: 'other' })).toBe(1);
+
+    const missing = await write().delete('/api/crags/roshka/members/owner-a');
+    expect(missing.status).toBe(404);
+    expect(missing.body).toEqual({ error: 'not_found', message: 'member not found' });
+  });
+
+  it('lets an owner grant and remove admins but not owners', async () => {
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await db.collection('crag_members').insertMany([
+      { cragId: 'roshka', userId: 'owner-user', role: 'owner' },
+      { cragId: 'roshka', userId: 'other-owner', role: 'owner' },
+      { cragId: 'roshka', userId: 'admin-user', role: 'admin' },
+    ]);
+    const ownerApp = appFor({
+      uid: 'owner-user',
+      email: 'owner@example.com',
+      emailVerified: true,
+      superadmin: false,
+    });
+    const authz = { Authorization: 'Bearer owner-token' };
+
+    const listed = await request(ownerApp).get('/api/crags/roshka/members').set(authz);
+    expect(listed.status).toBe(200);
+    expect(listed.body).toEqual([
+      { userId: 'admin-user', role: 'admin' },
+      { userId: 'other-owner', role: 'owner' },
+      { userId: 'owner-user', role: 'owner' },
+    ]);
+
+    const granted = await request(ownerApp)
+      .put('/api/crags/roshka/members/new-admin')
+      .set(authz)
+      .send({ role: 'admin' });
+    expect(granted.status).toBe(200);
+    expect(granted.body).toEqual({ userId: 'new-admin', role: 'admin' });
+
+    const refreshed = await request(ownerApp)
+      .put('/api/crags/roshka/members/admin-user')
+      .set(authz)
+      .send({ role: 'admin' });
+    expect(refreshed.status).toBe(200);
+
+    const promote = await request(ownerApp)
+      .put('/api/crags/roshka/members/new-owner')
+      .set(authz)
+      .send({ role: 'owner' });
+    expect(promote.status).toBe(403);
+    expect(promote.body).toEqual({ error: 'forbidden' });
+
+    const demoteOther = await request(ownerApp)
+      .put('/api/crags/roshka/members/other-owner')
+      .set(authz)
+      .send({ role: 'admin' });
+    expect(demoteOther.status).toBe(403);
+    expect(demoteOther.body).toEqual({ error: 'forbidden' });
+
+    const demoteSelf = await request(ownerApp)
+      .put('/api/crags/roshka/members/owner-user')
+      .set(authz)
+      .send({ role: 'admin' });
+    expect(demoteSelf.status).toBe(403);
+    expect(demoteSelf.body).toEqual({ error: 'forbidden' });
+
+    const removeOwner = await request(ownerApp).delete('/api/crags/roshka/members/other-owner').set(authz);
+    expect(removeOwner.status).toBe(403);
+    expect(removeOwner.body).toEqual({ error: 'forbidden' });
+
+    const removeSelf = await request(ownerApp).delete('/api/crags/roshka/members/owner-user').set(authz);
+    expect(removeSelf.status).toBe(403);
+    expect(removeSelf.body).toEqual({ error: 'forbidden' });
+
+    const removeAdmin = await request(ownerApp).delete('/api/crags/roshka/members/admin-user').set(authz);
+    expect(removeAdmin.status).toBe(204);
+
+    const stored = await db.collection('crag_members').find({ cragId: 'roshka' }).sort({ userId: 1 }).toArray();
+    expect(stored.map((member) => ({ userId: member.userId, role: member.role }))).toEqual([
+      { userId: 'new-admin', role: 'admin' },
+      { userId: 'other-owner', role: 'owner' },
+      { userId: 'owner-user', role: 'owner' },
+    ]);
+  });
+
+  it.each([
+    { label: 'admin', uid: 'admin-user', role: 'admin' as const },
+    { label: 'signed-in user with no membership', uid: 'stranger' },
+  ])('rejects membership routes from a $label', async ({ uid, role }) => {
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await db.collection('crag_members').insertOne({
+      cragId: 'roshka',
+      userId: 'owner-user',
+      role: 'owner',
+    });
+    if (role) {
+      await db.collection('crag_members').insertOne({
+        cragId: 'roshka',
+        userId: uid,
+        role,
+      });
+    }
+    const callerApp = appFor({
+      uid,
+      email: `${uid}@example.com`,
+      emailVerified: true,
+      superadmin: false,
+    });
+    const authz = { Authorization: `Bearer ${uid}-token` };
+    const before = await db.collection('crag_members').countDocuments({ cragId: 'roshka' });
+
+    const listed = await request(callerApp).get('/api/crags/roshka/members').set(authz);
+    expect(listed.status).toBe(403);
+    expect(listed.body).toEqual({ error: 'forbidden' });
+
+    const granted = await request(callerApp)
+      .put('/api/crags/roshka/members/new-admin')
+      .set(authz)
+      .send({ role: 'admin' });
+    expect(granted.status).toBe(403);
+    expect(granted.body).toEqual({ error: 'forbidden' });
+
+    const removed = await request(callerApp).delete('/api/crags/roshka/members/owner-user').set(authz);
+    expect(removed.status).toBe(403);
+    expect(removed.body).toEqual({ error: 'forbidden' });
+
+    const missing = await request(callerApp).delete('/api/crags/roshka/members/missing-user').set(authz);
+    expect(missing.status).toBe(403);
+    expect(missing.body).toEqual({ error: 'forbidden' });
+
+    expect(await db.collection('crag_members').countDocuments({ cragId: 'roshka' })).toBe(before);
+  });
+
+  it('rejects membership routes when the caller owns a different crag', async () => {
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await db.collection('crag_members').insertOne({
+      cragId: 'other',
+      userId: 'owner-user',
+      role: 'owner',
+    });
+    const ownerApp = appFor({
+      uid: 'owner-user',
+      email: 'owner@example.com',
+      emailVerified: true,
+      superadmin: false,
+    });
+    const res = await request(ownerApp)
+      .get('/api/crags/roshka/members')
+      .set('Authorization', 'Bearer owner-token');
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ error: 'forbidden' });
+  });
+
+  it('keeps membership routes read-only on an extracted crag', async () => {
+    await db.collection('crags').insertOne({
+      _id: 'roshka',
+      name: 'Roshka',
+      source: 'external',
+      protocolVersion: 1,
+      description: [],
+      trails: [],
+      markers: [],
+      version: 1,
+      updatedAt: new Date(),
+    });
+    await db.collection('crag_members').insertOne({
+      cragId: 'roshka',
+      userId: 'owner-user',
+      role: 'owner',
+    });
+    const readOnlyBody = {
+      error: 'read_only',
+      message: 'An extracted crag is read-only',
+    };
+
+    const listed = await write().get('/api/crags/roshka/members');
+    expect(listed.status).toBe(403);
+    expect(listed.body).toEqual(readOnlyBody);
+
+    const granted = await write().put('/api/crags/roshka/members/owner-a').send({ role: 'owner' });
+    expect(granted.status).toBe(403);
+    expect(granted.body).toEqual(readOnlyBody);
+
+    const removed = await write().delete('/api/crags/roshka/members/owner-user');
+    expect(removed.status).toBe(403);
+    expect(removed.body).toEqual(readOnlyBody);
+
+    const ownerApp = appFor({
+      uid: 'owner-user',
+      email: 'owner@example.com',
+      emailVerified: true,
+      superadmin: false,
+    });
+    const ownerList = await request(ownerApp)
+      .get('/api/crags/roshka/members')
+      .set('Authorization', 'Bearer owner-token');
+    expect(ownerList.status).toBe(403);
+    expect(ownerList.body).toEqual(readOnlyBody);
+
+    expect(await db.collection('crag_members').countDocuments()).toBe(1);
+  });
+
+  it('returns 404 for membership routes when the crag is missing', async () => {
+    const listed = await write().get('/api/crags/missing/members');
+    expect(listed.status).toBe(404);
+    expect(listed.body).toEqual({ error: 'not_found', message: 'crag not found' });
+
+    const granted = await write().put('/api/crags/missing/members/user-a').send({ role: 'admin' });
+    expect(granted.status).toBe(404);
+    expect(granted.body).toEqual({ error: 'not_found', message: 'crag not found' });
+
+    const removed = await write().delete('/api/crags/missing/members/user-a');
+    expect(removed.status).toBe(404);
+    expect(removed.body).toEqual({ error: 'not_found', message: 'crag not found' });
+    expect(await db.collection('crag_members').countDocuments()).toBe(0);
+  });
+
+  it('returns the caller memberships at sign-in', async () => {
+    await db.collection('crag_members').insertMany([
+      { cragId: 'roshka', userId: 'owner-user', role: 'owner' },
+      { cragId: 'other', userId: 'owner-user', role: 'owner' },
+      { cragId: 'roshka', userId: 'admin-user', role: 'admin' },
+    ]);
+
+    const anonymous = await request(app).get('/api/me/memberships');
+    expect(anonymous.status).toBe(401);
+    expect(anonymous.body).toEqual({ error: 'unauthorized' });
+
+    const strangerApp = appFor({
+      uid: 'stranger',
+      email: 'stranger@example.com',
+      emailVerified: true,
+      superadmin: false,
+    });
+    const stranger = await request(strangerApp)
+      .get('/api/me/memberships')
+      .set('Authorization', 'Bearer stranger-token');
+    expect(stranger.status).toBe(200);
+    expect(stranger.body).toEqual({ memberships: [] });
+
+    const ownerApp = appFor({
+      uid: 'owner-user',
+      email: 'owner@example.com',
+      emailVerified: true,
+      superadmin: false,
+    });
+    const owner = await request(ownerApp)
+      .get('/api/me/memberships')
+      .set('Authorization', 'Bearer owner-token');
+    expect(owner.status).toBe(200);
+    expect(owner.body).toEqual({
+      memberships: [
+        { cragId: 'other', role: 'owner' },
+        { cragId: 'roshka', role: 'owner' },
+      ],
+    });
+
+    const adminApp = appFor({
+      uid: 'admin-user',
+      email: 'admin@example.com',
+      emailVerified: true,
+      superadmin: false,
+    });
+    const admin = await request(adminApp)
+      .get('/api/me/memberships')
+      .set('Authorization', 'Bearer admin-token');
+    expect(admin.status).toBe(200);
+    expect(admin.body).toEqual({
+      memberships: [{ cragId: 'roshka', role: 'admin' }],
+    });
+  });
+
+  it('rejects a membership role other than owner or admin', async () => {
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    const res = await write().put('/api/crags/roshka/members/user-a').send({ role: 'editor' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('invalid_request');
+    expect(await db.collection('crag_members').countDocuments()).toBe(0);
+  });
+
   it('keeps a route external id in storage and omits it from the response', async () => {
-    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
     await db.collection('sectors').insertOne({
       _id: 'wall-1',
       cragId: 'roshka',
@@ -793,7 +1368,7 @@ describe('crag-api', () => {
       updatedAt: new Date(),
     });
 
-    const patched = await request(app).patch('/api/crags/roshka/sectors/wall-1').send({
+    const patched = await write().patch('/api/crags/roshka/sectors/wall-1').send({
       version: 1,
       routes: [{ id: 'route-1', name: 'Direct', grade: '7a' }],
     });
@@ -817,17 +1392,17 @@ describe('crag-api', () => {
     const missingCrag = await request(app).get('/api/crags/missing');
     expect(missingCrag.status).toBe(404);
 
-    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
-    const missingSector = await request(app).delete(
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    const missingSector = await write().delete(
       '/api/crags/roshka/sectors/00000000-0000-0000-0000-000000000000',
     );
     expect(missingSector.status).toBe(404);
   });
 
   it('keeps explorer sectors in insert order across delete and GPX', async () => {
-    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
     for (const name of ['Sector 10', 'Cave', 'Sector 2']) {
-      const created = await request(app).post('/api/crags/roshka/sectors').send({
+      const created = await write().post('/api/crags/roshka/sectors').send({
         name,
         geo: { lat: 44.1, lon: 6.2 },
       });
@@ -851,7 +1426,7 @@ describe('crag-api', () => {
     expect(waypointNames).toEqual(['Sector 10', 'Cave', 'Sector 2']);
 
     const cave = assembled.body.sectors[1];
-    const renamed = await request(app).put(`/api/crags/roshka/sectors/${cave.id}`).send({
+    const renamed = await write().put(`/api/crags/roshka/sectors/${cave.id}`).send({
       version: cave.version,
       name: 'Zebra',
       geo: { lat: 44.1, lon: 6.2 },
@@ -864,9 +1439,9 @@ describe('crag-api', () => {
       'Sector 2',
     ]);
 
-    const removed = await request(app).delete(`/api/crags/roshka/sectors/${cave.id}`);
+    const removed = await write().delete(`/api/crags/roshka/sectors/${cave.id}`);
     expect(removed.status).toBe(204);
-    const added = await request(app).post('/api/crags/roshka/sectors').send({
+    const added = await write().post('/api/crags/roshka/sectors').send({
       name: 'Alpha',
       geo: { lat: 44.2, lon: 6.3 },
     });
@@ -881,12 +1456,12 @@ describe('crag-api', () => {
   });
 
   it('builds GPX from the current database state without writing to Storage', async () => {
-    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
-    await request(app).post('/api/crags/roshka/sectors').send({
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await write().post('/api/crags/roshka/sectors').send({
       name: 'Cave',
       geo: { lat: 44.1, lon: 6.2 },
     });
-    await request(app)
+    await write()
       .patch('/api/crags/roshka')
       .send({
         version: 1,
@@ -919,9 +1494,9 @@ describe('crag-api', () => {
   });
 
   it('uploads an image to Storage as {cragId}/images/{hash}.ext', async () => {
-    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
 
-    const res = await request(app)
+    const res = await write()
       .post('/api/crags/roshka/images')
       .attach(IMAGE_FIELD_NAME, PNG_1X1, { filename: 'wall.jpg', contentType: 'image/jpeg' });
 
@@ -932,12 +1507,12 @@ describe('crag-api', () => {
     expect(res.body).toEqual({ imageFile, storagePath });
     expect(uploaded.get(storagePath)?.equals(PNG_1X1)).toBe(true);
 
-    const missingCrag = await request(app)
+    const missingCrag = await write()
       .post('/api/crags/missing/images')
       .attach(IMAGE_FIELD_NAME, PNG_1X1, { filename: 'wall.png', contentType: 'image/png' });
     expect(missingCrag.status).toBe(404);
 
-    const notImage = await request(app)
+    const notImage = await write()
       .post('/api/crags/roshka/images')
       .attach(IMAGE_FIELD_NAME, Buffer.from('hello'), {
         filename: 'notes.txt',
@@ -947,10 +1522,10 @@ describe('crag-api', () => {
   });
 
   it('returns 503 when image storage is not configured and 502 when upload fails', async () => {
-    await request(app).post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
 
-    const noStorageApp = createApp(db);
-    const unavailable = await request(noStorageApp)
+    const noStorageApp = createApp(db, { auth });
+    const unavailable = await write(noStorageApp)
       .post('/api/crags/roshka/images')
       .attach(IMAGE_FIELD_NAME, PNG_1X1, { filename: 'wall.png', contentType: 'image/png' });
     expect(unavailable.status).toBe(503);
@@ -961,11 +1536,54 @@ describe('crag-api', () => {
         throw new Error('emulator down');
       },
     };
-    const failingApp = createApp(db, { storage: failing });
-    const failed = await request(failingApp)
+    const failingApp = createApp(db, { storage: failing, auth });
+    const failed = await write(failingApp)
       .post('/api/crags/roshka/images')
       .attach(IMAGE_FIELD_NAME, PNG_1X1, { filename: 'wall.png', contentType: 'image/png' });
     expect(failed.status).toBe(502);
     expect(failed.body.error).toBe('storage_failed');
+  });
+
+  it('rejects writes without a valid bearer token and still serves the catalog', async () => {
+    const catalog = await request(app).get('/api/crags');
+    expect(catalog.status).toBe(200);
+    expect(catalog.body).toEqual([]);
+
+    const anonymousWrites = [
+      () => request(app).post('/api/crags').send({ name: 'Roshka' }),
+      () => request(app).patch('/api/crags/roshka').send({ version: 1, name: 'Nope' }),
+      () => request(app).get('/api/crags/roshka/members'),
+      () => request(app).put('/api/crags/roshka/members/user-a').send({ role: 'admin' }),
+      () => request(app).delete('/api/crags/roshka/members/user-a'),
+      () => request(app).post('/api/crags/roshka/sectors').send({ name: 'Cave' }),
+      () => request(app).put('/api/crags/roshka/sectors/cave-1').send({ version: 1, name: 'Cave' }),
+      () => request(app).patch('/api/crags/roshka/sectors/cave-1').send({
+        version: 1,
+        geo: { lat: 1, lon: 2 },
+      }),
+      () => request(app).delete('/api/crags/roshka/sectors/cave-1'),
+      // A second file is a Multer error. 401 means the token check runs before that parser.
+      () => request(app)
+        .post('/api/crags/roshka/images')
+        .attach(IMAGE_FIELD_NAME, PNG_1X1, { filename: 'a.png', contentType: 'image/png' })
+        .attach(IMAGE_FIELD_NAME, PNG_1X1, { filename: 'b.png', contentType: 'image/png' }),
+    ];
+    for (const sendWrite of anonymousWrites) {
+      const rejected = await sendWrite();
+      expect(rejected.status).toBe(401);
+      expect(rejected.body).toEqual({ error: 'unauthorized' });
+    }
+
+    const badToken = await request(app)
+      .post('/api/crags')
+      .set('Authorization', 'Bearer wrong-token')
+      .send({ name: 'Roshka' });
+    expect(badToken.status).toBe(401);
+    expect(badToken.body).toEqual({ error: 'unauthorized' });
+
+    const after = await request(app).get('/api/crags');
+    expect(after.status).toBe(200);
+    expect(after.body).toEqual([]);
+    expect(uploaded.size).toBe(0);
   });
 });

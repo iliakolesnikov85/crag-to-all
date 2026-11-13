@@ -5,7 +5,6 @@ import { sectorNameKey, toSector, toSectorDocument } from '../convertors';
 import { alreadyExists, isDuplicateKeyError, notFound, versionConflict } from '../http';
 import type { SectorDocument, SectorPatch, SectorWriteInput } from '../types';
 import { now, sectorsCol } from './collections';
-import { requireWritableCrag } from './crags';
 
 const SECTOR_NAME_TAKEN = 'A sector with this name already exists.';
 const DETAIL_FIELDS = ['season', 'approachTime', 'altitude', 'orientation', 'timeInSun'] as const;
@@ -111,8 +110,6 @@ export async function addSector(
   cragId: string,
   sector: SectorWriteInput,
 ): Promise<Sector> {
-  await requireWritableCrag(db, cragId);
-
   const sectorId = randomUUID();
   await assertSectorNameAvailable(db, cragId, sectorId, sector.name);
   const order = await nextSectorOrder(db, cragId);
@@ -132,8 +129,6 @@ export async function replaceSector(
   version: number,
   sector: SectorWriteInput,
 ): Promise<Sector> {
-  await requireWritableCrag(db, cragId);
-
   const existing = await sectorsCol(db).findOne({ _id: sectorId, cragId });
   if (!existing) throw notFound('sector');
   if (existing.version !== version) {
@@ -168,8 +163,6 @@ export async function patchSector(
   version: number,
   patch: SectorPatch,
 ): Promise<Sector> {
-  await requireWritableCrag(db, cragId);
-
   const existing = await sectorsCol(db).findOne({ _id: sectorId, cragId });
   if (!existing) throw notFound('sector');
   if (existing.version !== version) {
@@ -247,8 +240,6 @@ export async function patchSector(
 }
 
 export async function deleteSector(db: Db, cragId: string, sectorId: string): Promise<void> {
-  await requireWritableCrag(db, cragId);
-
   const result = await sectorsCol(db).deleteOne({ _id: sectorId, cragId });
   if (result.deletedCount === 0) throw notFound('sector');
 }

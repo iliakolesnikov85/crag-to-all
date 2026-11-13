@@ -1,7 +1,7 @@
 import React from 'react';
 import { MdArrowDownward, MdArrowUpward, MdVideocam } from 'react-icons/md';
 import { Link } from 'react-router';
-import { canEditCrag } from '../api/permissions';
+import { useCanEditCrag } from '../auth/useAuthSession';
 import { Pager, RoutesFilter } from '../components';
 import RouteRating from '../components/RouteRating';
 import { useCrag } from '../context/CragContext';
@@ -30,7 +30,7 @@ function sectorNamed(sectors: readonly Sector[], name: string): Sector | undefin
 
 const RoutesPage: React.FC<RoutesPageProps> = ({ sectors }) => {
   const { crag, getUrl } = useCrag();
-  const canEdit = canEditCrag(crag);
+  const canEdit = useCanEditCrag(crag);
   const [actionError, setActionError] = React.useState<string | null>(null);
   const editors = useDetailsEditors({
     sectors,

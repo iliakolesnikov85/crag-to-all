@@ -14,7 +14,7 @@ const FIREBASE_BASE_URL = DEV_LOCAL
   : `https://firebasestorage.googleapis.com/v0/b/${FIREBASE_BUCKET}/o`;
 
 if (DEV_LOCAL) {
-  console.log('Using Firebase Storage emulator at http://localhost:9199');
+  console.log('Using local Firebase Storage at http://localhost:9199');
 } else {
   console.log('Using Firebase Storage production');
 }

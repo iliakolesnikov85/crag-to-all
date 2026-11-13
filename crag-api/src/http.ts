@@ -33,6 +33,14 @@ export function badRequest(message: string): HttpError {
   return new HttpError(400, { error: 'invalid_request', message });
 }
 
+export function unauthorized(): HttpError {
+  return new HttpError(401, { error: 'unauthorized' });
+}
+
+export function forbidden(): HttpError {
+  return new HttpError(403, { error: 'forbidden' });
+}
+
 export function notFound(entity: string): HttpError {
   return new HttpError(404, { error: 'not_found', message: `${entity} not found` });
 }

@@ -18,7 +18,7 @@ vi.mock('../api/permissions', () => ({
 
 vi.mock('../api/client', () => ({
   deleteSector: vi.fn(),
-  patchSectorGeo: vi.fn(),
+  patchSector: vi.fn(),
   uploadCragImage: vi.fn(),
 }));
 

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { uploadCragImage } from '../api/client';
-import { canEditCrag } from '../api/permissions';
+import { useCanEditCrag } from '../auth/useAuthSession';
 import { useCreateSector, usePatchCrag, usePatchSector } from '../api/useCragMutations';
 import { useCrag } from '../context/CragContext';
 import { useIsMobileLayout } from '../hooks/useIsMobileLayout';
@@ -75,7 +75,7 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSec
   const [placement, setPlacement] = useState<MapPlacementMode | null>(null);
   const placing = placement != null;
 
-  const canEdit = canEditCrag({
+  const canEdit = useCanEditCrag({
     cragId: crag.cragId,
     source: cragData.source ?? crag.source,
   });

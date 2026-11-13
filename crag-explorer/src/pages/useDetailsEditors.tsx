@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { SectorPatch } from '../api/client';
 import { usePatchSector } from '../api/useCragMutations';
-import { canEditCrag } from '../api/permissions';
+import { useCanEditCrag } from '../auth/useAuthSession';
 import RouteDetailsModal from '../components/RouteDetailsModal';
 import SectorDetailsModal from '../components/SectorDetailsModal';
 import { confirm } from '../context/ConfirmContext';
@@ -84,7 +84,7 @@ function useDetailsEditors({
   onSectorSavedRef.current = onSectorSaved;
   onRouteSavedRef.current = onRouteSaved;
   const saving = patchSector.isPending;
-  const canEdit = canEditCrag(crag);
+  const canEdit = useCanEditCrag(crag);
 
   const report = (message: string | null) => {
     onNoticeRef.current?.(message);

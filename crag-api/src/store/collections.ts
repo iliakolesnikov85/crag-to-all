@@ -1,9 +1,10 @@
 import type { Db } from 'mongodb';
 import { isDuplicateKeyError } from '../http';
-import type { CragDocument, SectorDocument } from '../types';
+import type { CragDocument, CragMemberDocument, SectorDocument } from '../types';
 
 const CRAGS = 'crags';
 const SECTORS = 'sectors';
+const CRAG_MEMBERS = 'crag_members';
 const DUPLICATE_SECTOR_NAMES =
   'Sector names must be unique within a crag, ignoring case. Resolve duplicate sector names and retry.';
 
@@ -13,6 +14,10 @@ export function cragsCol(db: Db) {
 
 export function sectorsCol(db: Db) {
   return db.collection<SectorDocument>(SECTORS);
+}
+
+export function membersCol(db: Db) {
+  return db.collection<CragMemberDocument>(CRAG_MEMBERS);
 }
 
 export function now(): Date {
@@ -37,4 +42,6 @@ export async function ensureIndexes(db: Db): Promise<void> {
     console.error('Failed to create the sector name index:', error);
     throw error;
   }
+  await membersCol(db).createIndex({ userId: 1 });
+  await membersCol(db).createIndex({ cragId: 1, userId: 1 }, { unique: true });
 }

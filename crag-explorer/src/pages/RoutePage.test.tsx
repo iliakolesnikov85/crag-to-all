@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { patchSector } from '../api/client';
+import { signInTestUser } from '../test/authAccount';
 import { CragContext } from '../context/CragContext';
 import { chooseConfirm, withQueryClient } from '../test/helpers';
 import { SAMPLE_CRAG_ID, sampleCragData } from '../test/fixtures/cragData';
@@ -9,7 +10,7 @@ import type { Sector } from '../types';
 import RoutePage from './RoutePage';
 
 vi.mock('../api/client', () => ({
-  patchSectorGeo: vi.fn(),
+  patchSector: vi.fn(),
 }));
 
 const cragValue = {
@@ -95,6 +96,7 @@ describe('RoutePage lookup', () => {
 
 describe('RoutePage options', () => {
   beforeEach(() => {
+    signInTestUser();
     vi.mocked(patchSector).mockReset();
   });
 

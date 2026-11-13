@@ -10,6 +10,7 @@ const DEFAULT_MONGODB_DB = 'crag-to-all';
 const DEFAULT_FIREBASE_PROJECT_ID = 'crag-to-all';
 const DEFAULT_FIREBASE_STORAGE_BUCKET = 'crag-to-all.firebasestorage.app';
 const DEFAULT_FIREBASE_STORAGE_EMULATOR_HOST = '127.0.0.1:9199';
+const DEFAULT_FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
 
 function envString(name: string, fallback: string): string {
   const value = process.env[name];
@@ -43,6 +44,7 @@ export interface ApiConfig {
   firebaseProjectId: string;
   firebaseStorageBucket: string;
   firebaseStorageEmulatorHost: string;
+  firebaseAuthEmulatorHost: string;
 }
 
 export function getConfig(): ApiConfig {
@@ -56,6 +58,10 @@ export function getConfig(): ApiConfig {
     firebaseStorageEmulatorHost: envString(
       'FIREBASE_STORAGE_EMULATOR_HOST',
       DEFAULT_FIREBASE_STORAGE_EMULATOR_HOST,
+    ),
+    firebaseAuthEmulatorHost: envString(
+      'FIREBASE_AUTH_EMULATOR_HOST',
+      DEFAULT_FIREBASE_AUTH_EMULATOR_HOST,
     ),
   };
 }

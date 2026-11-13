@@ -2,8 +2,14 @@ import { existsSync, readFileSync } from 'fs';
 import { isAbsolute, resolve } from 'path';
 import { zipSync } from 'fflate';
 import { App, cert, getApps, initializeApp, type ServiceAccount } from 'firebase-admin/app';
+import { getAuth, type DecodedIdToken } from 'firebase-admin/auth';
 import { getStorage } from 'firebase-admin/storage';
 import type { Bucket, File } from '@google-cloud/storage';
+
+let initialized = false;
+let bucket: Bucket | null = null;
+let currentBucketName: string | null = null;
+let firebaseStorageService: FirebaseStorageService | null = null;
 
 function assertServiceAccountJson(parsed: unknown): asserts parsed is {
   type: 'service_account';
@@ -110,6 +116,11 @@ function parseServiceAccountFromEnv(): ServiceAccount {
 }
 
 function getAdminApp(useEmulator: boolean): App {
+  if (useEmulator) {
+    process.env.FIREBASE_STORAGE_EMULATOR_HOST = process.env.FIREBASE_STORAGE_EMULATOR_HOST || '127.0.0.1:9199';
+    process.env.FIREBASE_AUTH_EMULATOR_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099';
+  }
+
   const existingApp = getApps()[0];
   if (existingApp) {
     return existingApp;
@@ -119,7 +130,6 @@ function getAdminApp(useEmulator: boolean): App {
   const defaultBucket = process.env.FIREBASE_STORAGE_BUCKET || 'crag-to-all.firebasestorage.app';
 
   if (useEmulator) {
-    process.env.FIREBASE_STORAGE_EMULATOR_HOST = process.env.FIREBASE_STORAGE_EMULATOR_HOST || '127.0.0.1:9199';
     return initializeApp({ projectId: defaultProjectId, storageBucket: defaultBucket });
   }
 
@@ -133,30 +143,12 @@ function getAdminApp(useEmulator: boolean): App {
   });
 }
 
-let initialized = false;
-let bucket: Bucket | null = null;
-let currentBucketName: string | null = null;
-
-export function initializeFirebase(useEmulator: boolean = false) {
-  if (!initialized) {
-    const app = getAdminApp(useEmulator);
-    const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || 'crag-to-all.firebasestorage.app';
-    bucket = getStorage(app).bucket(storageBucket);
-    currentBucketName = storageBucket;
-    initialized = true;
-    console.log(`Firebase Admin initialized (${useEmulator ? 'emulator' : 'production'} mode)`);
-  }
-}
-
 function getInitializedBucket() {
   if (!bucket) {
     throw new Error('Firebase not initialized. Call initializeFirebase() first.');
   }
   return bucket;
 }
-
-/** GCS object metadata; safe for content-addressed / hashed image filenames. */
-export const IMAGE_OBJECT_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 
 function guessImageContentType(filePath: string): string {
   const ext = filePath.split('.').pop()?.toLowerCase();
@@ -176,33 +168,14 @@ function guessImageContentType(filePath: string): string {
   }
 }
 
-/** Local calendar date as `yyyy-MM-dd` for history folder names. */
-export function formatHistoryDate(date: Date = new Date()): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-/**
- * Live crag file `{cragId}/{fileName}` → `{cragId}/history/yyyy-MM-dd/{fileName}.zip`.
- * `filePath` must be a file in the crag root (one slash).
- */
-export function toHistoryStoragePath(filePath: string, date: Date = new Date()): string {
-  const slash = filePath.indexOf('/');
-  if (slash <= 0 || filePath.indexOf('/', slash + 1) !== -1 || slash === filePath.length - 1) {
-    throw new Error(`Expected a crag-root storage path like "{cragId}/{fileName}", got: ${filePath}`);
-  }
-  const cragId = filePath.slice(0, slash);
-  const fileName = filePath.slice(slash + 1);
-  return `${cragId}/history/${formatHistoryDate(date)}/${fileName}.zip`;
-}
-
 function zipNamedFile(fileName: string, data: Buffer): Buffer {
   const bytes = new Uint8Array(data.byteLength);
   bytes.set(data);
   return Buffer.from(zipSync({ [fileName]: bytes }));
 }
+
+/** GCS object metadata; safe for content-addressed / hashed image filenames. */
+export const IMAGE_OBJECT_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 
 export class FirebaseStorageService {
   async uploadFile(
@@ -335,7 +308,67 @@ export class FirebaseStorageService {
   }
 }
 
-let firebaseStorageService: FirebaseStorageService | null = null;
+export function initializeFirebase(useEmulator: boolean = false) {
+  if (!initialized) {
+    const app = getAdminApp(useEmulator);
+    const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || 'crag-to-all.firebasestorage.app';
+    bucket = getStorage(app).bucket(storageBucket);
+    currentBucketName = storageBucket;
+    initialized = true;
+    console.log(`Firebase Admin initialized (${useEmulator ? 'emulator' : 'production'} mode)`);
+  }
+}
+
+/** Checks a Firebase ID token and returns its claims. Emulator tokens verify when `FIREBASE_AUTH_EMULATOR_HOST` is set. */
+export async function verifyFirebaseIdToken(idToken: string): Promise<DecodedIdToken> {
+  return getAuth().verifyIdToken(idToken);
+}
+
+/**
+ * Sets the custom claim `superadmin` to the boolean `true` for one user.
+ * Other custom claims are kept. Call `initializeFirebase(false)` first.
+ * This is not used by HTTP handlers. The user's current ID token stays old
+ * until they sign in again or the client calls `getIdToken(true)`.
+ */
+export async function setSuperadminClaim(uid: string): Promise<{ projectId: string }> {
+  const trimmed = uid.trim();
+  if (!trimmed) {
+    throw new Error('A Firebase uid is required to set the superadmin claim.');
+  }
+  const auth = getAuth();
+  const user = await auth.getUser(trimmed);
+  await auth.setCustomUserClaims(trimmed, {
+    ...(user.customClaims ?? {}),
+    superadmin: true,
+  });
+  const updated = await auth.getUser(trimmed);
+  if (updated.customClaims?.superadmin !== true) {
+    throw new Error(`Custom claim superadmin was not stored as boolean true for ${trimmed}`);
+  }
+  return { projectId: auth.app.options.projectId ?? '' };
+}
+
+/** Local calendar date as `yyyy-MM-dd` for history folder names. */
+export function formatHistoryDate(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Live crag file `{cragId}/{fileName}` → `{cragId}/history/yyyy-MM-dd/{fileName}.zip`.
+ * `filePath` must be a file in the crag root (one slash).
+ */
+export function toHistoryStoragePath(filePath: string, date: Date = new Date()): string {
+  const slash = filePath.indexOf('/');
+  if (slash <= 0 || filePath.indexOf('/', slash + 1) !== -1 || slash === filePath.length - 1) {
+    throw new Error(`Expected a crag-root storage path like "{cragId}/{fileName}", got: ${filePath}`);
+  }
+  const cragId = filePath.slice(0, slash);
+  const fileName = filePath.slice(slash + 1);
+  return `${cragId}/history/${formatHistoryDate(date)}/${fileName}.zip`;
+}
 
 export function getFirebaseStorage(): FirebaseStorageService {
   if (!firebaseStorageService) {

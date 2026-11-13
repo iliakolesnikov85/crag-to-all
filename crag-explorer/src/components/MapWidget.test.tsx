@@ -1,8 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSector, patchCrag } from '../api/client';
+import { setAuthAccount } from '../auth/session';
+import { signInTestUser } from '../test/authAccount';
 import { CragContext } from '../context/CragContext';
 import { SAMPLE_CRAG_ID, sampleCragData } from '../test/fixtures/cragData';
 import { withQueryClient } from '../test/helpers';
@@ -96,8 +98,24 @@ function holdRejection(): { promise: Promise<never>; reject: (error: Error) => v
 
 describe('MapWidget', () => {
   beforeEach(() => {
+    signInTestUser();
     vi.mocked(createSector).mockReset();
     vi.mocked(patchCrag).mockReset();
+  });
+
+  it('shows add controls after sign-in', async () => {
+    setAuthAccount(null);
+    renderMap();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'View Fullscreen' })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: 'Add sector' })).not.toBeInTheDocument();
+
+    act(() => {
+      signInTestUser();
+    });
+
+    expect(screen.getByRole('button', { name: 'Add sector' })).toBeInTheDocument();
   });
 
   function renderMap(initial?: CragData) {

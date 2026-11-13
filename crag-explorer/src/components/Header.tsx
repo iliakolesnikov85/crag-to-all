@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router';
 import { MdCloudOff } from 'react-icons/md';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import AuthControls from './auth/AuthControls';
 import './Header.scss';
 
 interface HeaderProps {
@@ -28,8 +29,9 @@ const Header: React.FC<HeaderProps> = ({ title }) => {
           </span>
         )}
       </div>
-      <h1 className="app-header__title">{title}</h1>
+      <h1 className="app-header__title" title={title}>{title}</h1>
       <div className="app-header__explore">
+        <AuthControls />
         <Link to="/" className="link app-header__explore-crags">
           <span className="app-header__explore-crags-board">Explore other crags</span>
           <span className="app-header__explore-crags-post" aria-hidden="true" />

@@ -1,6 +1,7 @@
 import { webcrypto } from 'node:crypto';
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { act, cleanup } from '@testing-library/react';
+import { setAuthAccount } from '../auth/session';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, vi } from 'vitest';
 
@@ -141,6 +142,9 @@ Object.defineProperty(window, 'scrollTo', {
 
 afterEach(async () => {
   cleanup();
+  act(() => {
+    setAuthAccount(null);
+  });
   vi.unstubAllGlobals();
   fetchMock.mockReset();
   fetchMock.mockImplementation(() => Promise.reject(new Error(UNMOCKED_FETCH)));

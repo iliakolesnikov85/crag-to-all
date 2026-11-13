@@ -1,8 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { patchSector } from '../api/client';
+import { setAuthAccount } from '../auth/session';
+import { signInTestUser } from '../test/authAccount';
 import { CragContext } from '../context/CragContext';
 import { FilterContext, useFilterState } from '../context/FilterContext';
 import { SAMPLE_CRAG_ID, sampleCragData } from '../test/fixtures/cragData';
@@ -11,7 +13,7 @@ import type { Sector } from '../types';
 import RoutesPage from './RoutesPage';
 
 vi.mock('../api/client', () => ({
-  patchSectorGeo: vi.fn(),
+  patchSector: vi.fn(),
 }));
 
 const cragValue = {
@@ -123,7 +125,20 @@ describe('RoutesPage', () => {
 
 describe('RoutesPage options', () => {
   beforeEach(() => {
+    signInTestUser();
     vi.mocked(patchSector).mockReset();
+  });
+
+  it('shows row options after sign-in', () => {
+    setAuthAccount(null);
+    renderRoutes();
+    expect(screen.queryByRole('button', { name: 'Options for Classic' })).not.toBeInTheDocument();
+
+    act(() => {
+      signInTestUser();
+    });
+
+    expect(screen.getByRole('button', { name: 'Options for Classic' })).toBeInTheDocument();
   });
 
   it('offers route and sector edits from the last column', () => {

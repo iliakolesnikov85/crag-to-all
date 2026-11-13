@@ -2,7 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { CRAG_MAP_MARKER_TYPES, ROUTE_TYPES, type Route } from '@crag-to-all/shared-crag';
 import { z, ZodError } from 'zod';
 import { badRequest } from './http';
-import type { CragCreateInput, CragPatchInput, SectorPatch, SectorWriteInput } from './types';
+import type {
+  CragCreateInput,
+  CragMemberRole,
+  CragPatchInput,
+  SectorPatch,
+  SectorWriteInput,
+} from './types';
 
 const CRAG_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const MAX_CRAG_ID_LENGTH = 64;
@@ -50,6 +56,12 @@ const cragIdSchema = z
   });
 
 const sectorIdSchema = z.string().trim().min(1, 'sectorId is required');
+
+const memberUserIdSchema = z.string().trim().min(1, 'userId is required').max(128);
+
+const memberRoleBodySchema = z.object({
+  role: z.enum(['owner', 'admin']),
+});
 
 const versionSchema = z.number().int().min(1);
 
@@ -246,6 +258,14 @@ function parseSectorId(value: unknown): string {
   return parseWith(sectorIdSchema, value);
 }
 
+function parseMemberUserId(value: unknown): string {
+  return parseWith(memberUserIdSchema, value);
+}
+
+function parseMemberRole(body: unknown): CragMemberRole {
+  return parseWith(memberRoleBodySchema, body).role;
+}
+
 function parseCreateCrag(body: unknown): CragCreateInput {
   const { name, cragId } = parseWith(createCragBodySchema, body);
   if (cragId) return { name, cragId };
@@ -289,6 +309,8 @@ export {
   parseCragId,
   parseCragPatch,
   parseCreateCrag,
+  parseMemberRole,
+  parseMemberUserId,
   parseReplaceSector,
   parseSectorPatch,
   parseSectorId,

@@ -1,19 +1,35 @@
 import { CRAG_DATA_PROTOCOL, type CragData } from '@crag-to-all/shared-crag';
 import type { Db, UpdateFilter } from 'mongodb';
 import { toCrag, toCragData, toCragResponse } from '../convertors';
-import { alreadyExists, isDuplicateKeyError, notFound, readOnly, versionConflict } from '../http';
+import {
+  alreadyExists,
+  forbidden,
+  isDuplicateKeyError,
+  notFound,
+  readOnly,
+  versionConflict,
+} from '../http';
 import type {
+  AuthCaller,
   CragCreateInput,
   CragDocument,
   CragPatchInput,
   CragResponse,
   SectorDocument,
 } from '../types';
-import { cragsCol, now, sectorsCol } from './collections';
+import { cragsCol, membersCol, now, sectorsCol } from './collections';
 
 function compareSectorsByOrder(a: SectorDocument, b: SectorDocument): number {
   if (a.order !== b.order) return a.order - b.order;
   return a.name.localeCompare(b.name, undefined, { numeric: true });
+}
+
+async function hasWriteMembership(db: Db, cragId: string, userId: string): Promise<boolean> {
+  const member = await membersCol(db).findOne(
+    { cragId, userId },
+    { projection: { role: 1 } },
+  );
+  return member?.role === 'owner' || member?.role === 'admin';
 }
 
 export async function listCrags(db: Db) {
@@ -21,6 +37,7 @@ export async function listCrags(db: Db) {
   return docs.map(toCrag);
 }
 
+/** Inserts an empty explorer crag and no `crag_members` row. */
 export async function createCrag(db: Db, input: CragCreateInput): Promise<CragResponse> {
   const updatedAt = now();
   const doc: CragDocument = {
@@ -54,23 +71,33 @@ export async function getAssembledCrag(db: Db, cragId: string): Promise<CragData
   return toCragData(crag, sectors);
 }
 
-export async function assertCragExists(db: Db, cragId: string): Promise<void> {
-  const crag = await cragsCol(db).findOne({ _id: cragId }, { projection: { _id: 1 } });
-  if (!crag) throw notFound('crag');
-}
-
-/** The crag exists and may be changed. Authorization checks belong here. */
-export async function requireWritableCrag(db: Db, cragId: string): Promise<CragDocument> {
+/**
+ * The crag exists and this caller may change it.
+ * Extracted crags stay read-only for every role, including a superadmin.
+ * An explorer crag allows a superadmin, or a `crag_members` owner or admin.
+ */
+export async function requireWritableCrag(
+  db: Db,
+  cragId: string,
+  caller: AuthCaller,
+): Promise<CragDocument> {
   const crag = await cragsCol(db).findOne({ _id: cragId });
   if (!crag) throw notFound('crag');
   if (crag.source === 'external') {
     throw readOnly('An extracted crag is read-only');
   }
-  return crag;
+  if (caller.superadmin || (await hasWriteMembership(db, cragId, caller.uid))) {
+    return crag;
+  }
+  throw forbidden();
 }
 
-export async function patchCrag(db: Db, cragId: string, patch: CragPatchInput): Promise<CragResponse> {
-  const existing = await requireWritableCrag(db, cragId);
+export async function patchCrag(
+  db: Db,
+  existing: CragDocument,
+  patch: CragPatchInput,
+): Promise<CragResponse> {
+  const cragId = existing._id;
   if (existing.version !== patch.version) {
     throw versionConflict(existing.version);
   }

@@ -20,6 +20,7 @@ import {
 } from './pages';
 import { SeoDynamic, Footer, LoadingScreen, Header } from './components';
 import Navigation from './components/Navigation';
+import { AuthProvider } from './auth/AuthProvider';
 import { AppOnlineProvider } from './context/AppOnlineContext';
 import { ConfirmProvider } from './context/ConfirmContext';
 import { CragContext } from './context/CragContext';
@@ -150,11 +151,13 @@ export const AppRoutes: React.FC = () => {
 
 const App: React.FC = () => (
   <AppOnlineProvider>
-    <ConfirmProvider>
-      <Router>
-        <AppRoutes />
-      </Router>
-    </ConfirmProvider>
+    <AuthProvider>
+      <ConfirmProvider>
+        <Router>
+          <AppRoutes />
+        </Router>
+      </ConfirmProvider>
+    </AuthProvider>
   </AppOnlineProvider>
 );
 

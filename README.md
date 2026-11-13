@@ -15,7 +15,7 @@ Crag documents come from crag-api. Images, GPX, PDF guides, and map tiles are se
 | [`crag-explorer/`](crag-explorer/)                           | Vite + React explorer (Netlify) |
 | [`crag-api/`](crag-api/)                                     | Local Express API (port 3010) + MongoDB documents |
 | [`packages/shared-crag/`](packages/shared-crag/)             | Shared TypeScript types, geo, Bézier, and GPX helpers |
-| [`packages/shared-firebase/`](packages/shared-firebase/)     | Firebase Admin SDK + Storage emulator |
+| [`packages/shared-firebase/`](packages/shared-firebase/)     | Firebase Admin SDK, Storage emulator, and Auth emulator |
 
 ## Quick start
 
@@ -40,11 +40,13 @@ In another terminal, from `crag-explorer`:
 npm run dev
 ```
 
-To point file URLs at a local Storage emulator on port 9199:
+To point file URLs at the local emulators (Storage on port 9199, Authentication on port 9099):
 
 ```bash
 npm run emulator:start
 ```
+
+Accounts created in the Auth emulator are stored in gitignored `emulator-data` with the Storage files. The emulator UI at http://localhost:4000 shows those users and password-reset messages.
 
 In another terminal:
 
@@ -53,7 +55,7 @@ cd crag-explorer
 npm run dev-local
 ```
 
-See [`crag-api/README.md`](crag-api/README.md). Do not deploy `crag-api` until auth exists. Crag-management writes will send a bearer token through the explorer API client; reads stay anonymous until then. Set `VITE_API_BASE_URL` (no trailing slash) on production builds once the API is public. Image upload uses the Storage emulator via Admin SDK.
+See [`crag-api/README.md`](crag-api/README.md) and [`crag-explorer/README.md`](crag-explorer/README.md). `dev-local` signs in against the Auth emulator. Writes send that Firebase ID token as a bearer token. Reads stay anonymous. The explorer still shows edit controls for every signed-in user. The API allows an explorer-crag change when the ID token custom claim `superadmin` is boolean `true`, or when that user is an owner or admin. Extracted crags stay read-only. Production Authentication stays off. Phone auth stays off, and the project must not be upgraded to Identity Platform. Set `VITE_API_BASE_URL` (no trailing slash) on production builds once the API is public. Image upload uses the Storage emulator via Admin SDK.
 
 ## Build
 

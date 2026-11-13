@@ -2,6 +2,7 @@ import type {
   CragDocument,
   CragMapMarker,
   CragMapTrail,
+  CragMemberRole,
   CragSource,
   DescriptionSection,
   LatLng,
@@ -12,7 +13,7 @@ import type {
   SectorDocument as SharedSectorDocument,
 } from '@crag-to-all/shared-crag';
 
-export type { CragDocument } from '@crag-to-all/shared-crag';
+export type { CragDocument, CragMemberDocument, CragMemberRole } from '@crag-to-all/shared-crag';
 
 export interface SectorDocument extends SharedSectorDocument {
   /** Lowercase name for the per-crag unique index. Omitted on extracted sectors. */
@@ -54,8 +55,29 @@ export interface ImageUploadResponse {
   storagePath: string;
 }
 
+/** One `crag_members` row as returned by the membership routes. */
+export interface CragMemberResponse {
+  userId: string;
+  role: CragMemberRole;
+}
+
 export interface ImageStorage {
   uploadImage(storagePath: string, data: Buffer): Promise<void>;
+}
+
+/** Identity read from a verified Firebase ID token. */
+export interface AuthCaller {
+  uid: string;
+  /** Trimmed address from the token, or null when the token has none. */
+  email: string | null;
+  emailVerified: boolean;
+  /** True only when the custom claim `superadmin` is the boolean `true`. */
+  superadmin: boolean;
+}
+
+/** Resolves to the caller when `idToken` is a valid Firebase ID token. Rejects otherwise. */
+export interface IdTokenVerifier {
+  verifyIdToken(idToken: string): Promise<AuthCaller>;
 }
 
 export interface CragResponse {
@@ -70,4 +92,15 @@ export interface CragResponse {
   opentopoTilePack?: OpenTopoTilePackInfo;
   version: number;
   updatedAt: string;
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      /** Set after a verified ID token. Absent on anonymous requests. */
+      caller?: AuthCaller;
+      /** Set by the crag-write middleware after the caller is allowed to change this crag. */
+      writableCrag?: CragDocument;
+    }
+  }
 }

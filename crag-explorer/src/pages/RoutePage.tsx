@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { canEditCrag } from '../api/permissions';
+import { useCanEditCrag } from '../auth/useAuthSession';
 import RoutePageOptionsMenu from '../components/RoutePageOptionsMenu';
 import SectorView from '../components/SectorView';
 import { useCrag } from '../context/CragContext';
@@ -44,7 +44,7 @@ const RoutePage: React.FC<RoutePageProps> = ({ sectors, onSectorChange, onRouteC
       );
     },
   });
-  const canEdit = canEditCrag(crag);
+  const canEdit = useCanEditCrag(crag);
 
   useEffect(() => {
     if (onSectorChange) {

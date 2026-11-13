@@ -3,6 +3,10 @@
     "rules": "storage.rules"
   },
   "emulators": {
+    "auth": {
+      "host": "127.0.0.1",
+      "port": 9099
+    },
     "storage": {
       "port": 9199
     },
