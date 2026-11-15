@@ -1,5 +1,5 @@
 import React, { useId, useState } from 'react';
-import type { Route } from '../types';
+import type { Route } from '../../types';
 import {
   ROUTE_NAME_MAX_LENGTH,
   ROUTE_TAG_GROUPS,
@@ -11,12 +11,12 @@ import {
   toggleRouteTag,
   type RouteEditDraft,
   type RouteEditErrors,
-} from '../utils/routeEditor';
-import { confirm } from '../context/ConfirmContext';
-import Button from './Button';
-import ChoiceGroup from './ChoiceGroup';
-import Modal from './Modal';
-import RouteRating from './RouteRating';
+} from '../../utils/routeEditor';
+import { confirm } from '../../context/ConfirmContext';
+import Button from '../Button';
+import ChoiceGroup from '../ChoiceGroup';
+import Modal from '../Modal';
+import RouteRating from '../RouteRating';
 import './RouteDetailsModal.scss';
 
 const LEAVE_CONFIRM = 'Leave this edit? Your unsaved changes will be lost.';

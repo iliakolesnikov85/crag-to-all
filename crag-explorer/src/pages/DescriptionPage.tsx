@@ -4,7 +4,7 @@ import { usePatchCrag } from '../api/useCragMutations';
 import { canEditCrag } from '../api/permissions';
 import { useCanEditCrag } from '../auth/useAuthSession';
 import Button from '../components/Button';
-import DescriptionSectionModal from '../components/DescriptionSectionModal';
+import DescriptionSectionModal from '../components/editors/DescriptionSectionModal';
 import { confirm } from '../context/ConfirmContext';
 import { useCrag } from '../context/CragContext';
 import type { DescriptionSection } from '../types';

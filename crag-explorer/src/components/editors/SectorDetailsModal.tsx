@@ -1,6 +1,6 @@
 import React, { useId, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import type { Sector } from '../types';
+import type { Sector } from '../../types';
 import {
   MONTHS,
   ORIENTATIONS,
@@ -10,12 +10,12 @@ import {
   type SectorDetailsPatch,
   type SectorEditDraft,
   type SectorEditErrors,
-} from '../utils/sectorDetails';
-import { SECTOR_NAME_MAX_LENGTH } from '../utils/sectorName';
-import { confirm } from '../context/ConfirmContext';
-import Button from './Button';
-import ChoiceGroup, { type ChoiceOption } from './ChoiceGroup';
-import Modal from './Modal';
+} from '../../utils/sectorDetails';
+import { SECTOR_NAME_MAX_LENGTH } from '../../utils/sectorName';
+import { confirm } from '../../context/ConfirmContext';
+import Button from '../Button';
+import ChoiceGroup, { type ChoiceOption } from '../ChoiceGroup';
+import Modal from '../Modal';
 import './SectorDetailsModal.scss';
 
 interface SectorDetailsModalProps {

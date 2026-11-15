@@ -1,13 +1,13 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { patchSector } from '../api/client';
-import { setAuthAccount } from '../auth/session';
-import { signInTestUser } from '../test/authAccount';
-import { CragContext } from '../context/CragContext';
-import { withQueryClient } from '../test/helpers';
-import { SAMPLE_CRAG_ID, sampleCragData } from '../test/fixtures/cragData';
-import type { Sector } from '../types';
+import { patchSector } from '../../api/client';
+import { setAuthAccount } from '../../auth/session';
+import { signInTestUser } from '../../test/authAccount';
+import { CragContext } from '../../context/CragContext';
+import { withQueryClient } from '../../test/helpers';
+import { SAMPLE_CRAG_ID, sampleCragData } from '../../test/fixtures/cragData';
+import type { Sector } from '../../types';
 import useDetailsEditors from './useDetailsEditors';
 
 vi.mock('../api/client', () => ({

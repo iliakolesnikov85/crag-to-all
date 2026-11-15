@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import type { LatLng } from '../types';
-import { formatSectorCoordinatePair } from '../utils/map/sectorCoordinates';
-import Button from './Button';
-import Modal from './Modal';
-import PhotoLocationPrompt from './PhotoLocationPrompt';
-import SectorTopoInput from './map/SectorTopoInput';
-import { useTopoFile } from './map/useTopoFile';
+import type { LatLng } from '../../types';
+import { formatSectorCoordinatePair } from '../../utils/map/sectorCoordinates';
+import Button from '../Button';
+import Modal from '../Modal';
+import PhotoLocationPrompt from '../PhotoLocationPrompt';
+import SectorTopoInput from '../map/SectorTopoInput';
+import { useTopoFile } from '../map/useTopoFile';
 import './AddTopoModal.scss';
 
 interface AddTopoModalProps {

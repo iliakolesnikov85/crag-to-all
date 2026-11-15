@@ -1,13 +1,13 @@
 import React, { useId, useState } from 'react';
-import type { DescriptionSection } from '../types';
+import type { DescriptionSection } from '../../types';
 import {
   DESCRIPTION_NAME_MAX_LENGTH,
   isEmptyHtml,
   sectionHtmlToParagraphs,
-} from '../utils/descriptionHtml';
-import Button from './Button';
-import Modal from './Modal';
-import RichTextInput from './RichTextInput';
+} from '../../utils/descriptionHtml';
+import Button from '../Button';
+import Modal from '../Modal';
+import RichTextInput from '../RichTextInput';
 import './DescriptionSectionModal.scss';
 
 interface DescriptionSectionModalProps {

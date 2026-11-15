@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import type { SectorPatch } from '../api/client';
-import { usePatchSector } from '../api/useCragMutations';
-import { useCanEditCrag } from '../auth/useAuthSession';
-import RouteDetailsModal from '../components/RouteDetailsModal';
-import SectorDetailsModal from '../components/SectorDetailsModal';
-import { confirm } from '../context/ConfirmContext';
-import { useCrag } from '../context/CragContext';
-import type { Route, Sector } from '../types';
+import type { SectorPatch } from '../../api/client';
+import { usePatchSector } from '../../api/useCragMutations';
+import { useCanEditCrag } from '../../auth/useAuthSession';
+import RouteDetailsModal from './RouteDetailsModal';
+import SectorDetailsModal from './SectorDetailsModal';
+import { confirm } from '../../context/ConfirmContext';
+import { useCrag } from '../../context/CragContext';
+import type { Route, Sector } from '../../types';
 import {
   EDIT_MISSING_ID_MESSAGE,
   EDIT_MISSING_VERSION_MESSAGE,
@@ -15,9 +15,9 @@ import {
   otherRouteNames,
   otherSectorNames,
   type EditableSector,
-} from '../utils/editAccess';
-import type { SectorDetailsPatch } from '../utils/sectorDetails';
-import { setMapCenter } from '../utils/map';
+} from '../../utils/editAccess';
+import type { SectorDetailsPatch } from '../../utils/sectorDetails';
+import { setMapCenter } from '../../utils/map';
 
 const MISSING_SECTOR_MESSAGE = 'This sector could not be found. Reload the page and try again.';
 

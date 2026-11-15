@@ -13,7 +13,7 @@ import {
   type SortField,
 } from '../utils/routesSort';
 import RoutesPageListOptionsMenu from '../components/RoutesPageListOptionsMenu';
-import useDetailsEditors from './useDetailsEditors';
+import useDetailsEditors from '../components/editors/useDetailsEditors';
 import './RoutesPage.scss';
 
 const MISSING_SECTOR_MESSAGE = 'This sector could not be found.';

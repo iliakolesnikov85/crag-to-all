@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { ConfirmProvider } from '../context/ConfirmContext';
-import { chooseConfirm } from '../test/helpers';
-import type { Route } from '../types';
+import { ConfirmProvider } from '../../context/ConfirmContext';
+import { chooseConfirm } from '../../test/helpers';
+import type { Route } from '../../types';
 import DrawRouteModal from './DrawRouteModal';
 
 const route: Route = {

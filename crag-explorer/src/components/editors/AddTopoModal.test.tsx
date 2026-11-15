@@ -1,12 +1,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { type ComponentProps } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { LatLng } from '../types';
-import { TOPO_TYPE_ERROR, readTopoGps } from '../utils/topoImage';
+import type { LatLng } from '../../types';
+import { TOPO_TYPE_ERROR, readTopoGps } from '../../utils/topoImage';
 import AddTopoModal from './AddTopoModal';
 
-vi.mock('../utils/topoImage', async () => {
-  const actual = await vi.importActual<typeof import('../utils/topoImage')>('../utils/topoImage');
+vi.mock('../../utils/topoImage', async () => {
+  const actual = await vi.importActual<typeof import('../../utils/topoImage')>('../../utils/topoImage');
   return {
     ...actual,
     readTopoGps: vi.fn(async () => null),

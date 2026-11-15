@@ -1,7 +1,7 @@
 import React from 'react';
-import type { Route } from '../types';
-import Button from './Button';
-import Modal from './Modal';
+import type { Route } from '../../types';
+import Button from '../Button';
+import Modal from '../Modal';
 import './RouteListModal.scss';
 
 type RouteListMode = 'routes' | 'draw';

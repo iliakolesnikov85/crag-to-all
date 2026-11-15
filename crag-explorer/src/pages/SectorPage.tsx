@@ -3,9 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { uploadCragImage } from '../api/client';
 import { useDeleteSector } from '../api/useCragMutations';
 import { useCanEditCrag } from '../auth/useAuthSession';
-import AddTopoModal from '../components/AddTopoModal';
-import DrawRouteModal from '../components/DrawRouteModal';
-import RouteListModal from '../components/RouteListModal';
+import AddTopoModal from '../components/editors/AddTopoModal';
+import DrawRouteModal from '../components/editors/DrawRouteModal';
+import RouteListModal from '../components/editors/RouteListModal';
 import SectorOptionsMenu from '../components/SectorOptionsMenu';
 import SectorView from '../components/SectorView';
 import { confirm } from '../context/ConfirmContext';
@@ -16,7 +16,7 @@ import { moveRouteOnImage, removeRouteFromImage, setRouteLineOnImage } from '../
 import { moveTopoImage, removeTopoImage } from '../utils/topoImages';
 import { getCragImageUrl } from '../utils/firebaseStorage';
 import { setMapCenter } from '../utils/map';
-import useDetailsEditors from './useDetailsEditors';
+import useDetailsEditors from '../components/editors/useDetailsEditors';
 
 const DELETE_MISSING_ID_MESSAGE = 'This sector cannot be deleted because it has no id.';
 

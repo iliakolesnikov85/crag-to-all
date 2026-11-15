@@ -7,7 +7,7 @@ import { useCrag } from '../context/CragContext';
 import { Route, Sector } from '../types';
 import { getCragImageUrl } from '../utils/firebaseStorage';
 import { setMapCenter } from '../utils/map';
-import useDetailsEditors from './useDetailsEditors';
+import useDetailsEditors from '../components/editors/useDetailsEditors';
 
 interface RoutePageProps {
   sectors: Sector[];

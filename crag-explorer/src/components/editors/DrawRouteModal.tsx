@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { pointsToBezierPath, type LinePoint } from '@crag-to-all/shared-crag';
-import type { Route } from '../types';
-import { confirm } from '../context/ConfirmContext';
-import Button from './Button';
-import Modal from './Modal';
+import type { Route } from '../../types';
+import { confirm } from '../../context/ConfirmContext';
+import Button from '../Button';
+import Modal from '../Modal';
 import './DrawRouteModal.scss';
 
 const LEAVE_CONFIRM = 'Leave this drawing? Your unsaved line will be lost.';
