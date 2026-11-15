@@ -2,6 +2,7 @@ import { generateGPX } from '@crag-to-all/shared-crag';
 import cors from 'cors';
 import express, { type Express, type Request, type RequestHandler } from 'express';
 import type { Db } from 'mongodb';
+import { attachAccountProfiles, lookupVerifiedAccount } from './accounts';
 import { asyncHandler, errorHandler, forbidden, storageFailed, storageUnavailable, unauthorized } from './http';
 import {
   cragImageStoragePath,
@@ -20,11 +21,12 @@ import {
   patchCrag,
   patchSector,
   replaceSector,
+  requireMemberManager,
   requireWritableCrag,
   upsertMember,
 } from './store';
-import type { AuthCaller, CragDocument, IdTokenVerifier, ImageStorage, ImageUploadResponse } from './types';
-import { parseCragId, parseCreateCrag, parseCragPatch, parseMemberRole, parseMemberUserId, parseReplaceSector, parseSectorPatch, parseSectorId, parseSectorWrite } from './validate';
+import type { AuthCaller, AuthDirectory, CragDocument, IdTokenVerifier, ImageStorage, ImageUploadResponse } from './types';
+import { parseAccountEmail, parseCragId, parseCreateCrag, parseCragPatch, parseMemberRole, parseMemberUserId, parseReplaceSector, parseSectorPatch, parseSectorId, parseSectorWrite } from './validate';
 
 function readBearerToken(header: string | undefined): string | null {
   if (!header) return null;
@@ -71,6 +73,7 @@ function requireSuperadmin(): RequestHandler {
 export interface AppOptions {
   storage?: ImageStorage;
   auth?: IdTokenVerifier;
+  accounts?: AuthDirectory;
 }
 
 export function requireAuth(auth: IdTokenVerifier | undefined): RequestHandler {
@@ -169,11 +172,23 @@ export function createApp(db: Db, options: AppOptions = {}): Express {
   );
 
   app.get(
+    '/api/crags/:cragId/accounts',
+    authenticate,
+    asyncHandler(async (req, res) => {
+      const cragId = parseCragId(req.params.cragId);
+      await requireMemberManager(db, cragId, loadedCaller(req));
+      const email = parseAccountEmail(req.query.email);
+      res.json(await lookupVerifiedAccount(options.accounts, email));
+    }),
+  );
+
+  app.get(
     '/api/crags/:cragId/members',
     authenticate,
     asyncHandler(async (req, res) => {
       const cragId = parseCragId(req.params.cragId);
-      res.json(await listMembers(db, cragId, loadedCaller(req)));
+      const members = await listMembers(db, cragId, loadedCaller(req));
+      res.json(await attachAccountProfiles(members, options.accounts));
     }),
   );
 

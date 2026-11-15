@@ -1,5 +1,5 @@
 import type { Db } from 'mongodb';
-import { forbidden, isDuplicateKeyError, notFound, readOnly } from '../http';
+import { forbidden, notFound, readOnly } from '../http';
 import type { AuthCaller, CragMemberResponse, CragMemberRole } from '../types';
 import { cragsCol, membersCol } from './collections';
 
@@ -12,17 +12,31 @@ async function requireExplorerCrag(db: Db, cragId: string): Promise<void> {
   }
 }
 
-/** Superadmin or an owner of this crag. An admin, or a user with no row, is forbidden. */
-async function requireMemberManager(db: Db, cragId: string, caller: AuthCaller): Promise<void> {
+async function requireMemberRole(
+  db: Db,
+  cragId: string,
+  caller: AuthCaller,
+  roles: readonly CragMemberRole[],
+): Promise<void> {
   await requireExplorerCrag(db, cragId);
   if (caller.superadmin) return;
   const member = await membersCol(db).findOne(
     { cragId, userId: caller.uid },
     { projection: { role: 1 } },
   );
-  if (member?.role !== 'owner') {
+  if (!member || !roles.includes(member.role)) {
     throw forbidden();
   }
+}
+
+/** Superadmin, owner, or admin of this crag. A user with no row is forbidden. */
+function requireMemberReader(db: Db, cragId: string, caller: AuthCaller): Promise<void> {
+  return requireMemberRole(db, cragId, caller, ['owner', 'admin']);
+}
+
+/** Superadmin or an owner of this crag. An admin, or a user with no row, is forbidden. */
+function requireMemberManager(db: Db, cragId: string, caller: AuthCaller): Promise<void> {
+  return requireMemberRole(db, cragId, caller, ['owner']);
 }
 
 /**
@@ -55,37 +69,16 @@ async function saveMemberRole(
   role: CragMemberRole,
   caller: AuthCaller,
 ): Promise<void> {
-  try {
-    if (caller.superadmin) {
-      await membersCol(db).updateOne({ cragId, userId }, { $set: { role } }, { upsert: true });
-      return;
-    }
-    // An existing owner does not match, so the unique index turns that write into a duplicate key.
-    await membersCol(db).updateOne(
-      { cragId, userId, role: { $ne: 'owner' } },
-      { $set: { role } },
-      { upsert: true },
-    );
-  } catch (error) {
-    if (!isDuplicateKeyError(error)) {
-      console.error('Failed to upsert crag member:', error);
-      throw error;
-    }
-    if (caller.superadmin) {
-      const updated = await membersCol(db).updateOne({ cragId, userId }, { $set: { role } });
-      if (updated.matchedCount === 0) {
-        console.error('Failed to upsert crag member after a duplicate key:', error);
-        throw error;
-      }
-      return;
-    }
-    const current = await membersCol(db).findOne(
-      { cragId, userId },
-      { projection: { role: 1 } },
-    );
-    if (current?.role === role) return;
-    throw forbidden();
+  if (caller.superadmin) {
+    await membersCol(db).updateOne({ cragId, userId }, { $set: { role } }, { upsert: true });
+    return;
   }
+  // An owner row does not match, so a promotion between the check and this write is left in place.
+  await membersCol(db).updateOne(
+    { cragId, userId, role: { $ne: 'owner' } },
+    { $set: { role } },
+    { upsert: true },
+  );
 }
 
 /** Every membership for this caller, ordered by crag id. Any signed-in user may read their own rows. */
@@ -104,13 +97,13 @@ export async function listCallerMemberships(
   ));
 }
 
-/** Owner or superadmin. Returns `{ userId, role }` for this crag, ordered by user id. */
+/** Admin, owner, or superadmin. Returns `{ userId, role }` for this crag, ordered by user id. */
 export async function listMembers(
   db: Db,
   cragId: string,
   caller: AuthCaller,
 ): Promise<CragMemberResponse[]> {
-  await requireMemberManager(db, cragId, caller);
+  await requireMemberReader(db, cragId, caller);
   const docs = await membersCol(db)
     .find({ cragId }, { projection: { _id: 0, userId: 1, role: 1 } })
     .sort({ userId: 1 })
@@ -153,3 +146,5 @@ export async function deleteMember(
   const deleted = await membersCol(db).deleteOne({ cragId, userId });
   if (deleted.deletedCount === 0) throw notFound('member');
 }
+
+export { requireMemberManager };

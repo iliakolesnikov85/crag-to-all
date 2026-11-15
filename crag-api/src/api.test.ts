@@ -8,7 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app';
 import { IMAGE_FIELD_NAME } from './images';
 import { ensureIndexes } from './store';
-import type { AuthCaller, IdTokenVerifier, ImageStorage } from './types';
+import type { AuthAccountProfile, AuthCaller, AuthDirectory, IdTokenVerifier, ImageStorage } from './types';
 
 const TEST_TOKEN = 'test-token';
 const TEST_EMAIL = 'editor@example.com';
@@ -55,14 +55,31 @@ describe('crag-api', () => {
     };
   }
 
-  function appFor(caller: AuthCaller) {
+  function appFor(caller: AuthCaller, accounts?: AuthDirectory) {
     return createApp(db, {
       auth: {
         async verifyIdToken() {
           return caller;
         },
       },
+      accounts,
     });
+  }
+
+  function listedMember(userId: string, role: 'owner' | 'admin') {
+    return { userId, role, email: null, name: null };
+  }
+
+  function directoryFor(profiles: readonly AuthAccountProfile[]): AuthDirectory {
+    return {
+      async findByEmail(email) {
+        return profiles.find((profile) => profile.email === email) ?? null;
+      },
+      async getByUids(uids) {
+        const wanted = new Set(uids);
+        return profiles.filter((profile) => wanted.has(profile.uid));
+      },
+    };
   }
 
   beforeAll(async () => {
@@ -1051,9 +1068,9 @@ describe('crag-api', () => {
     const listed = await write().get('/api/crags/roshka/members');
     expect(listed.status).toBe(200);
     expect(listed.body).toEqual([
-      { userId: 'admin-user', role: 'admin' },
-      { userId: 'owner-a', role: 'admin' },
-      { userId: 'owner-b', role: 'owner' },
+      listedMember('admin-user', 'admin'),
+      listedMember('owner-a', 'admin'),
+      listedMember('owner-b', 'owner'),
     ]);
 
     const removedAdmin = await write().delete('/api/crags/roshka/members/admin-user');
@@ -1091,9 +1108,9 @@ describe('crag-api', () => {
     const listed = await request(ownerApp).get('/api/crags/roshka/members').set(authz);
     expect(listed.status).toBe(200);
     expect(listed.body).toEqual([
-      { userId: 'admin-user', role: 'admin' },
-      { userId: 'other-owner', role: 'owner' },
-      { userId: 'owner-user', role: 'owner' },
+      listedMember('admin-user', 'admin'),
+      listedMember('other-owner', 'owner'),
+      listedMember('owner-user', 'owner'),
     ]);
 
     const granted = await request(ownerApp)
@@ -1149,30 +1166,63 @@ describe('crag-api', () => {
     ]);
   });
 
-  it.each([
-    { label: 'admin', uid: 'admin-user', role: 'admin' as const },
-    { label: 'signed-in user with no membership', uid: 'stranger' },
-  ])('rejects membership routes from a $label', async ({ uid, role }) => {
+  it('lets an admin list members but not change them', async () => {
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await db.collection('crag_members').insertMany([
+      { cragId: 'roshka', userId: 'owner-user', role: 'owner' },
+      { cragId: 'roshka', userId: 'admin-user', role: 'admin' },
+    ]);
+    const adminApp = appFor({
+      uid: 'admin-user',
+      email: 'admin@example.com',
+      emailVerified: true,
+      superadmin: false,
+    });
+    const authz = { Authorization: 'Bearer admin-token' };
+    const before = await db.collection('crag_members').countDocuments({ cragId: 'roshka' });
+
+    const listed = await request(adminApp).get('/api/crags/roshka/members').set(authz);
+    expect(listed.status).toBe(200);
+    expect(listed.body).toEqual([
+      listedMember('admin-user', 'admin'),
+      listedMember('owner-user', 'owner'),
+    ]);
+
+    const granted = await request(adminApp)
+      .put('/api/crags/roshka/members/new-admin')
+      .set(authz)
+      .send({ role: 'admin' });
+    expect(granted.status).toBe(403);
+    expect(granted.body).toEqual({ error: 'forbidden' });
+
+    const removed = await request(adminApp).delete('/api/crags/roshka/members/owner-user').set(authz);
+    expect(removed.status).toBe(403);
+    expect(removed.body).toEqual({ error: 'forbidden' });
+
+    const lookup = await request(adminApp)
+      .get('/api/crags/roshka/accounts')
+      .query({ email: 'owner@example.com' })
+      .set(authz);
+    expect(lookup.status).toBe(403);
+    expect(lookup.body).toEqual({ error: 'forbidden' });
+
+    expect(await db.collection('crag_members').countDocuments({ cragId: 'roshka' })).toBe(before);
+  });
+
+  it('rejects membership routes from a signed-in user with no membership', async () => {
     await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
     await db.collection('crag_members').insertOne({
       cragId: 'roshka',
       userId: 'owner-user',
       role: 'owner',
     });
-    if (role) {
-      await db.collection('crag_members').insertOne({
-        cragId: 'roshka',
-        userId: uid,
-        role,
-      });
-    }
     const callerApp = appFor({
-      uid,
-      email: `${uid}@example.com`,
+      uid: 'stranger',
+      email: 'stranger@example.com',
       emailVerified: true,
       superadmin: false,
     });
-    const authz = { Authorization: `Bearer ${uid}-token` };
+    const authz = { Authorization: 'Bearer stranger-token' };
     const before = await db.collection('crag_members').countDocuments({ cragId: 'roshka' });
 
     const listed = await request(callerApp).get('/api/crags/roshka/members').set(authz);
@@ -1195,6 +1245,149 @@ describe('crag-api', () => {
     expect(missing.body).toEqual({ error: 'forbidden' });
 
     expect(await db.collection('crag_members').countDocuments({ cragId: 'roshka' })).toBe(before);
+  });
+
+  it('fills member names and emails from the Auth directory', async () => {
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    await db.collection('crag_members').insertMany([
+      { cragId: 'roshka', userId: 'known-user', role: 'admin' },
+      { cragId: 'roshka', userId: 'missing-user', role: 'owner' },
+    ]);
+    const directory = directoryFor([
+      {
+        uid: 'known-user',
+        email: 'known@example.com',
+        emailVerified: true,
+        name: 'Known Climber',
+      },
+    ]);
+    const callerApp = appFor({
+      uid: 'test-user',
+      email: TEST_EMAIL,
+      emailVerified: true,
+      superadmin: true,
+    }, directory);
+
+    const listed = await request(callerApp)
+      .get('/api/crags/roshka/members')
+      .set('Authorization', 'Bearer test-token');
+    expect(listed.status).toBe(200);
+    expect(listed.body).toEqual([
+      { userId: 'known-user', role: 'admin', email: 'known@example.com', name: 'Known Climber' },
+      { userId: 'missing-user', role: 'owner', email: null, name: null },
+    ]);
+  });
+
+  it('looks up a verified account by email and hides missing or unverified accounts', async () => {
+    await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
+    const directory = directoryFor([
+      {
+        uid: 'verified-user',
+        email: 'verified@example.com',
+        emailVerified: true,
+        name: 'Verified User',
+      },
+      {
+        uid: 'pending-user',
+        email: 'pending@example.com',
+        emailVerified: false,
+        name: 'Pending User',
+      },
+    ]);
+    const ownerApp = appFor({
+      uid: 'owner-user',
+      email: 'owner@example.com',
+      emailVerified: true,
+      superadmin: false,
+    }, directory);
+    await db.collection('crag_members').insertOne({
+      cragId: 'roshka',
+      userId: 'owner-user',
+      role: 'owner',
+    });
+    const authz = { Authorization: 'Bearer owner-token' };
+    const missingMessage = { error: 'not_found', message: 'No verified account uses that email' };
+
+    const found = await request(ownerApp)
+      .get('/api/crags/roshka/accounts')
+      .query({ email: '  Verified@Example.com ' })
+      .set(authz);
+    expect(found.status).toBe(200);
+    expect(found.body).toEqual({
+      uid: 'verified-user',
+      email: 'verified@example.com',
+      name: 'Verified User',
+    });
+
+    const pending = await request(ownerApp)
+      .get('/api/crags/roshka/accounts')
+      .query({ email: 'pending@example.com' })
+      .set(authz);
+    expect(pending.status).toBe(404);
+    expect(pending.body).toEqual(missingMessage);
+
+    const unknown = await request(ownerApp)
+      .get('/api/crags/roshka/accounts')
+      .query({ email: 'missing@example.com' })
+      .set(authz);
+    expect(unknown.status).toBe(404);
+    expect(unknown.body).toEqual(missingMessage);
+
+    const invalid = await request(ownerApp)
+      .get('/api/crags/roshka/accounts')
+      .query({ email: 'not-an-email' })
+      .set(authz);
+    expect(invalid.status).toBe(400);
+    expect(invalid.body.error).toBe('invalid_request');
+
+    const otherOwner = appFor({
+      uid: 'other-owner',
+      email: 'other@example.com',
+      emailVerified: true,
+      superadmin: false,
+    }, directory);
+    await db.collection('crag_members').insertOne({
+      cragId: 'other',
+      userId: 'other-owner',
+      role: 'owner',
+    });
+    const otherCrag = await request(otherOwner)
+      .get('/api/crags/roshka/accounts')
+      .query({ email: 'verified@example.com' })
+      .set('Authorization', 'Bearer other-token');
+    expect(otherCrag.status).toBe(403);
+    expect(otherCrag.body).toEqual({ error: 'forbidden' });
+
+    const unconfigured = await write().get('/api/crags/roshka/accounts').query({ email: 'verified@example.com' });
+    expect(unconfigured.status).toBe(503);
+    expect(unconfigured.body.error).toBe('accounts_unavailable');
+
+    const failing: AuthDirectory = {
+      async findByEmail() {
+        throw new Error('auth down');
+      },
+      async getByUids() {
+        throw new Error('auth down');
+      },
+    };
+    const failingApp = appFor({
+      uid: 'owner-user',
+      email: 'owner@example.com',
+      emailVerified: true,
+      superadmin: false,
+    }, failing);
+    const failedLookup = await request(failingApp)
+      .get('/api/crags/roshka/accounts')
+      .query({ email: 'verified@example.com' })
+      .set(authz);
+    expect(failedLookup.status).toBe(502);
+    expect(failedLookup.body.error).toBe('accounts_failed');
+
+    const failedList = await request(failingApp)
+      .get('/api/crags/roshka/members')
+      .set(authz);
+    expect(failedList.status).toBe(502);
+    expect(failedList.body.error).toBe('accounts_failed');
   });
 
   it('rejects membership routes when the caller owns a different crag', async () => {
@@ -1243,6 +1436,10 @@ describe('crag-api', () => {
     expect(listed.status).toBe(403);
     expect(listed.body).toEqual(readOnlyBody);
 
+    const lookup = await write().get('/api/crags/roshka/accounts').query({ email: 'owner@example.com' });
+    expect(lookup.status).toBe(403);
+    expect(lookup.body).toEqual(readOnlyBody);
+
     const granted = await write().put('/api/crags/roshka/members/owner-a').send({ role: 'owner' });
     expect(granted.status).toBe(403);
     expect(granted.body).toEqual(readOnlyBody);
@@ -1270,6 +1467,10 @@ describe('crag-api', () => {
     const listed = await write().get('/api/crags/missing/members');
     expect(listed.status).toBe(404);
     expect(listed.body).toEqual({ error: 'not_found', message: 'crag not found' });
+
+    const lookup = await write().get('/api/crags/missing/accounts').query({ email: 'a@b.co' });
+    expect(lookup.status).toBe(404);
+    expect(lookup.body).toEqual({ error: 'not_found', message: 'crag not found' });
 
     const granted = await write().put('/api/crags/missing/members/user-a').send({ role: 'admin' });
     expect(granted.status).toBe(404);
@@ -1553,6 +1754,7 @@ describe('crag-api', () => {
       () => request(app).post('/api/crags').send({ name: 'Roshka' }),
       () => request(app).patch('/api/crags/roshka').send({ version: 1, name: 'Nope' }),
       () => request(app).get('/api/crags/roshka/members'),
+      () => request(app).get('/api/crags/roshka/accounts').query({ email: 'a@b.co' }),
       () => request(app).put('/api/crags/roshka/members/user-a').send({ role: 'admin' }),
       () => request(app).delete('/api/crags/roshka/members/user-a'),
       () => request(app).post('/api/crags/roshka/sectors').send({ name: 'Cave' }),

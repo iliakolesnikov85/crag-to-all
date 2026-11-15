@@ -20,6 +20,7 @@ function buildQueryClient(): QueryClient {
 export const queryKeys = {
   crags: ['crags'] as const,
   crag: (cragId: string) => ['crag', cragId] as const,
+  cragMembers: (cragId: string) => ['crag-members', cragId] as const,
 };
 
 export const queryClient = buildQueryClient();

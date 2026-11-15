@@ -63,6 +63,14 @@ const memberRoleBodySchema = z.object({
   role: z.enum(['owner', 'admin']),
 });
 
+const accountEmailSchema = z
+  .string()
+  .min(1, 'email is required')
+  .max(320, 'email is too long')
+  .refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), {
+    message: 'email must be an email address',
+  });
+
 const versionSchema = z.number().int().min(1);
 
 const latLngSchema = z.object({
@@ -266,6 +274,13 @@ function parseMemberRole(body: unknown): CragMemberRole {
   return parseWith(memberRoleBodySchema, body).role;
 }
 
+function parseAccountEmail(value: unknown): string {
+  if (typeof value !== 'string') {
+    throw badRequest('email is required');
+  }
+  return parseWith(accountEmailSchema, value.trim().toLowerCase());
+}
+
 function parseCreateCrag(body: unknown): CragCreateInput {
   const { name, cragId } = parseWith(createCragBodySchema, body);
   if (cragId) return { name, cragId };
@@ -309,6 +324,7 @@ export {
   parseCragId,
   parseCragPatch,
   parseCreateCrag,
+  parseAccountEmail,
   parseMemberRole,
   parseMemberUserId,
   parseReplaceSector,

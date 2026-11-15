@@ -9,6 +9,7 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
+  updateProfile,
   type Auth,
   type User,
 } from 'firebase/auth';
@@ -140,8 +141,15 @@ export async function signInWithEmail(email: string, password: string): Promise<
   await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
 }
 
-export async function createAccount(email: string, password: string): Promise<void> {
-  await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
+export async function createAccount(
+  email: string,
+  password: string,
+  displayName = '',
+): Promise<void> {
+  const credential = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
+  const name = displayName.trim();
+  if (!name) return;
+  await updateProfile(credential.user, { displayName: name });
 }
 
 export async function signInWithGoogle(): Promise<void> {

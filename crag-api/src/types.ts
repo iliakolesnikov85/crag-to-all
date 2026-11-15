@@ -55,10 +55,35 @@ export interface ImageUploadResponse {
   storagePath: string;
 }
 
-/** One `crag_members` row as returned by the membership routes. */
+/** One `crag_members` row as returned by the membership write routes. */
 export interface CragMemberResponse {
   userId: string;
   role: CragMemberRole;
+}
+
+/** Member row plus the Auth profile shown in the membership table. */
+export interface CragMemberView extends CragMemberResponse {
+  email: string | null;
+  name: string | null;
+}
+
+/** Firebase Auth profile used to label members and to resolve an email. */
+export interface AuthAccountProfile {
+  uid: string;
+  email: string | null;
+  emailVerified: boolean;
+  name: string | null;
+}
+
+/**
+ * Account reads against Firebase Auth.
+ * Tests pass a stub. The server passes the Admin SDK implementation.
+ */
+export interface AuthDirectory {
+  /** Exact email lookup. Null when no account uses that address. */
+  findByEmail(email: string): Promise<AuthAccountProfile | null>;
+  /** Profiles for these uids. Uids with no Auth user are omitted. */
+  getByUids(uids: readonly string[]): Promise<AuthAccountProfile[]>;
 }
 
 export interface ImageStorage {

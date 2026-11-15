@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { setAuthAccount, type AuthAccount } from '../auth/session';
 import { signInTestUser } from '../test/authAccount';
-import { canEditCrag, canManageCrag } from './permissions';
+import { canEditCrag, canManageCrag, canManageMembers } from './permissions';
 
 function signIn(uid: string, roles: AuthAccount['roles']): void {
   setAuthAccount({
@@ -82,5 +82,29 @@ describe('canEditCrag', () => {
 
     signIn('owner-user', { shulaveri: 'owner' });
     expect(canEditCrag({ cragId: 'shulaveri', source: 'external' })).toBe(false);
+  });
+});
+
+describe('canManageMembers', () => {
+  beforeEach(() => {
+    setAuthAccount(null);
+  });
+
+  it('rejects membership changes when signed out', () => {
+    expect(canManageMembers('roshka')).toBe(false);
+  });
+
+  it('lets a superadmin change members without a membership row', () => {
+    signInTestUser();
+    expect(canManageMembers('roshka')).toBe(true);
+  });
+
+  it('lets an owner change members and keeps an admin read-only', () => {
+    signIn('owner-user', { roshka: 'owner' });
+    expect(canManageMembers('roshka')).toBe(true);
+    expect(canManageMembers('other')).toBe(false);
+
+    signIn('admin-user', { roshka: 'admin' });
+    expect(canManageMembers('roshka')).toBe(false);
   });
 });

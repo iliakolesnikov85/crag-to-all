@@ -30,7 +30,7 @@ export interface LatLng {
 }
 
 export interface Sector {
-  /** Stable document id. */
+  /** App-assigned id. Never an upstream sector id. */
   id?: string;
   name: string;
   geo: LatLng | null;

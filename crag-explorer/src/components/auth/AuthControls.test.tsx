@@ -86,6 +86,8 @@ describe('AuthControls', () => {
     });
     renderHeader();
     const dialog = openSignIn();
+    expect(within(dialog).queryByLabelText('Display name (optional)')).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText('Confirm password')).not.toBeInTheDocument();
     fireEvent.change(within(dialog).getByLabelText('Email'), {
       target: { value: '  ada@example.com  ' },
     });
@@ -155,13 +157,61 @@ describe('AuthControls', () => {
     fireEvent.change(within(dialog).getByLabelText('Email'), {
       target: { value: 'ada@example.com' },
     });
+    fireEvent.change(within(dialog).getByLabelText('Display name (optional)'), {
+      target: { value: '  Ada  ' },
+    });
     fireEvent.change(within(dialog).getByLabelText('Password'), {
+      target: { value: 'secret1' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Confirm password'), {
       target: { value: 'secret1' },
     });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Create account' }));
 
     await waitFor(() => {
-      expect(createAccount).toHaveBeenCalledWith('ada@example.com', 'secret1');
+      expect(createAccount).toHaveBeenCalledWith('ada@example.com', 'secret1', 'Ada');
+    });
+  });
+
+  it('asks again when the confirmation does not match', async () => {
+    renderHeader();
+    openSignIn();
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+    const dialog = screen.getByRole('dialog', { name: 'Create account' });
+    fireEvent.change(within(dialog).getByLabelText('Email'), {
+      target: { value: 'ada@example.com' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Password'), {
+      target: { value: 'secret1' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Confirm password'), {
+      target: { value: 'secret2' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create account' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Passwords do not match.');
+    expect(createAccount).not.toHaveBeenCalled();
+  });
+
+  it('creates an account without a display name', async () => {
+    renderHeader();
+    openSignIn();
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+    const dialog = screen.getByRole('dialog', { name: 'Create account' });
+    expect(within(dialog).queryByLabelText('Display name (optional)')).toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText('Email'), {
+      target: { value: 'ada@example.com' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Password'), {
+      target: { value: 'secret1' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Confirm password'), {
+      target: { value: 'secret1' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create account' }));
+
+    await waitFor(() => {
+      expect(createAccount).toHaveBeenCalledWith('ada@example.com', 'secret1', '');
     });
   });
 

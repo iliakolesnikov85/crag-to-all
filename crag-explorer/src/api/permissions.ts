@@ -17,3 +17,11 @@ export function canManageCrag(cragId: string): boolean {
 export function canEditCrag(crag: { cragId: string; source?: CragSource }): boolean {
   return crag.source !== 'external' && canManageCrag(crag.cragId);
 }
+
+/** A superadmin or an owner of this crag may add, change, and remove members. */
+export function canManageMembers(cragId: string): boolean {
+  const account = getAuthAccount();
+  if (!account) return false;
+  if (account.superadmin) return true;
+  return account.roles?.[cragId] === 'owner';
+}

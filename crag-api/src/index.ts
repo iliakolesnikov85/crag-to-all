@@ -1,7 +1,7 @@
 import { initializeFirebase } from '@crag-to-all/shared-firebase';
 import { MongoClient } from 'mongodb';
 import { createApp } from './app';
-import { createFirebaseIdTokenVerifier } from './auth';
+import { createFirebaseAuthDirectory, createFirebaseIdTokenVerifier } from './auth';
 import { getConfig } from './config';
 import { createFirebaseImageStorage } from './storage';
 import { ensureIndexes } from './store';
@@ -35,6 +35,7 @@ async function main(): Promise<void> {
   const app = createApp(db, {
     storage: createFirebaseImageStorage(),
     auth: createFirebaseIdTokenVerifier(),
+    accounts: createFirebaseAuthDirectory(),
   });
   const server = app.listen(config.port, () => {
     console.log(`crag-api listening on http://localhost:${config.port}`);

@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { FaInstagram, FaTelegram } from 'react-icons/fa';
+import CragMembersPanel from '../components/members/CragMembersPanel';
+import { useCanEditCrag } from '../auth/useAuthSession';
+import { useCrag } from '../context/CragContext';
 import { shuffle } from '../utils/shuffle';
 import './TeamPage.scss';
 
@@ -10,6 +13,8 @@ interface TeamMember {
 }
 
 const TeamPage: React.FC = () => {
+  const { crag } = useCrag();
+  const showMembers = useCanEditCrag(crag);
   const teamMembers: TeamMember[] = [
     { name: 'George Manukian' },
     { name: 'Anton Solovev' },
@@ -82,6 +87,7 @@ const TeamPage: React.FC = () => {
             })}
           </div>
         </div>
+        {showMembers ? <CragMembersPanel /> : null}
       </div>
     </div>
   );

@@ -65,6 +65,16 @@ export function storageFailed(message = 'Could not upload image to Storage'): Ht
   return new HttpError(502, { error: 'storage_failed', message });
 }
 
+export function accountsUnavailable(
+  message = 'Account lookup is not configured',
+): HttpError {
+  return new HttpError(503, { error: 'accounts_unavailable', message });
+}
+
+export function accountsFailed(message = 'Could not read accounts'): HttpError {
+  return new HttpError(502, { error: 'accounts_failed', message });
+}
+
 export function isDuplicateKeyError(err: unknown): boolean {
   return (
     typeof err === 'object' &&

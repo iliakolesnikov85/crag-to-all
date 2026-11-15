@@ -78,10 +78,14 @@ function authFailureMessage(error: unknown, mode: AuthMode, fallback: string): s
 
 function AuthDialog({ onClose }: AuthDialogProps) {
   const emailId = useId();
+  const displayNameId = useId();
   const passwordId = useId();
+  const confirmPasswordId = useId();
   const [mode, setMode] = useState<AuthMode>('sign-in');
   const [email, setEmail] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [resetSent, setResetSent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -126,6 +130,10 @@ function AuthDialog({ onClose }: AuthDialogProps) {
       setError('Enter a valid email address.');
       return;
     }
+    if (mode === 'create' && password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
 
     setBusy(true);
     try {
@@ -135,7 +143,7 @@ function AuthDialog({ onClose }: AuthDialogProps) {
         return;
       }
       if (mode === 'create') {
-        await createAccount(trimmedEmail, password);
+        await createAccount(trimmedEmail, password, displayName.trim());
         return;
       }
       await signInWithEmail(trimmedEmail, password);
@@ -204,6 +212,23 @@ function AuthDialog({ onClose }: AuthDialogProps) {
             onChange={(event) => setEmail(event.target.value)}
           />
         </label>
+        {mode === 'create' ? (
+          <label className="auth-form__field" htmlFor={displayNameId}>
+            <span className="auth-form__label">
+              Display name
+              <span className="auth-form__optional"> (optional)</span>
+            </span>
+            <input
+              id={displayNameId}
+              className="auth-form__input"
+              type="text"
+              autoComplete="nickname"
+              value={displayName}
+              disabled={busy}
+              onChange={(event) => setDisplayName(event.target.value)}
+            />
+          </label>
+        ) : null}
         {mode === 'reset' ? null : (
           <label className="auth-form__field" htmlFor={passwordId}>
             <span className="auth-form__label">Password</span>
@@ -218,6 +243,20 @@ function AuthDialog({ onClose }: AuthDialogProps) {
             />
           </label>
         )}
+        {mode === 'create' ? (
+          <label className="auth-form__field" htmlFor={confirmPasswordId}>
+            <span className="auth-form__label">Confirm password</span>
+            <input
+              id={confirmPasswordId}
+              className="auth-form__input"
+              type="password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              disabled={busy}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+            />
+          </label>
+        ) : null}
         <Button type="submit" fullWidth disabled={busy}>
           {submitLabel}
         </Button>

@@ -1,3 +1,4 @@
+import type { CragMemberRole } from '@crag-to-all/shared-crag';
 import type { Crag, CragData, CragMapMarker, DescriptionSection, Image, LatLng, Route, Sector } from '../types';
 import { getAccessToken } from './auth';
 
@@ -35,6 +36,49 @@ function isSectorGeo(geo: unknown): geo is LatLng | null {
   if (!geo || typeof geo !== 'object') return false;
   const point = geo as Partial<LatLng>;
   return typeof point.lat === 'number' && typeof point.lon === 'number';
+}
+
+function isMemberRole(role: unknown): role is CragMemberRole {
+  return role === 'owner' || role === 'admin';
+}
+
+function readNullableString(value: unknown, failure: string): string | null {
+  if (value === null) return null;
+  if (typeof value !== 'string') {
+    throw new Error(failure);
+  }
+  return value;
+}
+
+function readCragMember(value: unknown): CragMember {
+  if (!value || typeof value !== 'object') {
+    throw new Error('Crag members returned an unexpected response');
+  }
+  const row = value as { userId?: unknown; role?: unknown; email?: unknown; name?: unknown };
+  if (typeof row.userId !== 'string' || !isMemberRole(row.role)) {
+    throw new Error('Crag members returned an unexpected response');
+  }
+  return {
+    userId: row.userId,
+    role: row.role,
+    email: readNullableString(row.email, 'Crag members returned an unexpected response'),
+    name: readNullableString(row.name, 'Crag members returned an unexpected response'),
+  };
+}
+
+function readVerifiedAccount(value: unknown): VerifiedAccount {
+  if (!value || typeof value !== 'object') {
+    throw new Error('Account lookup returned an unexpected response');
+  }
+  const account = value as { uid?: unknown; email?: unknown; name?: unknown };
+  if (typeof account.uid !== 'string' || typeof account.email !== 'string') {
+    throw new Error('Account lookup returned an unexpected response');
+  }
+  return {
+    uid: account.uid,
+    email: account.email,
+    name: readNullableString(account.name, 'Account lookup returned an unexpected response'),
+  };
 }
 
 function isCragMapMarker(value: unknown): value is CragMapMarker {
@@ -238,6 +282,76 @@ export async function createSector(
     );
   }
   return readSectorResponse(response);
+}
+
+export interface CragMember {
+  userId: string;
+  role: CragMemberRole;
+  email: string | null;
+  name: string | null;
+}
+
+export interface VerifiedAccount {
+  uid: string;
+  email: string;
+  name: string | null;
+}
+
+export async function listCragMembers(cragId: string): Promise<CragMember[]> {
+  const response = await apiFetch(`${cragDocumentPath(cragId)}/members`);
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, `Failed to load crag members (${response.status})`),
+    );
+  }
+  const body = (await response.json()) as unknown;
+  if (!Array.isArray(body)) {
+    throw new Error('Crag members returned an unexpected response');
+  }
+  return body.map(readCragMember);
+}
+
+export async function lookupVerifiedAccount(cragId: string, email: string): Promise<VerifiedAccount> {
+  const params = new URLSearchParams({ email: email.trim() });
+  const response = await apiFetch(`${cragDocumentPath(cragId)}/accounts?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, `Failed to look up that email (${response.status})`),
+    );
+  }
+  return readVerifiedAccount(await response.json());
+}
+
+export async function upsertCragMember(
+  cragId: string,
+  userId: string,
+  role: CragMemberRole,
+): Promise<void> {
+  const response = await apiFetch(
+    `${cragDocumentPath(cragId)}/members/${encodeURIComponent(userId)}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role }),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, `Failed to save crag member (${response.status})`),
+    );
+  }
+}
+
+export async function deleteCragMember(cragId: string, userId: string): Promise<void> {
+  const response = await apiFetch(
+    `${cragDocumentPath(cragId)}/members/${encodeURIComponent(userId)}`,
+    { method: 'DELETE' },
+  );
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, `Failed to remove crag member (${response.status})`),
+    );
+  }
 }
 
 export async function deleteSector(cragId: string, sectorId: string): Promise<void> {

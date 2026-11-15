@@ -26,7 +26,8 @@ const firebaseMocks = vi.hoisted(() => {
     getAuth: vi.fn(() => authInstance),
     connectAuthEmulator: vi.fn(),
     signInWithEmailAndPassword: vi.fn(async () => ({})),
-    createUserWithEmailAndPassword: vi.fn(async () => ({})),
+    createUserWithEmailAndPassword: vi.fn(async () => ({ user: { uid: 'new-user' } })),
+    updateProfile: vi.fn(async () => undefined),
     signInWithPopup: vi.fn(async (_auth: unknown, _provider: object) => ({})),
     sendPasswordResetEmail: vi.fn(async () => undefined),
     signOut: vi.fn(async () => undefined),
@@ -55,6 +56,7 @@ vi.mock('firebase/auth', () => ({
   signInWithEmailAndPassword: firebaseMocks.signInWithEmailAndPassword,
   signInWithPopup: firebaseMocks.signInWithPopup,
   signOut: firebaseMocks.signOut,
+  updateProfile: firebaseMocks.updateProfile,
 }));
 
 vi.mock('./config', () => ({
@@ -93,6 +95,12 @@ describe('firebaseAuth', () => {
         firebaseMocks.authInstance,
         'new@example.com',
         'secret1',
+      );
+      expect(firebaseMocks.updateProfile).not.toHaveBeenCalled();
+      await createAccount('named@example.com', 'secret1', '  Ada Lovelace  ');
+      expect(firebaseMocks.updateProfile).toHaveBeenCalledWith(
+        { uid: 'new-user' },
+        { displayName: 'Ada Lovelace' },
       );
 
       await signInWithGoogle();
@@ -196,6 +204,7 @@ describe('firebaseAuth', () => {
     firebaseMocks.getAuth.mockClear();
     firebaseMocks.signInWithEmailAndPassword.mockClear();
     firebaseMocks.createUserWithEmailAndPassword.mockClear();
+    firebaseMocks.updateProfile.mockClear();
     firebaseMocks.signInWithPopup.mockClear();
     firebaseMocks.sendPasswordResetEmail.mockClear();
     firebaseMocks.signOut.mockClear();
@@ -220,6 +229,7 @@ describe('firebaseAuth', () => {
       expect(firebaseMocks.connectAuthEmulator).not.toHaveBeenCalled();
       expect(firebaseMocks.signInWithEmailAndPassword).not.toHaveBeenCalled();
       expect(firebaseMocks.createUserWithEmailAndPassword).not.toHaveBeenCalled();
+      expect(firebaseMocks.updateProfile).not.toHaveBeenCalled();
       expect(firebaseMocks.signInWithPopup).not.toHaveBeenCalled();
       expect(firebaseMocks.sendPasswordResetEmail).not.toHaveBeenCalled();
       expect(firebaseMocks.signOut).not.toHaveBeenCalled();
