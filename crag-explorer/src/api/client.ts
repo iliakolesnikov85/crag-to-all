@@ -152,6 +152,10 @@ export function getCragApiUrl(cragId: string): string {
   return apiUrl(cragDocumentPath(cragId));
 }
 
+export function getCragGpxUrl(cragId: string): string {
+  return apiUrl(`${cragDocumentPath(cragId)}/gpx`);
+}
+
 /** Shared fetch. Sends Authorization only when a management token is available. */
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const token = await getAccessToken();

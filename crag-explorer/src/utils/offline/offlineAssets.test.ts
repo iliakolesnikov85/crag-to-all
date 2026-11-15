@@ -1,14 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getCragApiUrl } from '../../api/client';
+import { getCragApiUrl, getCragGpxUrl } from '../../api/client';
 import {
   SAMPLE_CRAG_ID,
   SAMPLE_IMAGE_FILE,
   sampleCragData,
 } from '../../test/fixtures/cragData';
-import {
-  getCragImageUrl,
-  getCragSectorsGpxUrl,
-} from '../firebaseStorage';
+import { getCragImageUrl } from '../firebaseStorage';
 import {
   collectCragImageFiles,
   collectCragOfflineUrls,
@@ -28,7 +25,7 @@ describe('collectCragOfflineUrls', () => {
     const urls = collectCragOfflineUrls(SAMPLE_CRAG_ID, sampleCragData);
     expect(urls).toEqual([
       getCragApiUrl(SAMPLE_CRAG_ID),
-      getCragSectorsGpxUrl(SAMPLE_CRAG_ID),
+      getCragGpxUrl(SAMPLE_CRAG_ID),
       getCragImageUrl(SAMPLE_CRAG_ID, SAMPLE_IMAGE_FILE),
     ]);
   });
@@ -42,7 +39,7 @@ describe('getOfflineCacheName', () => {
 
 describe('isOptionalOfflineUrl', () => {
   it('treats the sectors GPX as optional', () => {
-    expect(isOptionalOfflineUrl(getCragSectorsGpxUrl(SAMPLE_CRAG_ID))).toBe(true);
+    expect(isOptionalOfflineUrl(getCragGpxUrl(SAMPLE_CRAG_ID))).toBe(true);
     expect(isOptionalOfflineUrl(getCragApiUrl(SAMPLE_CRAG_ID))).toBe(false);
     expect(
       isOptionalOfflineUrl(getCragImageUrl(SAMPLE_CRAG_ID, SAMPLE_IMAGE_FILE)),

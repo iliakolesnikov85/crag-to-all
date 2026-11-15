@@ -42,10 +42,26 @@ async function fetchAndCache(
   cache: Cache,
   url: string,
 ): Promise<void> {
-  const response = await fetch(url, { cache: 'no-store' });
+  const optional = isOptionalOfflineUrl(url);
+  let response: Response;
+  try {
+    response = await fetch(url, { cache: 'no-store' });
+  } catch (error) {
+    if (optional) {
+      console.warn(`Optional offline fetch failed for ${url}; keeping the previous copy:`, error);
+      return;
+    }
+    throw error;
+  }
   if (!response.ok) {
-    if (isOptionalOfflineUrl(url) && response.status === 404) {
+    if (optional && response.status === 404) {
       await cache.delete(url);
+      return;
+    }
+    if (optional) {
+      console.warn(
+        `Optional offline fetch returned ${response.status} for ${url}; keeping the previous copy`,
+      );
       return;
     }
     throw new Error(`Failed to fetch ${url} (${response.status})`);

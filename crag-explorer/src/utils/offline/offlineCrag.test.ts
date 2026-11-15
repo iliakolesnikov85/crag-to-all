@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CragData } from '../../types';
 import { CRAG_DATA_PROTOCOL } from '../../types';
-import { getCragApiUrl } from '../../api/client';
+import { getCragApiUrl, getCragGpxUrl } from '../../api/client';
 import {
   SAMPLE_CRAG_ID,
   SAMPLE_IMAGE_FILE,
@@ -12,7 +12,6 @@ import { computeCragDataChecksum } from '../cragChecksum';
 import {
   getCragImageUrl,
   getCragOpenTopoPackUrl,
-  getCragSectorsGpxUrl,
 } from '../firebaseStorage';
 import { collectCragImageFiles, getOfflineCacheName } from './offlineAssets';
 import {
@@ -53,7 +52,7 @@ function mockSyncFetches(
     if (url === getCragApiUrl(SAMPLE_CRAG_ID)) {
       return Promise.resolve(jsonResponse(data));
     }
-    if (url === getCragSectorsGpxUrl(SAMPLE_CRAG_ID)) {
+    if (url === getCragGpxUrl(SAMPLE_CRAG_ID)) {
       const status = options.gpxStatus ?? 200;
       return Promise.resolve(new Response(status === 200 ? 'gpx' : 'missing', { status }));
     }
@@ -281,7 +280,7 @@ describe('syncCragOffline', () => {
 
     const cache = await caches.open(getOfflineCacheName(SAMPLE_CRAG_ID));
     expect(await cache.match(getCragApiUrl(SAMPLE_CRAG_ID))).toBeDefined();
-    expect(await cache.match(getCragSectorsGpxUrl(SAMPLE_CRAG_ID))).toBeDefined();
+    expect(await cache.match(getCragGpxUrl(SAMPLE_CRAG_ID))).toBeDefined();
     expect(
       await cache.match(getCragImageUrl(SAMPLE_CRAG_ID, SAMPLE_IMAGE_FILE)),
     ).toBeDefined();
@@ -312,14 +311,14 @@ describe('syncCragOffline', () => {
     await syncCragOffline(SAMPLE_CRAG_ID, () => {});
 
     expect(fetched).toContain(getCragApiUrl(SAMPLE_CRAG_ID));
-    expect(fetched).toContain(getCragSectorsGpxUrl(SAMPLE_CRAG_ID));
+    expect(fetched).toContain(getCragGpxUrl(SAMPLE_CRAG_ID));
     expect(fetched).toContain(getCragImageUrl(SAMPLE_CRAG_ID, NEW_IMAGE_FILE));
     expect(fetched).not.toContain(getCragImageUrl(SAMPLE_CRAG_ID, SAMPLE_IMAGE_FILE));
   });
 
   it('does not fail the pack when optional GPX is 404', async () => {
     mockSyncFetches(structuredClone(sampleCragData), { gpxStatus: 404 });
-    const gpxUrl = getCragSectorsGpxUrl(SAMPLE_CRAG_ID);
+    const gpxUrl = getCragGpxUrl(SAMPLE_CRAG_ID);
     const cache = await caches.open(getOfflineCacheName(SAMPLE_CRAG_ID));
     await cache.put(gpxUrl, okResponse('old-gpx'));
 
@@ -327,6 +326,27 @@ describe('syncCragOffline', () => {
 
     expect(await cache.match(gpxUrl)).toBeUndefined();
     expect(await isCragOffline(SAMPLE_CRAG_ID)).toBe(true);
+  });
+
+  it('keeps the cached GPX when the optional request fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const gpxUrl = getCragGpxUrl(SAMPLE_CRAG_ID);
+    const cache = await caches.open(getOfflineCacheName(SAMPLE_CRAG_ID));
+    await cache.put(gpxUrl, okResponse('old-gpx'));
+
+    mockSyncFetches(structuredClone(sampleCragData), { gpxStatus: 503 });
+    await syncCragOffline(SAMPLE_CRAG_ID, () => {});
+    expect(await (await cache.match(gpxUrl))?.text()).toBe('old-gpx');
+
+    mockSyncFetches(structuredClone(sampleCragData), {
+      extra: (url) => (url === gpxUrl ? Promise.reject(new Error('gpx down')) : null),
+    });
+    await syncCragOffline(SAMPLE_CRAG_ID, () => {});
+
+    expect(await (await cache.match(gpxUrl))?.text()).toBe('old-gpx');
+    expect(await isCragOffline(SAMPLE_CRAG_ID)).toBe(true);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it('deletes cached images that were removed from crag data', async () => {

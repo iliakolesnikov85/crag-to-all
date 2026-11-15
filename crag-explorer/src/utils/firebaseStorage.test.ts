@@ -4,7 +4,6 @@ import {
   getCragImageUrl,
   getCragOpenTopoPackUrl,
   getCragOpenTopoTileUrl,
-  getCragSectorsGpxUrl,
   getFirebaseStorageUrl,
 } from './firebaseStorage';
 
@@ -23,10 +22,7 @@ describe('firebaseStorage URLs', () => {
     );
   });
 
-  it('builds GPX, PDF, pack, and tile URLs', () => {
-    expect(getCragSectorsGpxUrl('roshka')).toBe(
-      `${PROD_HOST}/roshka%2Froshka-sectors.gpx?alt=media`,
-    );
+  it('builds PDF, pack, and tile URLs', () => {
     expect(getCragGuideUrl('roshka')).toBe(
       `${PROD_HOST}/roshka%2Froshka-guide.pdf?alt=media`,
     );

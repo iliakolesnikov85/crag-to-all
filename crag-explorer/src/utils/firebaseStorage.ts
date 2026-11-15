@@ -1,5 +1,5 @@
 /**
- * Firebase Storage URL utilities for images, PDFs, GPX, and map tiles.
+ * Firebase Storage URL utilities for images, PDFs, and map tiles.
  *
  * Crag documents come from crag-api. File URLs use production Storage unless
  * `npm run dev-local` sets VITE_DEV_LOCAL=true (localhost:9199).
@@ -36,15 +36,6 @@ export function getFirebaseStorageUrl(filePath: string): string {
  */
 export function getCragGuideUrl(cragId: string): string {
   return getFirebaseStorageUrl(`${cragId}/${cragId}-guide.pdf`);
-}
-
-/**
- * Get the URL for a crag sectors GPX file
- * @param cragId - The crag identifier
- * @returns The Firebase Storage URL for the sectors GPX
- */
-export function getCragSectorsGpxUrl(cragId: string): string {
-  return getFirebaseStorageUrl(`${cragId}/${cragId}-sectors.gpx`);
 }
 
 /**

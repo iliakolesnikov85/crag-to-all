@@ -1,9 +1,6 @@
-import { getCragApiUrl } from '../../api/client';
+import { getCragApiUrl, getCragGpxUrl } from '../../api/client';
 import { CragData } from '../../types';
-import {
-  getCragImageUrl,
-  getCragSectorsGpxUrl,
-} from '../firebaseStorage';
+import { getCragImageUrl } from '../firebaseStorage';
 
 /** Collect unique image filenames from crag data. */
 export function collectCragImageFiles(data: CragData): string[] {
@@ -21,11 +18,11 @@ export function collectCragImageFiles(data: CragData): string[] {
   return Array.from(files);
 }
 
-/** URLs to store for offline use (crag JSON from the API, images, GPX). */
+/** URLs to store for offline use (crag JSON and GPX from the API, plus images). */
 export function collectCragOfflineUrls(cragId: string, data: CragData): string[] {
   const urls = [
     getCragApiUrl(cragId),
-    getCragSectorsGpxUrl(cragId),
+    getCragGpxUrl(cragId),
   ];
   for (const imageFile of collectCragImageFiles(data)) {
     urls.push(getCragImageUrl(cragId, imageFile));
@@ -37,9 +34,10 @@ export function getOfflineCacheName(cragId: string): string {
   return `crag-offline-${cragId}`;
 }
 
-/** GPX is for external apps; offline pack succeeds if it is not published yet. */
+/** GPX is for external apps; the offline pack still succeeds if this request fails. */
 export function isOptionalOfflineUrl(url: string): boolean {
-  return url.includes('-sectors.gpx');
+  const path = url.split('?')[0].split('#')[0];
+  return /\/api\/crags\/[^/]+\/gpx$/.test(path);
 }
 
 export function extractImageFileFromUrl(url: string): string | null {
