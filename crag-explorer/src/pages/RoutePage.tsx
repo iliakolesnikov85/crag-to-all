@@ -77,7 +77,7 @@ const RoutePage: React.FC<RoutePageProps> = ({ sectors, onSectorChange, onRouteC
   return (
     <div className="page">
       <SectorView
-        cragId={crag.cragId}
+        cragId={crag.id}
         sector={sector}
         route={route}
         getImageUrl={getCragImageUrl}
@@ -98,7 +98,7 @@ const RoutePage: React.FC<RoutePageProps> = ({ sectors, onSectorChange, onRouteC
             title={title}
             onClick={() => {
               if (to !== '/map') return;
-              if (sector?.geo) setMapCenter(crag.cragId, [sector?.geo.lat, sector?.geo.lon], 17);
+              if (sector?.geo) setMapCenter(crag.id, [sector?.geo.lat, sector?.geo.lon], 17);
             }}
           >
             {children}

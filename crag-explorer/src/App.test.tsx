@@ -67,6 +67,20 @@ describe('App load', () => {
     ).toBeInTheDocument();
   });
 
+  it('does not open a crag when the url has no crag id', async () => {
+    mockIndexOk();
+    renderApp('/overview');
+
+    expect(
+      await screen.findByRole('heading', { name: 'Page Not Found' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Choose a crag' })).toHaveAttribute(
+      'href',
+      '/',
+    );
+    expect(screen.queryByText('Loading crag data...')).not.toBeInTheDocument();
+  });
+
   it('shows a load error when offline JSON fails and no pack is saved', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.mocked(fetch).mockImplementation((input) => {

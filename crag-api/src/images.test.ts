@@ -30,7 +30,7 @@ describe('parseUploadedImage', () => {
     expect(parsed.imageFile).toBe(`${hash}.png`);
     expect(parsed.contentType).toBe('image/png');
     expect(cragImageStoragePath('roshka', parsed.imageFile)).toBe(
-      `roshka/images/${hash}.png`,
+      `crags/roshka/topo-images/${hash}.png`,
     );
   });
 

@@ -11,8 +11,8 @@ import {
 } from '../utils/offline';
 import CragSelector from './CragSelector';
 
-const DOWNLOADED: Crag = { cragId: SAMPLE_CRAG_ID, cragName: 'Test Crag' };
-const UNDOWNLOADED: Crag = { cragId: 'other-crag', cragName: 'Other Crag' };
+const DOWNLOADED: Crag = { id: SAMPLE_CRAG_ID, cragName: 'Test Crag' };
+const UNDOWNLOADED: Crag = { id: 'other-crag', cragName: 'Other Crag' };
 const crags = [DOWNLOADED, UNDOWNLOADED];
 
 function manifest(
@@ -44,7 +44,7 @@ describe('CragSelector offline disable', () => {
 
     expect(
       await screen.findByRole('link', { name: /Test Crag/ }),
-    ).toHaveAttribute('href', '/overview');
+    ).toHaveAttribute('href', `/${SAMPLE_CRAG_ID}/overview`);
     expect(screen.getByRole('link', { name: /Other Crag/ })).toHaveAttribute(
       'href',
       '/other-crag/overview',

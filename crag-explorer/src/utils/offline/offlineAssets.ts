@@ -42,9 +42,9 @@ export function isOptionalOfflineUrl(url: string): boolean {
 
 export function extractImageFileFromUrl(url: string): string | null {
   try {
-    const match = url.match(/images%2F([^?&]+)/);
+    const match = url.match(/topo-images%2F([^?&]+)/);
     if (match) return decodeURIComponent(match[1]);
-    const pathMatch = url.match(/\/images\/([^?&]+)/);
+    const pathMatch = url.match(/\/topo-images\/([^?&]+)/);
     if (pathMatch) return decodeURIComponent(pathMatch[1]);
   } catch (error) {
     console.warn('Failed to extract image file from URL:', url, error);

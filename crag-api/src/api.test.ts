@@ -129,7 +129,6 @@ describe('crag-api', () => {
     expect(created.status).toBe(201);
     expect(created.body).toMatchObject({
       id: 'roshka',
-      cragId: 'roshka',
       cragName: 'Roshka',
       source: 'explorer',
       version: 1,
@@ -137,14 +136,14 @@ describe('crag-api', () => {
 
     const catalog = await request(app).get('/api/crags');
     expect(catalog.body).toEqual([
-      { id: 'roshka', cragId: 'roshka', cragName: 'Roshka', source: 'explorer' },
+      { id: 'roshka', cragName: 'Roshka', source: 'explorer' },
     ]);
 
     const crag = await request(app).get('/api/crags/roshka');
     expect(crag.status).toBe(200);
     expect(crag.body.name).toBe('Roshka');
     expect(crag.body.id).toBe('roshka');
-    expect(crag.body.cragId).toBe('roshka');
+    expect(crag.body.cragId).toBeUndefined();
     expect(crag.body.sectors).toEqual([]);
     expect(crag.body.protocolVersion).toBe(CRAG_DATA_PROTOCOL);
     expect(crag.body.source).toBe('explorer');
@@ -825,7 +824,7 @@ describe('crag-api', () => {
 
     const catalog = await request(app).get('/api/crags');
     expect(catalog.body).toEqual([
-      { id: 'roshka', cragId: 'roshka', cragName: 'Roshka', source: 'external' },
+      { id: 'roshka', cragName: 'Roshka', source: 'external' },
     ]);
   });
 
@@ -924,7 +923,7 @@ describe('crag-api', () => {
 
     const catalog = await request(app).get('/api/crags');
     expect(catalog.body).toEqual([
-      { id: 'roshka', cragId: 'roshka', cragName: 'Roshka', source: 'explorer' },
+      { id: 'roshka', cragName: 'Roshka', source: 'explorer' },
     ]);
   });
 
@@ -955,7 +954,7 @@ describe('crag-api', () => {
         .set('Authorization', 'Bearer member-token')
         .attach(IMAGE_FIELD_NAME, PNG_1X1, { filename: 'wall.jpg', contentType: 'image/jpeg' });
       expect(res.status).toBe(201);
-      expect(res.body.storagePath).toBe(`roshka/images/${res.body.imageFile}`);
+      expect(res.body.storagePath).toBe(`crags/roshka/topo-images/${res.body.imageFile}`);
     },
   );
 
@@ -1694,7 +1693,7 @@ describe('crag-api', () => {
     expect(missing.status).toBe(404);
   });
 
-  it('uploads an image to Storage as {cragId}/images/{hash}.ext', async () => {
+  it('uploads an image to Storage as crags/{cragId}/topo-images/{hash}.ext', async () => {
     await write().post('/api/crags').send({ name: 'Roshka', cragId: 'roshka' });
 
     const res = await write()
@@ -1703,7 +1702,7 @@ describe('crag-api', () => {
 
     const hash = createHash('sha256').update(PNG_1X1).digest('hex');
     const imageFile = `${hash}.png`;
-    const storagePath = `roshka/images/${imageFile}`;
+    const storagePath = `crags/roshka/topo-images/${imageFile}`;
     expect(res.status).toBe(201);
     expect(res.body).toEqual({ imageFile, storagePath });
     expect(uploaded.get(storagePath)?.equals(PNG_1X1)).toBe(true);

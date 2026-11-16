@@ -22,7 +22,7 @@ async function main(): Promise<void> {
   }
 
   process.env.FIREBASE_PROJECT_ID = config.firebaseProjectId;
-  process.env.FIREBASE_STORAGE_BUCKET = config.firebaseStorageBucket;
+  process.env.FIREBASE_STORAGE_BUCKET_v2 = config.firebaseStorageBucket;
   if (config.firebaseUseEmulator) {
     process.env.FIREBASE_STORAGE_EMULATOR_HOST = config.firebaseStorageEmulatorHost;
     process.env.FIREBASE_AUTH_EMULATOR_HOST = config.firebaseAuthEmulatorHost;

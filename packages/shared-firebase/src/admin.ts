@@ -2,6 +2,13 @@ import { existsSync, readFileSync } from 'fs';
 import { isAbsolute, resolve } from 'path';
 import { App, cert, getApps, initializeApp, type ServiceAccount } from 'firebase-admin/app';
 
+const DEFAULT_STORAGE_BUCKET = 'crag-to-all';
+
+function storageBucketFromEnv(): string {
+  const configured = process.env.FIREBASE_STORAGE_BUCKET_v2?.trim();
+  return configured || DEFAULT_STORAGE_BUCKET;
+}
+
 function assertServiceAccountJson(parsed: unknown): asserts parsed is {
   type: 'service_account';
   project_id: string;
@@ -121,7 +128,7 @@ export function getAdminApp(useEmulator: boolean): App {
   }
 
   const defaultProjectId = process.env.FIREBASE_PROJECT_ID || 'crag-to-all';
-  const defaultBucket = process.env.FIREBASE_STORAGE_BUCKET || 'crag-to-all.firebasestorage.app';
+  const defaultBucket = storageBucketFromEnv();
 
   if (useEmulator) {
     return initializeApp({ projectId: defaultProjectId, storageBucket: defaultBucket });
@@ -129,7 +136,7 @@ export function getAdminApp(useEmulator: boolean): App {
 
   const serviceAccount = parseServiceAccountFromEnv();
   const projectId = process.env.FIREBASE_PROJECT_ID?.trim() || serviceAccount.projectId;
-  const storageBucket = process.env.FIREBASE_STORAGE_BUCKET?.trim() || 'crag-to-all.firebasestorage.app';
+  const storageBucket = storageBucketFromEnv();
   return initializeApp({
     credential: cert(serviceAccount),
     projectId,

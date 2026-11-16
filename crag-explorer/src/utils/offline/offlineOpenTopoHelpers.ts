@@ -1,3 +1,4 @@
+import { cragStoragePath } from '@crag-to-all/shared-crag';
 import type { OpenTopoTilePackInfo } from '../../types';
 
 function bboxEqual(
@@ -29,8 +30,8 @@ export function isOpenTopoTilePacksEquals(
 }
 
 export function isOpenTopoTileUrl(url: string, cragId: string): boolean {
-  const marker = encodeURIComponent(`${cragId}/tiles/opentopo/`);
-  return url.includes(marker) || url.includes(`${cragId}/tiles/opentopo/`);
+  const prefix = `${cragStoragePath(cragId, 'tiles', 'opentopo')}/`;
+  return url.includes(encodeURIComponent(prefix)) || url.includes(prefix);
 }
 
 /** Parse `z/x/y.png` (or with leading folders) into tile coords. */

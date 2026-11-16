@@ -107,7 +107,6 @@ export interface IdTokenVerifier {
 
 export interface CragResponse {
   id: string;
-  cragId: string;
   cragName: string;
   source: CragSource;
   protocolVersion: number;

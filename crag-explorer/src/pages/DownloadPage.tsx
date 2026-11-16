@@ -39,7 +39,7 @@ function formatDate(ts?: number): string {
 
 const DownloadPage: React.FC<DownloadPageProps> = ({ cragData }) => {
   const { crag } = useCrag();
-  const cragId = crag?.cragId || '';
+  const cragId = crag?.id || '';
   const online = useOnlineStatus();
   const [downloaded, setDownloaded] = useState(false);
   const [manifest, setManifest] = useState<OfflineCragManifest | null>(null);

@@ -62,12 +62,12 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSec
   const { crag } = useCrag();
   const online = useOnlineStatus();
   const isMobile = useIsMobileLayout();
-  const patchSector = usePatchSector(crag.cragId);
-  const createSectorMutation = useCreateSector(crag.cragId);
-  const patchCrag = usePatchCrag(crag.cragId);
+  const patchSector = usePatchSector(crag.id);
+  const createSectorMutation = useCreateSector(crag.id);
+  const patchCrag = usePatchCrag(crag.id);
   const mapRef = useRef<HTMLDivElement>(null);
-  const map = useLeafletMap(mapRef, { cragId: crag.cragId, cragData, online });
-  const { fullscreen, toggleFullscreen } = useMapFullscreen(crag.cragId, map);
+  const map = useLeafletMap(mapRef, { cragId: crag.id, cragData, online });
+  const { fullscreen, toggleFullscreen } = useMapFullscreen(crag.id, map);
   const location = useLocationTracking(map);
   const [openCard, setOpenCard] = useState<OpenCard | null>(null);
   const selectedId = openCard?.kind === 'sector' ? openCard.id : null;
@@ -76,7 +76,7 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSec
   const placing = placement != null;
 
   const canEdit = useCanEditCrag({
-    cragId: crag.cragId,
+    id: crag.id,
     source: cragData.source ?? crag.source,
   });
   const markers = cragData.markers ?? EMPTY_MARKERS;
@@ -91,7 +91,7 @@ const MapWidget: React.FC<MapWidgetProps> = ({ cragData, onSectorGeoSaved, onSec
       return patchSector.mutateAsync({ sectorId: sector.id, version: sector.version, patch });
     },
     createSector: async (input, topo) => {
-      const images = topo ? [await uploadCragImage(crag.cragId, topo)] : undefined;
+      const images = topo ? [await uploadCragImage(crag.id, topo)] : undefined;
       return createSectorMutation.mutateAsync({ ...input, ...(images ? { images } : {}) });
     },
     onSaved: (sector) => onSectorGeoSaved?.(sector),

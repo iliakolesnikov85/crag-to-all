@@ -59,7 +59,7 @@ describe('TeamPage', () => {
       <QueryClientProvider client={client}>
         <CragContext.Provider
           value={{
-            crag: { cragId: 'roshka', cragName: 'Roshka', source: 'explorer' },
+            crag: { id: 'roshka', cragName: 'Roshka', source: 'explorer' },
             getUrl: (url) => url,
           }}
         >

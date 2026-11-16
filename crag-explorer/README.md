@@ -22,7 +22,7 @@ npm run build
 npm run seo-check
 ```
 
-Start `crag-api` on port 3010 before `npm run dev`. Production builds set `VITE_API_BASE_URL` once the API is public. Reads stay anonymous.
+Start `crag-api` on port 3010 before `npm run dev`. Production builds set `VITE_API_BASE_URL` once the API is public. Storage URLs use `VITE_FIREBASE_STORAGE_BUCKET_v2` (default `crag-to-all`). Reads stay anonymous.
 
 ## Sign in on dev-local
 

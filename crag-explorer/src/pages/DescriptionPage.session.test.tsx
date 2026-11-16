@@ -7,7 +7,7 @@ import { withQueryClient } from '../test/helpers';
 import DescriptionPage from './DescriptionPage';
 
 const explorerCrag = {
-  crag: { cragId: 'roshka', cragName: 'Roshka', source: 'explorer' as const },
+  crag: { id: 'roshka', cragName: 'Roshka', source: 'explorer' as const },
   getUrl: (url: string) => url,
 };
 

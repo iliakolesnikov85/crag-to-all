@@ -100,7 +100,7 @@ export interface CragMapMarker {
 
 /**
  * Metadata for a crag's OpenTopo raster tile pack.
- * packVersion 2+: single ZIP at `{cragId}/tiles/opentopo/pack.zip`
+ * packVersion 2+: single ZIP at `crags/{cragId}/tiles/opentopo/pack.zip`
  * (entries `z/x/y.png`); clients unpack into Cache Storage.
  */
 export interface OpenTopoTilePackInfo {
@@ -120,10 +120,8 @@ export interface OpenTopoTilePackInfo {
 
 export interface CragData {
   protocolVersion: number;
-  /** Stable document id. */
+  /** Stable document id. Also the catalog / URL slug. */
   id?: string;
-  /** Catalog / URL slug; same as id when both are present. */
-  cragId?: string;
   source?: CragSource;
   name: string;
   sectors: Sector[];
@@ -136,10 +134,8 @@ export interface CragData {
 }
 
 export interface Crag {
-  /** Stable document id. */
-  id?: string;
+  /** Stable document id. Also the catalog / URL slug. */
+  id: string;
   cragName: string;
-  /** Catalog / URL slug; same as id when both are present. */
-  cragId: string;
   source?: CragSource;
 }

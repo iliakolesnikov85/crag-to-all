@@ -1,9 +1,8 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { Link } from 'react-router';
 import { MdCloudOff } from 'react-icons/md';
 import { Crag } from '../types';
 import './CragSelector.scss';
-import { getDefaultCragForHost } from '../utils/defaultCrag';
 import { useIsMobileLayout } from '../hooks/useIsMobileLayout';
 import { useOfflineCrags } from '../hooks/useOfflineCrags';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
@@ -49,14 +48,6 @@ const CragSelector: React.FC<CragSelectorProps> = ({ crags }) => {
   const online = useOnlineStatus();
   const { downloadedIds, updateStatusMap } = useOfflineCrags();
 
-  const cragPath = useCallback(
-    (cragId: string, tab: string) =>
-      getDefaultCragForHost(crags)?.cragId === cragId
-        ? `/${tab}`
-        : `/${cragId}/${tab}`,
-    [crags],
-  );
-
   return (
     <div className="page crag-selector">
       <div className="crag-selector-header">
@@ -76,16 +67,16 @@ const CragSelector: React.FC<CragSelectorProps> = ({ crags }) => {
 
       <div className="crags-grid">
         {crags.map((crag) => {
-          const isDownloaded = downloadedIds.has(crag.cragId);
+          const isDownloaded = downloadedIds.has(crag.id);
           const disabled = !online && !isDownloaded;
           const badgeState = resolveBadgeState(
             isDownloaded,
-            updateStatusMap.get(crag.cragId) ?? false,
+            updateStatusMap.get(crag.id) ?? false,
           );
           const showBadge = isMobile && (online || isDownloaded);
-          const blurb = cragHighlights[crag.cragId]?.homepageBlurb;
-          const overviewPath = cragPath(crag.cragId, 'overview');
-          const downloadPath = cragPath(crag.cragId, 'download');
+          const blurb = cragHighlights[crag.id]?.homepageBlurb;
+          const overviewPath = `/${crag.id}/overview`;
+          const downloadPath = `/${crag.id}/download`;
           const badgeTo =
             badgeState === 'update' || badgeState === 'not-saved'
               ? downloadPath
@@ -96,7 +87,7 @@ const CragSelector: React.FC<CragSelectorProps> = ({ crags }) => {
               <div className="crag-card__media">
                 <img
                   className="crag-card__bg"
-                  src={assetUrl(`images/titles/${crag.cragId}.jpg`)}
+                  src={assetUrl(`images/titles/${crag.id}.jpg`)}
                   alt=""
                   decoding="async"
                   onError={handleTitleImageError}
@@ -112,7 +103,7 @@ const CragSelector: React.FC<CragSelectorProps> = ({ crags }) => {
 
           return (
             <div
-              key={crag.cragId}
+              key={crag.id}
               className={`crag-card${disabled ? ' crag-card--disabled' : ''}`}
             >
               {showBadge && (

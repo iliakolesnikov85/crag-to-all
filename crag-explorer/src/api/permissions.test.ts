@@ -45,43 +45,43 @@ describe('canEditCrag', () => {
   });
 
   it('rejects an explorer crag when signed out', () => {
-    expect(canEditCrag({ cragId: 'roshka', source: 'explorer' })).toBe(false);
+    expect(canEditCrag({ id: 'roshka', source: 'explorer' })).toBe(false);
   });
 
   it('rejects an explorer crag for a signed-in user with no role', () => {
     signIn('visitor', {});
-    expect(canEditCrag({ cragId: 'roshka', source: 'explorer' })).toBe(false);
+    expect(canEditCrag({ id: 'roshka', source: 'explorer' })).toBe(false);
   });
 
   it('allows an explorer crag for a superadmin', () => {
     signInTestUser();
-    expect(canEditCrag({ cragId: 'roshka', source: 'explorer' })).toBe(true);
+    expect(canEditCrag({ id: 'roshka', source: 'explorer' })).toBe(true);
   });
 
   it('allows an explorer crag for an admin of that crag', () => {
     signIn('admin-user', { roshka: 'admin' });
-    expect(canEditCrag({ cragId: 'roshka', source: 'explorer' })).toBe(true);
+    expect(canEditCrag({ id: 'roshka', source: 'explorer' })).toBe(true);
   });
 
   it('rejects a crag with no source when signed out', () => {
-    expect(canEditCrag({ cragId: 'roshka' })).toBe(false);
+    expect(canEditCrag({ id: 'roshka' })).toBe(false);
   });
 
   it('allows a crag that has no source yet for a superadmin', () => {
     signInTestUser();
-    expect(canEditCrag({ cragId: 'roshka' })).toBe(true);
+    expect(canEditCrag({ id: 'roshka' })).toBe(true);
   });
 
   it('rejects an extracted crag when signed out', () => {
-    expect(canEditCrag({ cragId: 'shulaveri', source: 'external' })).toBe(false);
+    expect(canEditCrag({ id: 'shulaveri', source: 'external' })).toBe(false);
   });
 
   it('rejects an extracted crag for a superadmin and for its owner', () => {
     signInTestUser();
-    expect(canEditCrag({ cragId: 'shulaveri', source: 'external' })).toBe(false);
+    expect(canEditCrag({ id: 'shulaveri', source: 'external' })).toBe(false);
 
     signIn('owner-user', { shulaveri: 'owner' });
-    expect(canEditCrag({ cragId: 'shulaveri', source: 'external' })).toBe(false);
+    expect(canEditCrag({ id: 'shulaveri', source: 'external' })).toBe(false);
   });
 });
 

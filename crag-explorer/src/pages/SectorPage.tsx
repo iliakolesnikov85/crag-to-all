@@ -41,7 +41,7 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
   const { sectorName } = useParams<{ sectorName: string }>();
   const { crag, getUrl } = useCrag();
   const navigate = useNavigate();
-  const deleteSectorMutation = useDeleteSector(crag.cragId);
+  const deleteSectorMutation = useDeleteSector(crag.id);
   const [headerError, setHeaderError] = useState<string | null>(null);
   const [routesOpen, setRoutesOpen] = useState(false);
   const [drawImageFile, setDrawImageFile] = useState<string | null>(null);
@@ -303,7 +303,7 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
     setTopoSaving(true);
     setAddTopoError(null);
     try {
-      const uploaded = await uploadCragImage(crag.cragId, file);
+      const uploaded = await uploadCragImage(crag.id, file);
       const images = [...target.images, { imageFile: uploaded.imageFile }];
       const moveToPhoto = target.images.length === 0 && geo != null;
       const saved = await editors.savePatch({
@@ -430,13 +430,13 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
 
   const focusSectorOnMap = () => {
     if (!sector.geo) return;
-    setMapCenter(crag.cragId, [sector.geo.lat, sector.geo.lon], 17);
+    setMapCenter(crag.id, [sector.geo.lat, sector.geo.lon], 17);
   };
 
   return (
     <div className="page">
       <SectorView
-        cragId={crag.cragId}
+        cragId={crag.id}
         sector={sector}
         getImageUrl={getCragImageUrl}
         headerActions={
@@ -510,7 +510,7 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
           open
           route={routeDraw.route}
           imageFile={routeDraw.imageFile}
-          imageUrl={getCragImageUrl(crag.cragId, routeDraw.imageFile)}
+          imageUrl={getCragImageUrl(crag.id, routeDraw.imageFile)}
           saving={saving}
           error={routeDrawError}
           onClose={() => {

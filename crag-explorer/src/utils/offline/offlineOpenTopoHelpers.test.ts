@@ -59,7 +59,7 @@ describe('isOpenTopoTileUrl', () => {
       true,
     );
     expect(
-      isOpenTopoTileUrl('https://example.com/roshka/tiles/opentopo/12/1/2.png', 'roshka'),
+      isOpenTopoTileUrl('https://example.com/crags/roshka/tiles/opentopo/12/1/2.png', 'roshka'),
     ).toBe(true);
     expect(isOpenTopoTileUrl(getCragOpenTopoTileUrl('other', 12, 1, 2), 'roshka')).toBe(
       false,

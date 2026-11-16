@@ -57,16 +57,16 @@ describe('extractImageFileFromUrl', () => {
     ).toBe('a b.jpg');
   });
 
-  it('parses unencoded /images/ paths and ignores unrelated URLs', () => {
+  it('parses unencoded /topo-images/ paths and ignores unrelated URLs', () => {
     expect(
-      extractImageFileFromUrl('https://example.com/images/wall.jpg?alt=media'),
+      extractImageFileFromUrl('https://example.com/topo-images/wall.jpg?alt=media'),
     ).toBe('wall.jpg');
     expect(extractImageFileFromUrl(getCragApiUrl(SAMPLE_CRAG_ID))).toBeNull();
   });
 
   it('returns null when the encoded filename cannot be decoded', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    expect(extractImageFileFromUrl('https://example.com/images%2F%')).toBeNull();
+    expect(extractImageFileFromUrl('https://example.com/topo-images%2F%')).toBeNull();
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });

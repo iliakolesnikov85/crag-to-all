@@ -29,7 +29,7 @@ async function fetchGpx(cragId: string): Promise<Response | null> {
 
 const GpxDownloadButton: React.FC = () => {
   const { crag } = useCrag();
-  const cragId = crag?.cragId || '';
+  const cragId = crag?.id || '';
 
   const onDownload = async () => {
     if (!cragId) return;

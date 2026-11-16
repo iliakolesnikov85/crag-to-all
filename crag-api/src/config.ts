@@ -8,7 +8,7 @@ const DEFAULT_PORT = 3010;
 const DEFAULT_MONGODB_URI = 'mongodb://127.0.0.1:27017';
 const DEFAULT_MONGODB_DB = 'crag-to-all';
 const DEFAULT_FIREBASE_PROJECT_ID = 'crag-to-all';
-const DEFAULT_FIREBASE_STORAGE_BUCKET = 'crag-to-all.firebasestorage.app';
+const DEFAULT_FIREBASE_STORAGE_BUCKET = 'crag-to-all';
 const DEFAULT_FIREBASE_STORAGE_EMULATOR_HOST = '127.0.0.1:9199';
 const DEFAULT_FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
 
@@ -54,7 +54,7 @@ export function getConfig(): ApiConfig {
     mongodbDb: envString('MONGODB_DB', DEFAULT_MONGODB_DB),
     firebaseUseEmulator: envBool('FIREBASE_USE_EMULATOR', true),
     firebaseProjectId: envString('FIREBASE_PROJECT_ID', DEFAULT_FIREBASE_PROJECT_ID),
-    firebaseStorageBucket: envString('FIREBASE_STORAGE_BUCKET', DEFAULT_FIREBASE_STORAGE_BUCKET),
+    firebaseStorageBucket: envString('FIREBASE_STORAGE_BUCKET_v2', DEFAULT_FIREBASE_STORAGE_BUCKET),
     firebaseStorageEmulatorHost: envString(
       'FIREBASE_STORAGE_EMULATOR_HOST',
       DEFAULT_FIREBASE_STORAGE_EMULATOR_HOST,

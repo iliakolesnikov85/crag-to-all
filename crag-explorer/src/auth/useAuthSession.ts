@@ -8,7 +8,7 @@ export function useAuthSession(): AuthAccount | null {
 }
 
 /** Subscribe to the signed-in user, then apply crag edit rules. */
-export function useCanEditCrag(crag: { cragId: string; source?: CragSource }): boolean {
+export function useCanEditCrag(crag: { id: string; source?: CragSource }): boolean {
   useAuthSession();
   return canEditCrag(crag);
 }

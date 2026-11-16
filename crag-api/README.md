@@ -54,7 +54,7 @@ npm run dev
 
 Or from the repo root: `npm run dev:api`.
 
-Optional `.env` (see `.env.example`): `PORT`, `MONGODB_URI`, `MONGODB_DB`, `FIREBASE_USE_EMULATOR` (default `true`), `FIREBASE_PROJECT_ID`, `FIREBASE_STORAGE_BUCKET`, `FIREBASE_STORAGE_EMULATOR_HOST` (default `127.0.0.1:9199`), `FIREBASE_AUTH_EMULATOR_HOST` (default `127.0.0.1:9099`).
+Optional `.env` (see `.env.example`): `PORT`, `MONGODB_URI`, `MONGODB_DB`, `FIREBASE_USE_EMULATOR` (default `true`), `FIREBASE_PROJECT_ID`, `FIREBASE_STORAGE_BUCKET_v2` (default `crag-to-all`), `FIREBASE_STORAGE_EMULATOR_HOST` (default `127.0.0.1:9199`), `FIREBASE_AUTH_EMULATOR_HOST` (default `127.0.0.1:9099`).
 
 ## HTTP
 
@@ -72,7 +72,7 @@ Optional `.env` (see `.env.example`): `PORT`, `MONGODB_URI`, `MONGODB_DB`, `FIRE
 | PUT | `/api/crags/:cragId/sectors/:sectorId` | bearer | Replace that sector; body includes `version`; stale → **409** |
 | PATCH | `/api/crags/:cragId/sectors/:sectorId` | bearer | Update sector coordinates (`{ version, geo }`); stale version → **409** |
 | DELETE | `/api/crags/:cragId/sectors/:sectorId` | bearer | Remove that sector |
-| POST | `/api/crags/:cragId/images` | bearer | Multipart field `image`; Admin SDK upload to `{cragId}/images/{sha256}.{ext}` |
+| POST | `/api/crags/:cragId/images` | bearer | Multipart field `image`; Admin SDK upload to `crags/{cragId}/topo-images/{sha256}.{ext}` |
 | GET | `/api/crags/:cragId/gpx` | anonymous | GPX built from current Mongo state (`application/gpx+xml`; no Storage write) |
 
 `POST .../images` checks the bearer token before reading the multipart body. A request without a valid token is **401**, and the file is not stored. A successful upload returns `{ imageFile, storagePath }`. The explorer still loads images from Storage URLs using `imageFile`.

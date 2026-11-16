@@ -14,8 +14,8 @@ export function canManageCrag(cragId: string): boolean {
 }
 
 /** Extracted crags stay read-only for every signed-in user, including a superadmin. */
-export function canEditCrag(crag: { cragId: string; source?: CragSource }): boolean {
-  return crag.source !== 'external' && canManageCrag(crag.cragId);
+export function canEditCrag(crag: { id: string; source?: CragSource }): boolean {
+  return crag.source !== 'external' && canManageCrag(crag.id);
 }
 
 /** A superadmin or an owner of this crag may add, change, and remove members. */

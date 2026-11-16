@@ -41,7 +41,7 @@ const INITIAL: CragData = {
 };
 
 const cragValue = {
-  crag: { cragId: SAMPLE_CRAG_ID, cragName: 'Test Crag', source: 'explorer' as const },
+  crag: { id: SAMPLE_CRAG_ID, cragName: 'Test Crag', source: 'explorer' as const },
   getUrl: (url: string) => `/${url}`,
 };
 

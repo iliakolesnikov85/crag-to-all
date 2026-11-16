@@ -9,7 +9,6 @@ function toPublicRoute(route: StoredRoute): Route {
 export function toCrag(doc: CragDocument): Crag {
   return {
     id: doc._id,
-    cragId: doc._id,
     cragName: doc.name,
     source: doc.source,
   };
@@ -18,7 +17,6 @@ export function toCrag(doc: CragDocument): Crag {
 export function toCragResponse(doc: CragDocument): CragResponse {
   return {
     id: doc._id,
-    cragId: doc._id,
     cragName: doc.name,
     source: doc.source,
     protocolVersion: doc.protocolVersion,
@@ -58,7 +56,6 @@ export function toCragData(crag: CragDocument, sectors: SectorDocument[]): CragD
     markers: crag.markers,
     ...(crag.opentopoTilePack ? { opentopoTilePack: crag.opentopoTilePack } : {}),
     id: crag._id,
-    cragId: crag._id,
     source: crag.source,
     version: crag.version,
     updatedAt: crag.updatedAt.toISOString(),

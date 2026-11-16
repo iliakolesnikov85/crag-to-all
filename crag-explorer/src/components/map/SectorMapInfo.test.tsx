@@ -19,7 +19,7 @@ vi.mock('../../utils/topoImage', async () => {
 });
 
 const cragValue = {
-  crag: { cragId: 'shulaveri', cragName: 'Shulaveri', source: 'explorer' as const },
+  crag: { id: 'shulaveri', cragName: 'Shulaveri', source: 'explorer' as const },
   getUrl: (url: string) => url,
 };
 

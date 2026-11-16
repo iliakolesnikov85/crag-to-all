@@ -3,10 +3,12 @@ service firebase.storage {
   match /b/{bucket}/o {
     // Named segments are strings. `{allPaths=**}` is a Path; Path and string
     // both have size() and [i], so a helper on allPaths does not type-check.
-    match /{first}/{second}/{rest=**} {
-      allow read: if second != 'history';
+    // History is excluded inside the allow: a separate deny does not override
+    // another matching allow, because Firebase ORs them.
+    match /crags/{cragId}/{file} {
+      allow read: if file != 'history';
     }
-    match /{first}/{second} {
+    match /crags/{cragId}/{second}/{rest=**} {
       allow read: if second != 'history';
     }
     match /{first} {

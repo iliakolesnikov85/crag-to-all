@@ -1,5 +1,14 @@
 {
   "projects": {
     "default": "crag-to-all"
+  },
+  "targets": {
+    "crag-to-all": {
+      "storage": {
+        "v2": [
+          "crag-to-all"
+        ]
+      }
+    }
   }
 }

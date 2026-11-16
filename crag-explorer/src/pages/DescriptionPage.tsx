@@ -39,7 +39,7 @@ const DescriptionPage: React.FC<DescriptionPageProps> = ({
   version,
 }) => {
   const { crag } = useCrag();
-  const patchCrag = usePatchCrag(crag.cragId);
+  const patchCrag = usePatchCrag(crag.id);
   const [editor, setEditor] = useState<SectionEditor | null>(null);
   const [baseline, setBaseline] = useState<DescriptionBaseline | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);

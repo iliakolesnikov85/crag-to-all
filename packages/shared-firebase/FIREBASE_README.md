@@ -51,16 +51,16 @@ npm run start
 The data is stored in Firebase Storage with the same structure as the local `public/data` folder:
 
 ```
-crag-data/
-├── index.json
+index.json
+crags/
 ├── roshka/
 │   ├── roshka.json
-│   └── images/
+│   └── topo-images/
 │       ├── abc123.jpg
 │       └── def456.jpg
 └── other-crag/
     ├── other-crag.json
-    └── images/
+    └── topo-images/
         └── ghi789.jpg
 ```
 
@@ -69,13 +69,13 @@ crag-data/
 Use `.env.example` in this package as the source of truth:
 
 - `FIREBASE_PROJECT_ID`
-- `FIREBASE_STORAGE_BUCKET`
+- `FIREBASE_STORAGE_BUCKET_v2` (defaults to `crag-to-all` when unset)
 - `FIREBASE_SERVICE_ACCOUNT_KEY` (JSON string for service account)
 
 Behavior:
 
 - In local mode (`--dev-local`), service account is not required.
-- In production mode, all vars above are required and startup fails fast if any are missing.
+- In production mode, project id and service account are required and startup fails fast if either is missing. The bucket name falls back to `crag-to-all`.
 
 ## Authentication
 
@@ -94,7 +94,7 @@ To use real Firebase Storage in production:
 1. Create a Firebase project
 2. Create a service account with Storage access (Google Cloud IAM)
 3. Put the full JSON key into `FIREBASE_SERVICE_ACCOUNT_KEY` (single-line JSON secret)
-4. Set `FIREBASE_PROJECT_ID` and `FIREBASE_STORAGE_BUCKET`
+4. Set `FIREBASE_PROJECT_ID`. Set `FIREBASE_STORAGE_BUCKET_v2` only to override the default bucket `crag-to-all`
 5. Ensure proper Firebase Storage rules
 
 ## Production Rules Strategy
@@ -102,7 +102,7 @@ To use real Firebase Storage in production:
 Current `storage.rules` strategy:
 
 - Public read is enabled for explorer/public links (JSON, GPX, PDF, images, tiles)
-- `{cragId}/history/**` backups are not publicly readable
+- `crags/{cragId}/history/**` backups are not publicly readable
 - Client writes are denied
 - Writes (and history reads) from `crag-extract` and `crag-to-pdf` work via Firebase Admin SDK (rules are bypassed for server credentials)
 

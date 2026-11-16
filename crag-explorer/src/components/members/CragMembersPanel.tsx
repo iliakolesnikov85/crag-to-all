@@ -33,23 +33,23 @@ const CragMembersPanel: React.FC = () => {
   const { crag } = useCrag();
   const account = useAuthSession();
   const canSee = useCanEditCrag(crag);
-  const canManage = useCanManageMembers(crag.cragId);
+  const canManage = useCanManageMembers(crag.id);
   const queryClient = useQueryClient();
   const headingId = useId();
   const [editor, setEditor] = useState<MemberEditor | null>(null);
   const [editorSession, setEditorSession] = useState(0);
   const membersQuery = useQuery({
-    queryKey: queryKeys.cragMembers(crag.cragId),
-    queryFn: () => listCragMembers(crag.cragId),
-    enabled: canSee && crag.cragId.length > 0,
+    queryKey: queryKeys.cragMembers(crag.id),
+    queryFn: () => listCragMembers(crag.id),
+    enabled: canSee && crag.id.length > 0,
   });
 
   const saveMember = useMutation({
     mutationFn: (input: { userId: string; role: CragMemberRole }) => (
-      upsertCragMember(crag.cragId, input.userId, input.role)
+      upsertCragMember(crag.id, input.userId, input.role)
     ),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.cragMembers(crag.cragId) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.cragMembers(crag.id) });
       setEditor(null);
     },
     onError: (error) => {
@@ -58,9 +58,9 @@ const CragMembersPanel: React.FC = () => {
   });
 
   const removeMember = useMutation({
-    mutationFn: (userId: string) => deleteCragMember(crag.cragId, userId),
+    mutationFn: (userId: string) => deleteCragMember(crag.id, userId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.cragMembers(crag.cragId) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.cragMembers(crag.id) });
     },
     onError: (error) => {
       console.error('Failed to remove crag member:', error);
@@ -186,7 +186,7 @@ const CragMembersPanel: React.FC = () => {
         <MemberEditorModal
           key={editorSession}
           open
-          cragId={crag.cragId}
+          cragId={crag.id}
           mode={editor.mode}
           member={editor.mode === 'edit' ? editor.member : null}
           allowOwnerRole={superadmin}

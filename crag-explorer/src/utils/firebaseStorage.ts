@@ -1,11 +1,14 @@
+import { cragStoragePath } from '@crag-to-all/shared-crag';
+
 /**
  * Firebase Storage URL utilities for images, PDFs, and map tiles.
  *
  * Crag documents come from crag-api. File URLs use production Storage unless
  * `npm run dev-local` sets VITE_DEV_LOCAL=true (localhost:9199).
+ * `VITE_FIREBASE_STORAGE_BUCKET_v2` selects the bucket; unset uses `crag-to-all`.
  */
 
-const FIREBASE_BUCKET = 'crag-to-all.firebasestorage.app';
+const FIREBASE_BUCKET = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET_v2?.trim() || 'crag-to-all';
 
 const DEV_LOCAL = import.meta.env.VITE_DEV_LOCAL === 'true';
 
@@ -21,7 +24,7 @@ if (DEV_LOCAL) {
 
 /**
  * Construct a Firebase Storage URL for a given file path
- * @param filePath - The file path in Firebase Storage (e.g., 'roshka/roshka.json')
+ * @param filePath - The file path in Firebase Storage (e.g., 'crags/roshka/roshka.json')
  * @returns The public Firebase Storage URL
  */
 export function getFirebaseStorageUrl(filePath: string): string {
@@ -35,7 +38,7 @@ export function getFirebaseStorageUrl(filePath: string): string {
  * @returns The Firebase Storage URL for the guide PDF
  */
 export function getCragGuideUrl(cragId: string): string {
-  return getFirebaseStorageUrl(`${cragId}/${cragId}-guide.pdf`);
+  return getFirebaseStorageUrl(cragStoragePath(cragId, `${cragId}-guide.pdf`));
 }
 
 /**
@@ -45,15 +48,15 @@ export function getCragGuideUrl(cragId: string): string {
  * @returns The Firebase Storage URL for the image
  */
 export function getCragImageUrl(cragId: string, imageFile: string): string {
-  return getFirebaseStorageUrl(`${cragId}/images/${imageFile}`);
+  return getFirebaseStorageUrl(cragStoragePath(cragId, 'topo-images', imageFile));
 }
 
 /**
  * Get the URL for the OpenTopo tile ZIP pack in Firebase Storage.
- * Path: `{cragId}/tiles/opentopo/pack.zip`
+ * Path: `crags/{cragId}/tiles/opentopo/pack.zip`
  */
 export function getCragOpenTopoPackUrl(cragId: string): string {
-  return getFirebaseStorageUrl(`${cragId}/tiles/opentopo/pack.zip`);
+  return getFirebaseStorageUrl(cragStoragePath(cragId, 'tiles', 'opentopo', 'pack.zip'));
 }
 
 /**
@@ -67,6 +70,6 @@ export function getCragOpenTopoTileUrl(
   y: number,
 ): string {
   return getFirebaseStorageUrl(
-    `${cragId}/tiles/opentopo/${z}/${x}/${y}.png`,
+    cragStoragePath(cragId, 'tiles', 'opentopo', String(z), String(x), `${y}.png`),
   );
 }

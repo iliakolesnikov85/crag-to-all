@@ -48,17 +48,17 @@ export function formatHistoryDate(date: Date = new Date()): string {
 }
 
 /**
- * Live crag file `{cragId}/{fileName}` → `{cragId}/history/yyyy-MM-dd/{fileName}.zip`.
- * `filePath` must be a file in the crag root (one slash).
+ * Live crag file `crags/{cragId}/{fileName}` → `crags/{cragId}/history/yyyy-MM-dd/{fileName}.zip`.
+ * `filePath` must be a file directly under the crag folder (exactly two slashes).
  */
 export function toHistoryStoragePath(filePath: string, date: Date = new Date()): string {
-  const slash = filePath.indexOf('/');
-  if (slash <= 0 || filePath.indexOf('/', slash + 1) !== -1 || slash === filePath.length - 1) {
-    throw new Error(`Expected a crag-root storage path like "{cragId}/{fileName}", got: ${filePath}`);
+  const parts = filePath.split('/');
+  if (parts.length !== 3 || parts[0] !== 'crags' || parts[1].length === 0 || parts[2].length === 0) {
+    throw new Error(`Expected a crag-root storage path like "crags/{cragId}/{fileName}", got: ${filePath}`);
   }
-  const cragId = filePath.slice(0, slash);
-  const fileName = filePath.slice(slash + 1);
-  return `${cragId}/history/${formatHistoryDate(date)}/${fileName}.zip`;
+  const cragId = parts[1];
+  const fileName = parts[2];
+  return `crags/${cragId}/history/${formatHistoryDate(date)}/${fileName}.zip`;
 }
 
 /** GCS object metadata; safe for content-addressed / hashed image filenames. */
@@ -84,7 +84,7 @@ export class FirebaseStorageService {
     });
   }
 
-  /** Uploads to the live crag-root path and a zipped copy under `{cragId}/history/yyyy-MM-dd/`. */
+  /** Uploads to the live crag-root path and a zipped copy under `crags/{cragId}/history/yyyy-MM-dd/`. */
   async uploadFileWithHistory(
     filePath: string,
     data: Buffer | string,
@@ -107,7 +107,7 @@ export class FirebaseStorageService {
     await this.uploadFile(filePath, jsonString, 'application/json');
   }
 
-  /** Uploads JSON to the live crag-root path and a zipped copy under `{cragId}/history/yyyy-MM-dd/`. */
+  /** Uploads JSON to the live crag-root path and a zipped copy under `crags/{cragId}/history/yyyy-MM-dd/`. */
   async uploadJsonWithHistory(filePath: string, data: unknown): Promise<void> {
     const jsonString = JSON.stringify(data, null, 2);
     await this.uploadFileWithHistory(filePath, jsonString, 'application/json');
@@ -199,7 +199,7 @@ export class FirebaseStorageService {
 export function initializeFirebase(useEmulator: boolean = false) {
   if (!initialized) {
     const app = getAdminApp(useEmulator);
-    const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || 'crag-to-all.firebasestorage.app';
+    const storageBucket = process.env.FIREBASE_STORAGE_BUCKET_v2?.trim() || 'crag-to-all';
     bucket = getStorage(app).bucket(storageBucket);
     currentBucketName = storageBucket;
     initialized = true;

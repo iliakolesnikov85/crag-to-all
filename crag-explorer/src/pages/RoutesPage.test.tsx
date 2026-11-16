@@ -17,7 +17,7 @@ vi.mock('../api/client', () => ({
 }));
 
 const cragValue = {
-  crag: { cragId: SAMPLE_CRAG_ID, cragName: 'Test Crag' },
+  crag: { id: SAMPLE_CRAG_ID, cragName: 'Test Crag' },
   getUrl: (url: string) => `/${url}`,
 };
 
@@ -41,7 +41,7 @@ function FilterHarness({ children }: { children: ReactNode }) {
 }
 
 const readOnlyCrag = {
-  crag: { cragId: SAMPLE_CRAG_ID, cragName: 'Test Crag', source: 'external' as const },
+  crag: { id: SAMPLE_CRAG_ID, cragName: 'Test Crag', source: 'external' as const },
   getUrl: (url: string) => `/${url}`,
 };
 

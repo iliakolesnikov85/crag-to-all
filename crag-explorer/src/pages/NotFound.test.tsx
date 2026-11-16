@@ -11,7 +11,7 @@ describe('NotFound', () => {
       <MemoryRouter>
         <CragContext.Provider
           value={{
-            crag: { cragId: SAMPLE_CRAG_ID, cragName: 'Test Crag' },
+            crag: { id: SAMPLE_CRAG_ID, cragName: 'Test Crag' },
             getUrl: (url: string) => `/test-crag${url}`,
           }}
         >
@@ -27,5 +27,18 @@ describe('NotFound', () => {
     expect(
       screen.getByRole('link', { name: 'Go to Overview' }),
     ).toHaveAttribute('href', '/test-crag/overview');
+  });
+
+  it('links to the crag list when no crag is in the url', () => {
+    render(
+      <MemoryRouter>
+        <NotFound />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('link', { name: 'Choose a crag' })).toHaveAttribute(
+      'href',
+      '/',
+    );
   });
 });

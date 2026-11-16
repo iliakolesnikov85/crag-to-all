@@ -17,7 +17,7 @@ vi.mock('../components/GradeHistogram', () => ({
 }));
 
 const cragValue = {
-  crag: { cragId: SAMPLE_CRAG_ID, cragName: 'Test Crag' },
+  crag: { id: SAMPLE_CRAG_ID, cragName: 'Test Crag' },
   getUrl: (url: string) => url,
 };
 

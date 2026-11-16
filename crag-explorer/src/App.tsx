@@ -1,10 +1,9 @@
 import React, { useCallback, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router';
 import './App.scss';
 import { useCragQuery } from './api/useCragQuery';
 import { useCragsQuery } from './api/useCragsQuery';
 import { Crag } from './types';
-import { getDefaultCragForHost } from './utils/defaultCrag';
 import {
   OverviewPage,
   RoutesPage,
@@ -26,15 +25,15 @@ import { ConfirmProvider } from './context/ConfirmContext';
 import { CragContext } from './context/CragContext';
 import { FilterContext, useFilterState } from './context/FilterContext';
 
-const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags, defaultCragId }) => {
-  const cragId = crags.find(c => c.cragId === location.pathname.split('/')[1])?.cragId;
+const AppContent: React.FC<{ crags: Crag[] }> = ({ crags }) => {
+  const { pathname } = useLocation();
+  const cragId = crags.find(c => c.id === pathname.split('/')[1])?.id ?? null;
 
   const [currentSector, setCurrentSector] = useState<string | undefined>();
   const [currentRoute, setCurrentRoute] = useState<string | undefined>();
 
-  const effectiveCragId = cragId || defaultCragId || (crags.length > 0 ? crags[0].cragId : null);
-  const crag = crags.find(c => c.cragId === effectiveCragId) || null;
-  const cragQuery = useCragQuery(effectiveCragId);
+  const crag = crags.find(c => c.id === cragId) || null;
+  const cragQuery = useCragQuery(cragId);
 
   const filterContext = useFilterState();
 
@@ -46,7 +45,7 @@ const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags
     setCurrentRoute(routeName);
   }, []);
 
-  if (!crag) return <div className="page">Crag not found.</div>;
+  if (!crag) return <NotFound />;
   if (cragQuery.isPending) return <LoadingScreen message="Loading crag data..." />;
   if (cragQuery.isError) {
     const message = cragQuery.error instanceof Error
@@ -63,11 +62,8 @@ const AppContent: React.FC<{ crags: Crag[]; defaultCragId?: string }> = ({ crags
       {
         crag: crag,
         getUrl: (url: string) => {
-          url = url.startsWith('/') ? url : `/${url}`;
-          if (crag.cragId === defaultCragId) {
-            return url;
-          }
-          return `/${crag.cragId}${url}`;
+          const path = url.startsWith('/') ? url : `/${url}`;
+          return `/${crag.id}${path}`;
         }
       }}>
       <FilterContext.Provider value={filterContext}>
@@ -132,19 +128,17 @@ export const AppRoutes: React.FC = () => {
     );
   }
 
-  const defaultCrag = getDefaultCragForHost(crags);
-
   return (
     <Routes>
       <Route path="/" element={<CragSelector crags={crags} />} />
       {crags.map((crag) => (
         <Route
-          key={crag.cragId}
-          path={`/${crag.cragId}/*`}
-          element={<AppContent crags={crags} defaultCragId={defaultCrag?.cragId} />}
+          key={crag.id}
+          path={`/${crag.id}/*`}
+          element={<AppContent crags={crags} />}
         />
       ))}
-      <Route path="/*" element={<AppContent crags={crags} defaultCragId={defaultCrag?.cragId} />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };

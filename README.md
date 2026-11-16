@@ -6,7 +6,15 @@ The live site is **[roshkaclimb.ge](https://roshkaclimb.ge/)** — currently cov
 
 You can look up sectors and routes, view topo photos with line overlays, check grades and descriptions, watch beta videos, use the map (including your location), and download PDF guides and GPX tracks. Before a trip with no signal, download a crag in the app so topos, routes, and the outdoor/topo map still work offline.
 
-Crag documents come from crag-api. Images, GPX, PDF guides, and map tiles are served from public Firebase Storage.
+## Versions
+
+Two major versions. Refer to a change as **v1** or **v2** when it belongs to one of them.
+
+**v1** is `main`, and what [roshkaclimb.ge](https://roshkaclimb.ge/) runs in production. External crags only. Crag documents, images, GPX, PDF guides, and map tiles come from public Firebase Storage. There is no API and no database.
+
+**v2** is this branch (`managed-crags`). It keeps external crags and adds explorer crags that can be authored in the app: Firebase Auth, MongoDB through `crag-api`, and an explorer admin UI. It runs locally (API, MongoDB, and the Auth and Storage emulators) and is not deployed to a real environment yet.
+
+The rest of this document describes **v2**. Crag documents come from crag-api. Images, GPX, PDF guides, and map tiles are served from Firebase Storage.
 
 ## Packages
 

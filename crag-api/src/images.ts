@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { cragStoragePath } from '@crag-to-all/shared-crag';
 import type { RequestHandler } from 'express';
 import multer from 'multer';
 import { badRequest } from './http';
@@ -46,7 +47,7 @@ export interface ParsedImageUpload {
 }
 
 export function cragImageStoragePath(cragId: string, imageFile: string): string {
-  return `${cragId}/images/${imageFile}`;
+  return cragStoragePath(cragId, 'topo-images', imageFile);
 }
 
 export function parseUploadedImage(file: Express.Multer.File | undefined): ParsedImageUpload {

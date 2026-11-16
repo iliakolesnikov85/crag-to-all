@@ -122,7 +122,7 @@ export function createApp(db: Db, options: AppOptions = {}): Express {
     requireSuperadmin(),
     asyncHandler(async (req, res) => {
       const created = await createCrag(db, parseCreateCrag(req.body));
-      res.status(201).location(`/api/crags/${created.cragId}`).json(created);
+      res.status(201).location(`/api/crags/${created.id}`).json(created);
     }),
   );
 

@@ -121,7 +121,7 @@ const OverviewPage: React.FC<OverviewPageProps> = ({ description, sectors }) => 
                 >
                   <div className="sector-card-image">
                     <img
-                      src={getCragImageUrl(crag.cragId, image.imageFile)}
+                      src={getCragImageUrl(crag.id, image.imageFile)}
                       alt={sector.name}
                       loading="lazy"
                     />

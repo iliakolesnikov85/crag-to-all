@@ -72,7 +72,7 @@ function useDetailsEditors({
   onRouteSaved,
 }: UseDetailsEditorsOptions) {
   const { crag, getUrl } = useCrag();
-  const patchSector = usePatchSector(crag.cragId);
+  const patchSector = usePatchSector(crag.id);
   const [sectorEdit, setSectorEdit] = useState<EditableSector | null>(null);
   const [sectorError, setSectorError] = useState<string | null>(null);
   const [routeEdit, setRouteEdit] = useState<RouteEditState | null>(null);
@@ -172,7 +172,7 @@ function useDetailsEditors({
 
   const focusSectorOnMap = (sector: Sector) => {
     if (!sector.geo) return;
-    setMapCenter(crag.cragId, [sector.geo.lat, sector.geo.lon], 17);
+    setMapCenter(crag.id, [sector.geo.lat, sector.geo.lon], 17);
   };
 
   const saveSector = async (patch: SectorDetailsPatch) => {

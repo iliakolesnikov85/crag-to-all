@@ -75,7 +75,7 @@ const SectorMapInfo: React.FC<SectorMapInfoProps> = ({
   const sectorPath = getUrl(`sector/${encodeURIComponent(displayName.toLowerCase())}`);
   const firstImage = sector.images?.[0];
   const imageUrl = firstImage
-    ? getCragImageUrl(crag.cragId, firstImage.imageFile)
+    ? getCragImageUrl(crag.id, firstImage.imageFile)
     : null;
   const routes = sector.routes ?? [];
   const visible = routes.slice(0, maxRoutes);
