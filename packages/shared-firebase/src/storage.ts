@@ -77,9 +77,9 @@ export class FirebaseStorageService {
       resumable: false,
       metadata: contentType || customMetadata
         ? {
-            ...(contentType ? { contentType } : {}),
-            ...(customMetadata ? { metadata: customMetadata } : {})
-          }
+          ...(contentType ? { contentType } : {}),
+          ...(customMetadata ? { metadata: customMetadata } : {})
+        }
         : undefined
     });
   }

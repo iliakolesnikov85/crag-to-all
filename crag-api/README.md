@@ -49,12 +49,12 @@ npm run build-shared-crag
 npm run build-shared-firebase
 cd crag-api
 npm ci
-npm run dev
+npm run dev-local
 ```
 
 Or from the repo root: `npm run dev:api`.
 
-Optional `.env` (see `.env.example`): `PORT`, `MONGODB_URI`, `MONGODB_DB`, `FIREBASE_USE_EMULATOR` (default `true`), `FIREBASE_PROJECT_ID`, `FIREBASE_STORAGE_BUCKET_v2` (default `crag-to-all`), `FIREBASE_STORAGE_EMULATOR_HOST` (default `127.0.0.1:9199`), `FIREBASE_AUTH_EMULATOR_HOST` (default `127.0.0.1:9099`).
+Optional `.env` (see `.env.example`): `PORT`, `MONGODB_URI`, `MONGODB_DB`, `FIREBASE_USE_EMULATOR` (default `true`), `FIREBASE_PROJECT_ID`, `FIREBASE_STORAGE_BUCKET_v2` (default `crag-to-all`), `FIREBASE_STORAGE_EMULATOR_HOST` (default `127.0.0.1:9199`), `FIREBASE_AUTH_EMULATOR_HOST` (default `127.0.0.1:9099`). An Atlas `MONGODB_URI` includes the database user and password. Mongo and Firebase settings are read by `@crag-to-all/shared-firebase`.
 
 ## HTTP
 

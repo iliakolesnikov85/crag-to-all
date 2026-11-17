@@ -1,8 +1,9 @@
 import { CRAG_DATA_PROTOCOL, type CragData } from '@crag-to-all/shared-crag';
-import type { Db, UpdateFilter } from 'mongodb';
+import type { Db } from '@crag-to-all/shared-firebase';
 import { toCrag, toCragData, toCragResponse } from '../convertors';
 import {
   alreadyExists,
+  conflict,
   forbidden,
   isDuplicateKeyError,
   notFound,
@@ -24,6 +25,13 @@ function compareSectorsByOrder(a: SectorDocument, b: SectorDocument): number {
   return a.name.localeCompare(b.name, undefined, { numeric: true });
 }
 
+function duplicateKeyField(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null || !('keyPattern' in error)) return undefined;
+  const pattern = (error as { keyPattern?: unknown }).keyPattern;
+  if (typeof pattern !== 'object' || pattern === null) return undefined;
+  return Object.keys(pattern)[0];
+}
+
 async function hasWriteMembership(db: Db, cragId: string, userId: string): Promise<boolean> {
   const member = await membersCol(db).findOne(
     { cragId, userId },
@@ -37,13 +45,13 @@ export async function listCrags(db: Db) {
   return docs.map(toCrag);
 }
 
-/** Inserts an empty explorer crag and no `crag_members` row. */
+/** Inserts an empty crag and no `crag_members` row. */
 export async function createCrag(db: Db, input: CragCreateInput): Promise<CragResponse> {
   const updatedAt = now();
   const doc: CragDocument = {
     _id: input.cragId,
     name: input.name,
-    source: 'explorer',
+    source: input.source,
     protocolVersion: CRAG_DATA_PROTOCOL,
     description: [],
     trails: [],
@@ -51,10 +59,14 @@ export async function createCrag(db: Db, input: CragCreateInput): Promise<CragRe
     version: 1,
     updatedAt,
   };
+  if (input.externalId !== undefined) doc.externalId = input.externalId;
   try {
     await cragsCol(db).insertOne(doc);
   } catch (error) {
     if (isDuplicateKeyError(error)) {
+      if (duplicateKeyField(error) === 'externalId') {
+        throw alreadyExists(`A crag with externalId "${input.externalId}" already exists`);
+      }
       throw alreadyExists(`Crag "${input.cragId}" already exists`);
     }
     console.error('Failed to insert crag:', error);
@@ -103,25 +115,14 @@ export async function patchCrag(
   }
 
   const $set: Omit<Partial<CragDocument>, '_id'> = { updatedAt: now() };
-  const $unset: { opentopoTilePack?: '' } = {};
   if (patch.name !== undefined) $set.name = patch.name;
   if (patch.description !== undefined) $set.description = patch.description;
   if (patch.trails !== undefined) $set.trails = patch.trails;
   if (patch.markers !== undefined) $set.markers = patch.markers;
-  if (patch.opentopoTilePack === null) {
-    $unset.opentopoTilePack = '';
-  } else if (patch.opentopoTilePack !== undefined) {
-    $set.opentopoTilePack = patch.opentopoTilePack;
-  }
-
-  const update: UpdateFilter<CragDocument> = { $set, $inc: { version: 1 } };
-  if ($unset.opentopoTilePack !== undefined) {
-    update.$unset = $unset;
-  }
 
   const updated = await cragsCol(db).findOneAndUpdate(
     { _id: cragId, version: patch.version },
-    update,
+    { $set, $inc: { version: 1 } },
     { returnDocument: 'after' },
   );
   if (!updated) {
@@ -130,4 +131,35 @@ export async function patchCrag(
     throw versionConflict(current.version);
   }
   return toCragResponse(updated);
+}
+
+/**
+ * Deletes a crag that has no sectors, and its membership rows.
+ * The check and both deletes commit together, so a failed member delete
+ * cannot leave owners behind for a later crag with the same id.
+ */
+export async function deleteCrag(db: Db, cragId: string): Promise<void> {
+  const session = db.client.startSession();
+  try {
+    await session.withTransaction(async () => {
+      const crag = await cragsCol(db).findOne(
+        { _id: cragId },
+        { projection: { _id: 1 }, session },
+      );
+      if (!crag) throw notFound('crag');
+      const sectorCount = await sectorsCol(db).countDocuments({ cragId }, { session });
+      if (sectorCount > 0) {
+        throw conflict('Crag still has sectors');
+      }
+      const deleted = await cragsCol(db).deleteOne({ _id: cragId }, { session });
+      if (deleted.deletedCount !== 1) throw notFound('crag');
+      await membersCol(db).deleteMany({ cragId }, { session });
+    });
+  } finally {
+    try {
+      await session.endSession();
+    } catch (error) {
+      console.error('Failed to end the MongoDB session after deleting a crag:', error);
+    }
+  }
 }

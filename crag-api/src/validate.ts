@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { CRAG_MAP_MARKER_TYPES, ROUTE_TYPES, type Route } from '@crag-to-all/shared-crag';
+import { CRAG_MAP_MARKER_TYPES, CRAG_SOURCES, ROUTE_TYPES, type Route } from '@crag-to-all/shared-crag';
 import { z, ZodError } from 'zod';
 import { badRequest } from './http';
 import type {
@@ -19,15 +19,6 @@ const MAX_DESCRIPTION_HTML_LENGTH = 20_000;
 
 function nonemptyString(max: number) {
   return z.string().trim().min(1).max(max);
-}
-
-function slugifyCragId(name: string): string {
-  return name
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
 }
 
 function formatIssue(error: ZodError): string {
@@ -53,6 +44,16 @@ const cragIdSchema = z
   .transform((value) => value.toLowerCase())
   .refine((value) => CRAG_ID_PATTERN.test(value), {
     message: 'cragId must be a lowercase slug (letters, digits, hyphens)',
+  });
+
+/** Create body `id`. Unlike a URL cragId, this is not lowercased for the caller. */
+const createCragIdSchema = z
+  .string()
+  .trim()
+  .min(1, 'id is required')
+  .max(MAX_CRAG_ID_LENGTH)
+  .refine((value) => CRAG_ID_PATTERN.test(value), {
+    message: 'id must be a lowercase slug (letters, digits, hyphens)',
   });
 
 const sectorIdSchema = z.string().trim().min(1, 'sectorId is required');
@@ -135,43 +136,36 @@ const markerSchema = z.object({
   geo: latLngSchema,
 });
 
-const tilePackSchema = z.object({
-  bbox: z.tuple([
-    z.number().finite(),
-    z.number().finite(),
-    z.number().finite(),
-    z.number().finite(),
-  ]),
-  zoomMin: z.number().int().min(0),
-  zoomMax: z.number().int().min(0),
-  packVersion: z.number().int().min(1),
-  fetchedAt: z.number().int().min(0),
-  tileCount: z.number().int().min(0),
-  totalBytes: z.number().int().min(0),
-  archiveBytes: z.number().int().min(0),
-});
-
-const createCragBodySchema = z.object({
-  name: nonemptyString(MAX_NAME_LENGTH),
-  cragId: cragIdSchema.optional(),
-});
+const createCragBodySchema = z
+  .strictObject({
+    id: createCragIdSchema,
+    name: nonemptyString(MAX_NAME_LENGTH),
+    source: z.enum(CRAG_SOURCES).default('explorer'),
+    externalId: nonemptyString(128).optional(),
+  })
+  .refine(
+    (body) => body.source !== 'external' || body.externalId !== undefined,
+    { message: 'externalId is required when source is external', path: ['externalId'] },
+  )
+  .refine(
+    (body) => body.source === 'external' || body.externalId === undefined,
+    { message: 'externalId is only allowed when source is external', path: ['externalId'] },
+  );
 
 const cragPatchSchema = z
-  .object({
+  .strictObject({
     version: versionSchema,
     name: nonemptyString(MAX_NAME_LENGTH).optional(),
     description: z.array(descriptionSchema).optional(),
     trails: z.array(trailSchema).optional(),
     markers: z.array(markerSchema).optional(),
-    opentopoTilePack: tilePackSchema.nullable().optional(),
   })
   .refine(
     (patch) =>
       patch.name !== undefined ||
       patch.description !== undefined ||
       patch.trails !== undefined ||
-      patch.markers !== undefined ||
-      patch.opentopoTilePack !== undefined,
+      patch.markers !== undefined,
     { message: 'PATCH body must include at least one crag field besides version' },
   );
 
@@ -282,13 +276,14 @@ function parseAccountEmail(value: unknown): string {
 }
 
 function parseCreateCrag(body: unknown): CragCreateInput {
-  const { name, cragId } = parseWith(createCragBodySchema, body);
-  if (cragId) return { name, cragId };
-  const slug = slugifyCragId(name);
-  if (!slug) {
-    throw badRequest('name must contain letters or digits to derive cragId');
-  }
-  return { name, cragId: parseWith(cragIdSchema, slug) };
+  const parsed = parseWith(createCragBodySchema, body);
+  const input: CragCreateInput = {
+    name: parsed.name,
+    cragId: parsed.id,
+    source: parsed.source,
+  };
+  if (parsed.externalId !== undefined) input.externalId = parsed.externalId;
+  return input;
 }
 
 function parseCragPatch(body: unknown): CragPatchInput {
@@ -331,5 +326,4 @@ export {
   parseSectorPatch,
   parseSectorId,
   parseSectorWrite,
-  slugifyCragId,
 };

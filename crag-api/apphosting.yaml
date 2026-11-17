@@ -1,0 +1,52 @@
+# Pre-prod crag-api on Firebase App Hosting.
+# The backend root directory is crag-api. Shared packages live outside that
+# directory. scripts/apphosting-build.js compiles them, then packs the results
+# into crag-api/node_modules so Cloud Run does not need the sibling directories.
+# Cloud Run sets PORT. Do not set PORT here.
+#
+# Secrets MONGODB_URI and FIREBASE_SERVICE_ACCOUNT_KEY must exist in Cloud
+# Secret Manager, and this backend must be granted access, before a rollout.
+
+scripts:
+  buildCommand: node scripts/apphosting-build.js
+  runCommand: npm start
+
+outputFiles:
+  serverApp:
+    include:
+      - dist
+      - package.json
+      - node_modules
+
+runConfig:
+  cpu: 1
+  memoryMiB: 512
+  concurrency: 40
+  minInstances: 0
+  maxInstances: 2
+
+env:
+  - variable: FIREBASE_USE_EMULATOR
+    value: "false"
+    availability:
+      - RUNTIME
+  - variable: FIREBASE_PROJECT_ID
+    value: crag-to-all
+    availability:
+      - RUNTIME
+  - variable: FIREBASE_STORAGE_BUCKET_v2
+    value: crag-to-all
+    availability:
+      - RUNTIME
+  - variable: MONGODB_DB
+    value: crag-to-all
+    availability:
+      - RUNTIME
+  - variable: MONGODB_URI
+    secret: MONGODB_URI
+    availability:
+      - RUNTIME
+  - variable: FIREBASE_SERVICE_ACCOUNT_KEY
+    secret: FIREBASE_SERVICE_ACCOUNT_KEY
+    availability:
+      - RUNTIME

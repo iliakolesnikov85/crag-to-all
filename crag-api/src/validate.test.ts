@@ -3,11 +3,48 @@ import { HttpError } from './http';
 import { parseCragId, parseCragPatch, parseCreateCrag, parseSectorPatch, parseSectorWrite } from './validate';
 
 describe('validate', () => {
-  it('slugifies the crag name when cragId is omitted', () => {
-    expect(parseCreateCrag({ name: 'Roshka Valley' })).toEqual({
+  it('requires an explicit lowercase id and defaults source to explorer', () => {
+    expect(parseCreateCrag({ id: ' roshka-valley ', name: 'Roshka Valley' })).toEqual({
       name: 'Roshka Valley',
       cragId: 'roshka-valley',
+      source: 'explorer',
     });
+    for (const body of [
+      { name: 'Roshka Valley' },
+      { id: 'Roshka', name: 'Roshka' },
+      { cragId: 'roshka', name: 'Roshka' },
+      { id: 'roshka', name: 'Roshka', externalId: '35366' },
+      { id: 'roshka', name: 'Roshka', source: 'external' },
+    ]) {
+      try {
+        parseCreateCrag(body);
+        throw new Error('expected parseCreateCrag to throw');
+      } catch (error) {
+        expect(error).toBeInstanceOf(HttpError);
+        expect((error as HttpError).status).toBe(400);
+      }
+    }
+    expect(parseCreateCrag({
+      id: 'roshka',
+      name: 'Roshka',
+      source: 'external',
+      externalId: ' 35366 ',
+    })).toEqual({
+      name: 'Roshka',
+      cragId: 'roshka',
+      source: 'external',
+      externalId: '35366',
+    });
+  });
+
+  it('rejects opentopoTilePack on a crag patch', () => {
+    try {
+      parseCragPatch({ version: 1, opentopoTilePack: null });
+      throw new Error('expected parseCragPatch to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(HttpError);
+      expect((error as HttpError).status).toBe(400);
+    }
   });
 
   it('lowercases an explicit cragId', () => {

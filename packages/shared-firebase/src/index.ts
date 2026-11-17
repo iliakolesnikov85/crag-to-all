@@ -14,3 +14,18 @@ export {
   initializeFirebase,
   toHistoryStoragePath,
 } from './storage';
+
+export {
+  applyFirebaseEnv,
+  connectMongo,
+  MongoClient,
+  readCloudConfig,
+} from './cloud';
+export type {
+  CloudConfig,
+  Db,
+  Filter,
+  FirebaseSettings,
+  MongoSettings,
+  ReadCloudConfigOptions,
+} from './cloud';

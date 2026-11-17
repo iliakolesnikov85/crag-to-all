@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Image, LatLng, Sector, StoredRoute } from '@crag-to-all/shared-crag';
-import type { Db } from 'mongodb';
+import type { Db } from '@crag-to-all/shared-firebase';
 import { sectorNameKey, toSector, toSectorDocument } from '../convertors';
 import { alreadyExists, isDuplicateKeyError, notFound, versionConflict } from '../http';
 import type { SectorDocument, SectorPatch, SectorWriteInput } from '../types';

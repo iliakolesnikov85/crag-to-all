@@ -1,7 +1,7 @@
 import { generateGPX } from '@crag-to-all/shared-crag';
 import cors from 'cors';
 import express, { type Express, type Request, type RequestHandler } from 'express';
-import type { Db } from 'mongodb';
+import type { Db } from '@crag-to-all/shared-firebase';
 import { attachAccountProfiles, lookupVerifiedAccount } from './accounts';
 import { asyncHandler, errorHandler, forbidden, storageFailed, storageUnavailable, unauthorized } from './http';
 import {
@@ -12,6 +12,7 @@ import {
 import {
   addSector,
   createCrag,
+  deleteCrag,
   deleteMember,
   deleteSector,
   getAssembledCrag,
@@ -159,7 +160,21 @@ export function createApp(db: Db, options: AppOptions = {}): Express {
     authenticate,
     writableCrag,
     asyncHandler(async (req, res) => {
-      res.json(await patchCrag(db, loadedCrag(req), parseCragPatch(req.body)));
+      const patch = parseCragPatch(req.body);
+      if (patch.name !== undefined && !loadedCaller(req).superadmin) {
+        throw forbidden();
+      }
+      res.json(await patchCrag(db, loadedCrag(req), patch));
+    }),
+  );
+
+  app.delete(
+    '/api/crags/:cragId',
+    authenticate,
+    requireSuperadmin(),
+    asyncHandler(async (req, res) => {
+      await deleteCrag(db, parseCragId(req.params.cragId));
+      res.status(204).send();
     }),
   );
 

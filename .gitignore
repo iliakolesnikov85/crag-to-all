@@ -4,6 +4,7 @@ node_modules/
 # Build outputs
 dist/
 build/
+crag-api/.apphosting-packs/
 crag-explorer/dev-dist/
 
 # Local data copies
@@ -47,6 +48,7 @@ jspm_packages/
 .env
 .env.test
 .env.local
+.env.prod
 
 # Temporary files
 temp

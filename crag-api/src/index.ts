@@ -1,5 +1,4 @@
-import { initializeFirebase } from '@crag-to-all/shared-firebase';
-import { MongoClient } from 'mongodb';
+import { applyFirebaseEnv, connectMongo, initializeFirebase } from '@crag-to-all/shared-firebase';
 import { createApp } from './app';
 import { createFirebaseAuthDirectory, createFirebaseIdTokenVerifier } from './auth';
 import { getConfig } from './config';
@@ -8,28 +7,19 @@ import { ensureIndexes } from './store';
 
 async function main(): Promise<void> {
   const config = getConfig();
-  const client = new MongoClient(config.mongodbUri);
+  applyFirebaseEnv(config.firebase);
+  initializeFirebase(config.firebase.useEmulator);
 
+  let client;
   try {
-    await client.connect();
+    client = await connectMongo(config.mongo);
   } catch (error) {
-    console.error(
-      `Cannot connect to MongoDB at ${config.mongodbUri}. Start the local MongoDB service and retry.`,
-      error,
-    );
+    console.error('crag-api is stopping because MongoDB did not connect:', error);
     process.exitCode = 1;
     return;
   }
 
-  process.env.FIREBASE_PROJECT_ID = config.firebaseProjectId;
-  process.env.FIREBASE_STORAGE_BUCKET_v2 = config.firebaseStorageBucket;
-  if (config.firebaseUseEmulator) {
-    process.env.FIREBASE_STORAGE_EMULATOR_HOST = config.firebaseStorageEmulatorHost;
-    process.env.FIREBASE_AUTH_EMULATOR_HOST = config.firebaseAuthEmulatorHost;
-  }
-  initializeFirebase(config.firebaseUseEmulator);
-
-  const db = client.db(config.mongodbDb);
+  const db = client.db(config.mongo.db);
   await ensureIndexes(db);
 
   const app = createApp(db, {
@@ -39,12 +29,12 @@ async function main(): Promise<void> {
   });
   const server = app.listen(config.port, () => {
     console.log(`crag-api listening on http://localhost:${config.port}`);
-    if (config.firebaseUseEmulator) {
+    if (config.firebase.useEmulator) {
       console.log(
-        `Image uploads use Storage emulator at ${config.firebaseStorageEmulatorHost}`,
+        `Image uploads use Storage emulator at ${config.firebase.storageEmulatorHost}`,
       );
       console.log(
-        `ID tokens are verified by the Auth emulator at ${config.firebaseAuthEmulatorHost}`,
+        `ID tokens are verified by the Auth emulator at ${config.firebase.authEmulatorHost}`,
       );
     }
   });

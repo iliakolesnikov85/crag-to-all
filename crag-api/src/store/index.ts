@@ -1,5 +1,12 @@
 export { ensureIndexes } from './collections';
-export { createCrag, getAssembledCrag, listCrags, patchCrag, requireWritableCrag } from './crags';
+export {
+  createCrag,
+  deleteCrag,
+  getAssembledCrag,
+  listCrags,
+  patchCrag,
+  requireWritableCrag,
+} from './crags';
 export {
   deleteMember,
   listCallerMemberships,

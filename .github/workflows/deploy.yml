@@ -1,20 +1,24 @@
-name: Build and Deploy Explorer
+name: Build and deploy pre-prod
 
 on:
   push:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
+
+# Tests run on pull requests and on main. Pre-prod deploy runs only from a
+# manual workflow run, until this environment becomes production.
 
 jobs:
   crag-api:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 24
 
@@ -35,17 +39,14 @@ jobs:
         working-directory: crag-api
         run: npm test
 
-  build-and-deploy:
+  build-explorer:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: true
-
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 24
 
@@ -61,13 +62,73 @@ jobs:
         working-directory: crag-explorer
         run: npm test
 
-      - name: Deploy to Netlify
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        # --build runs netlify.toml build + bundles edge functions.
-        # Deploying publish-dir alone (old action) never uploaded netlify/edge-functions.
-        working-directory: crag-explorer
-        run: npx netlify-cli deploy --build --prod --message "Deploy from GitHub Actions"
+  deploy-api:
+    needs:
+      - crag-api
+      - build-explorer
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment:
+      name: pre-prod
+      url: ${{ vars.VITE_API_BASE_URL }}
+    concurrency:
+      group: pre-prod-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Roll out crag-api on App Hosting
         env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-        timeout-minutes: 10
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "Set the pre-prod secret FIREBASE_SERVICE_ACCOUNT to the deployer service account JSON."
+            exit 1
+          fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-deployer.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-deployer.json"
+          npx --yes firebase-tools@15.28.2 apphosting:rollouts:create crag-api \
+            --git-commit "${{ github.sha }}" \
+            --project crag-to-all \
+            --force \
+            --non-interactive
+
+  deploy-explorer:
+    needs: deploy-api
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment:
+      name: pre-prod
+      url: https://crag-to-all.web.app
+    concurrency:
+      group: pre-prod-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies for crag-explorer
+        working-directory: crag-explorer
+        run: npm ci
+
+      - name: Build explorer
+        working-directory: crag-explorer
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_FIREBASE_STORAGE_BUCKET_v2: crag-to-all
+        run: |
+          if [ -z "$VITE_API_BASE_URL" ]; then
+            echo "Set the pre-prod variable VITE_API_BASE_URL to the App Hosting URL."
+            exit 1
+          fi
+          npm run build
+
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: crag-to-all
+          channelId: live

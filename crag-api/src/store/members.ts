@@ -1,4 +1,4 @@
-import type { Db } from 'mongodb';
+import type { Db } from '@crag-to-all/shared-firebase';
 import { forbidden, notFound, readOnly } from '../http';
 import type { AuthCaller, CragMemberResponse, CragMemberRole } from '../types';
 import { cragsCol, membersCol } from './collections';

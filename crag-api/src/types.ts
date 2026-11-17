@@ -23,12 +23,12 @@ export interface SectorDocument extends SharedSectorDocument {
 export interface CragCreateInput {
   name: string;
   cragId: string;
+  source: CragSource;
+  externalId?: string;
 }
 
 export type CragPatchInput = Pick<CragDocument, 'version'> &
-  Partial<Pick<CragDocument, 'name' | 'description' | 'trails' | 'markers'>> & {
-    opentopoTilePack?: OpenTopoTilePackInfo | null;
-  };
+  Partial<Pick<CragDocument, 'name' | 'description' | 'trails' | 'markers'>>;
 
 export type SectorWriteInput = Omit<Sector, 'id' | 'order' | 'version' | 'updatedAt'>;
 

@@ -1,4 +1,4 @@
-import type { Db } from 'mongodb';
+import type { Db } from '@crag-to-all/shared-firebase';
 import { isDuplicateKeyError } from '../http';
 import type { CragDocument, CragMemberDocument, SectorDocument } from '../types';
 
@@ -25,6 +25,13 @@ export function now(): Date {
 }
 
 export async function ensureIndexes(db: Db): Promise<void> {
+  await cragsCol(db).createIndex(
+    { externalId: 1 },
+    {
+      unique: true,
+      partialFilterExpression: { externalId: { $type: 'string' } },
+    },
+  );
   await sectorsCol(db).createIndex({ cragId: 1 });
   try {
     await sectorsCol(db).createIndex(

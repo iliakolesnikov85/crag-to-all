@@ -6,7 +6,9 @@
     "crag-to-all": {
       "storage": {
         "v2": [
-          "crag-to-all"
+          "crag-to-all",
+          "crag-to-all.appspot.com",
+          "crag-to-all.firebasestorage.app"
         ]
       }
     }

@@ -53,6 +53,10 @@ export function alreadyExists(message: string): HttpError {
   return new HttpError(409, { error: 'already_exists', message });
 }
 
+export function conflict(message: string): HttpError {
+  return new HttpError(409, { error: 'conflict', message });
+}
+
 export function readOnly(message: string): HttpError {
   return new HttpError(403, { error: 'read_only', message });
 }
