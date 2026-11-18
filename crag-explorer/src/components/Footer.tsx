@@ -1,21 +1,23 @@
 import React from 'react';
-import './Footer.scss';
-import { useCrag } from '../context/CragContext';
 import { Link } from 'react-router';
+import { useCrag } from '../context/CragContext';
+import './Footer.scss';
 
 const Footer: React.FC = () => {
-  const { getUrl } = useCrag();
+  const { crag, getUrl } = useCrag();
+  const teamUrl = crag.id ? getUrl('/team') : null;
 
   return (
     <footer className="footer">
       <div className="footer-content">
         <div className="footer-links">
-          <Link 
-            to={getUrl('/team')}             
-            className="footer-link"
-          >
-                         Created by Roshka Team
-          </Link>
+          {teamUrl ? (
+            <Link to={teamUrl} className="footer-link">
+              Created by Roshka Team
+            </Link>
+          ) : (
+            <span className="footer-link">Created by Roshka Team</span>
+          )}
           <span className="footer-separator">•</span>
           <a 
             href="https://cursor.sh" 

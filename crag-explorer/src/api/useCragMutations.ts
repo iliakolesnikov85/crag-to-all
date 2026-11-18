@@ -37,6 +37,7 @@ function applyCragPatch(
 ): void {
   writeCragData(queryClient, cragId, (current) => ({
     ...current,
+    ...(saved.name !== undefined ? { name: saved.name } : {}),
     ...(saved.description !== undefined ? { description: saved.description } : {}),
     ...(saved.markers !== undefined ? { markers: saved.markers } : {}),
     version: saved.version,

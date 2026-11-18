@@ -36,7 +36,6 @@ function AuthControls() {
           <span className="auth-controls__user" title={email}>
             {email}
           </span>
-          <span className="auth-controls__sep" aria-hidden="true">|</span>
           <Button
             type="button"
             size="sm"

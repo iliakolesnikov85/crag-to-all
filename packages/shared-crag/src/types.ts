@@ -138,4 +138,15 @@ export interface Crag {
   id: string;
   cragName: string;
   source?: CragSource;
+  /** Sectors stored for this crag. Present on catalog responses. */
+  sectorCount?: number;
+  /** Present on catalog responses. */
+  updatedAt?: string;
+  /** Present on catalog responses. Used to rename without loading the crag. */
+  version?: number;
+  /**
+   * Plain-text excerpt of the crag description. Present on catalog responses
+   * when the crag has one. The homepage uses it when no SEO blurb is set.
+   */
+  description?: string;
 }

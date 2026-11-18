@@ -37,7 +37,7 @@ const ada: AuthAccount = {
 function renderHeader() {
   return render(
     <MemoryRouter>
-      <Header title="Roshka" />
+      <Header />
     </MemoryRouter>,
   );
 }

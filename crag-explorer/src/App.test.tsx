@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { getCragApiUrl, getCragsApiUrl } from './api/client';
 import { AppRoutes } from './App';
+import { signInTestUser } from './test/authAccount';
 import { AppOnlineProvider } from './context/AppOnlineContext';
 import { SAMPLE_CRAG_ID, sampleCrags } from './test/fixtures/cragData';
 import { jsonResponse, requestUrl, withQueryClient } from './test/helpers';
@@ -122,5 +123,22 @@ describe('App load', () => {
     });
 
     expect(await getOfflineCragIndex()).toBeUndefined();
+  });
+
+  it('opens crag management from an empty catalog for a superadmin', async () => {
+    signInTestUser();
+    vi.mocked(fetch).mockImplementation(() => Promise.resolve(jsonResponse([])));
+    renderApp('/crag-manage');
+
+    expect(await screen.findByRole('button', { name: 'Add crag' })).toBeInTheDocument();
+    expect(screen.getByText('No crags yet.')).toBeInTheDocument();
+  });
+
+  it('hides crag management from visitors who are not superadmins', async () => {
+    mockIndexOk();
+    renderApp('/crag-manage');
+
+    expect(await screen.findByRole('heading', { name: 'Page Not Found' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add crag' })).not.toBeInTheDocument();
   });
 });

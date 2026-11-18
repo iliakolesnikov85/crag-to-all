@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router';
 import { MdCloudOff } from 'react-icons/md';
 import { Crag } from '../types';
-import './CragSelector.scss';
+import './Homepage.scss';
 import { useIsMobileLayout } from '../hooks/useIsMobileLayout';
 import { useOfflineCrags } from '../hooks/useOfflineCrags';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
@@ -11,16 +11,14 @@ import OfflineStatusBadge, {
 } from '../components/OfflineStatusBadge';
 import { siteConfig, cragConfigs } from '../../scripts/seo-config.js';
 
-interface CragSelectorProps {
+interface HomepageProps {
   crags: Crag[];
 }
 
 // Per-crag SEO highlights surfaced as visible copy on the homepage. Lookup is
-// keyed by cragId; missing entries simply fall back to no blurb.
+// keyed by cragId; missing entries fall back to the crag description.
 type CragHighlight = {
   homepageBlurb?: string;
-  nearby?: string[];
-  climbingType?: string;
 };
 
 const cragHighlights: Record<string, CragHighlight> = cragConfigs as Record<string, CragHighlight>;
@@ -43,7 +41,7 @@ function handleTitleImageError(e: React.SyntheticEvent<HTMLImageElement>) {
   img.src = assetUrl('icon.svg');
 }
 
-const CragSelector: React.FC<CragSelectorProps> = ({ crags }) => {
+const Homepage: React.FC<HomepageProps> = ({ crags }) => {
   const isMobile = useIsMobileLayout();
   const online = useOnlineStatus();
   const { downloadedIds, updateStatusMap } = useOfflineCrags();
@@ -74,7 +72,9 @@ const CragSelector: React.FC<CragSelectorProps> = ({ crags }) => {
             updateStatusMap.get(crag.id) ?? false,
           );
           const showBadge = isMobile && (online || isDownloaded);
-          const blurb = cragHighlights[crag.id]?.homepageBlurb;
+          const blurb = cragHighlights[crag.id]?.homepageBlurb?.trim()
+            || crag.description?.trim()
+            || '';
           const overviewPath = `/${crag.id}/overview`;
           const downloadPath = `/${crag.id}/download`;
           const badgeTo =
@@ -95,9 +95,11 @@ const CragSelector: React.FC<CragSelectorProps> = ({ crags }) => {
                 <div className="crag-card__overlay" aria-hidden="true" />
                 <h3 className="crag-name">{crag.cragName}</h3>
               </div>
-              <div className="crag-card__body">
-                {blurb && <p className="crag-card__blurb">{blurb}</p>}
-              </div>
+              {blurb && (
+                <div className="crag-card__body">
+                  <p className="crag-card__blurb">{blurb}</p>
+                </div>
+              )}
             </>
           );
 
@@ -147,4 +149,4 @@ const CragSelector: React.FC<CragSelectorProps> = ({ crags }) => {
   );
 };
 
-export default CragSelector;
+export default Homepage;

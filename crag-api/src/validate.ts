@@ -1,5 +1,17 @@
 import { randomUUID } from 'node:crypto';
-import { CRAG_MAP_MARKER_TYPES, CRAG_SOURCES, ROUTE_TYPES, type Route } from '@crag-to-all/shared-crag';
+import {
+  CRAG_EXTERNAL_ID_FORBIDDEN_MESSAGE,
+  CRAG_EXTERNAL_ID_REQUIRED_MESSAGE,
+  CRAG_ID_MAX_LENGTH,
+  CRAG_MAP_MARKER_TYPES,
+  CRAG_SOURCES,
+  ROUTE_TYPES,
+  validateCragExternalId,
+  validateCragId,
+  validateCragName,
+  type CragFieldCheck,
+  type Route,
+} from '@crag-to-all/shared-crag';
 import { z, ZodError } from 'zod';
 import { badRequest } from './http';
 import type {
@@ -10,8 +22,6 @@ import type {
   SectorWriteInput,
 } from './types';
 
-const CRAG_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const MAX_CRAG_ID_LENGTH = 64;
 const MAX_NAME_LENGTH = 200;
 const MAX_TEXT_LENGTH = 2000;
 /** One HTML document per description section, same cap as a route description. */
@@ -36,25 +46,25 @@ function parseWith<T>(schema: z.ZodType<T>, value: unknown): T {
   return result.data;
 }
 
+function cragString(validate: (value: string) => CragFieldCheck) {
+  return z.string().superRefine((value, ctx) => {
+    const result = validate(value);
+    if (!result.ok) ctx.addIssue(result.error);
+  }).transform((value) => value.trim());
+}
+
 const cragIdSchema = z
   .string()
   .trim()
   .min(1, 'cragId is required')
-  .max(MAX_CRAG_ID_LENGTH)
+  .max(CRAG_ID_MAX_LENGTH)
   .transform((value) => value.toLowerCase())
-  .refine((value) => CRAG_ID_PATTERN.test(value), {
+  .refine((value) => validateCragId(value).ok, {
     message: 'cragId must be a lowercase slug (letters, digits, hyphens)',
   });
 
 /** Create body `id`. Unlike a URL cragId, this is not lowercased for the caller. */
-const createCragIdSchema = z
-  .string()
-  .trim()
-  .min(1, 'id is required')
-  .max(MAX_CRAG_ID_LENGTH)
-  .refine((value) => CRAG_ID_PATTERN.test(value), {
-    message: 'id must be a lowercase slug (letters, digits, hyphens)',
-  });
+const createCragIdSchema = cragString(validateCragId);
 
 const sectorIdSchema = z.string().trim().min(1, 'sectorId is required');
 
@@ -139,23 +149,23 @@ const markerSchema = z.object({
 const createCragBodySchema = z
   .strictObject({
     id: createCragIdSchema,
-    name: nonemptyString(MAX_NAME_LENGTH),
+    name: cragString(validateCragName),
     source: z.enum(CRAG_SOURCES).default('explorer'),
-    externalId: nonemptyString(128).optional(),
+    externalId: cragString(validateCragExternalId).optional(),
   })
   .refine(
     (body) => body.source !== 'external' || body.externalId !== undefined,
-    { message: 'externalId is required when source is external', path: ['externalId'] },
+    { message: CRAG_EXTERNAL_ID_REQUIRED_MESSAGE, path: ['externalId'] },
   )
   .refine(
     (body) => body.source === 'external' || body.externalId === undefined,
-    { message: 'externalId is only allowed when source is external', path: ['externalId'] },
+    { message: CRAG_EXTERNAL_ID_FORBIDDEN_MESSAGE, path: ['externalId'] },
   );
 
 const cragPatchSchema = z
   .strictObject({
     version: versionSchema,
-    name: nonemptyString(MAX_NAME_LENGTH).optional(),
+    name: cragString(validateCragName).optional(),
     description: z.array(descriptionSchema).optional(),
     trails: z.array(trailSchema).optional(),
     markers: z.array(markerSchema).optional(),

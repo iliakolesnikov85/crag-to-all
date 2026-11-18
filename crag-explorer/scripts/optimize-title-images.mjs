@@ -1,5 +1,5 @@
 /**
- * Resize title JPEGs under public/images/titles/ for faster loads on CragSelector.
+ * Resize title JPEGs under public/images/titles/ for faster loads on Homepage.
  * Run: node scripts/optimize-title-images.mjs
  */
 import sharp from 'sharp';

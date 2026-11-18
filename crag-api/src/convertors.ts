@@ -1,16 +1,48 @@
 import type { Crag, CragData, Route, Sector, StoredRoute } from '@crag-to-all/shared-crag';
 import type { CragDocument, CragResponse, SectorDocument, SectorWriteInput } from './types';
 
+/** Long enough for the homepage line clamp to ellipsize, short enough for the catalog. */
+const DESCRIPTION_EXCERPT_MAX = 400;
+
+function plainText(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([.,;:!?])/g, '$1')
+    .trim();
+}
+
+function descriptionExcerpt(sections: CragDocument['description']): string | undefined {
+  for (const section of sections) {
+    for (const paragraph of section.paragraphs) {
+      const text = plainText(paragraph);
+      if (text) return text.slice(0, DESCRIPTION_EXCERPT_MAX);
+    }
+  }
+  return undefined;
+}
+
 function toPublicRoute(route: StoredRoute): Route {
   const { externalId: _externalId, ...rest } = route;
   return rest;
 }
 
-export function toCrag(doc: CragDocument): Crag {
+export function toCrag(doc: CragDocument, sectorCount: number): Crag {
+  const description = descriptionExcerpt(doc.description);
   return {
     id: doc._id,
     cragName: doc.name,
     source: doc.source,
+    sectorCount,
+    updatedAt: doc.updatedAt.toISOString(),
+    version: doc.version,
+    ...(description ? { description } : {}),
   };
 }
 

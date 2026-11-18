@@ -1,0 +1,30 @@
+.header-options__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #0f172a;
+  cursor: pointer;
+
+  svg {
+    width: 1.45rem;
+    height: 1.45rem;
+  }
+
+  &:hover:not(:disabled),
+  &.is-open {
+    background: #fff;
+    border-color: rgba(15, 23, 42, 0.2);
+  }
+
+  &:focus-visible {
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+  }
+}

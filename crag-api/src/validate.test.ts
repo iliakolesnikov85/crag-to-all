@@ -35,6 +35,26 @@ describe('validate', () => {
       source: 'external',
       externalId: '35366',
     });
+    try {
+      parseCreateCrag({ id: 'Roshka', name: 'Roshka' });
+      throw new Error('expected parseCreateCrag to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(HttpError);
+      expect((error as HttpError).message).toBe(
+        'id: id must be a lowercase slug (letters, digits, hyphens)',
+      );
+    }
+  });
+
+  it('rejects the reserved crag id', () => {
+    try {
+      parseCreateCrag({ id: 'crag-manage', name: 'Manage' });
+      throw new Error('expected parseCreateCrag to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(HttpError);
+      expect((error as HttpError).status).toBe(400);
+      expect((error as HttpError).message).toBe('id: id is reserved');
+    }
   });
 
   it('rejects opentopoTilePack on a crag patch', () => {

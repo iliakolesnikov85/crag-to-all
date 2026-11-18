@@ -30,21 +30,12 @@ $border-radius-xs: 4px;
 
 /* Crag Selector Styles */
 .crag-selector {
-  padding: 2rem;
-  max-width: 800px;
-  margin: 0 auto;
+  padding: 1.5rem 1.5rem 2rem;
 
   &-header {
     text-align: center;
     margin: 0 0 1.5rem;
-    padding: 1.75rem 1.75rem 2rem;
-    border-radius: $border-radius;
-    background: rgba(255, 255, 255, 0.42);
-    box-shadow:
-      0 1px 2px rgba(15, 23, 42, 0.05),
-      0 8px 28px rgba(15, 23, 42, 0.08);
-    backdrop-filter: saturate(150%) blur(16px);
-    -webkit-backdrop-filter: saturate(150%) blur(16px);
+    padding: 0.5rem 0 0.25rem;
 
     h1,
     &__title {
@@ -58,9 +49,6 @@ $border-radius-xs: 4px;
       margin: 0 0 0.75rem;
       color: #0f172a;
       letter-spacing: -0.02em;
-      text-shadow:
-        0 0 12px rgba(255, 255, 255, 0.75),
-        0 1px 2px rgba(255, 255, 255, 0.9);
     }
 
     &__flag {
@@ -79,9 +67,6 @@ $border-radius-xs: 4px;
       line-height: 1.6;
       color: $text-muted;
       font-weight: 500;
-      text-shadow:
-        0 0 10px rgba(255, 255, 255, 0.7),
-        0 1px 1px rgba(255, 255, 255, 0.85);
     }
 
     &__tagline {
@@ -99,8 +84,8 @@ $border-radius-xs: 4px;
   }
 
   .crag-card {
-    background: rgba(255, 255, 255, 0.42);
-    border: 1px solid rgba(255, 255, 255, 0.55);
+    background: #fff;
+    border: 1px solid $border-color;
     border-radius: $border-radius;
     transition: all $transition-duration ease;
     position: relative;
@@ -110,8 +95,6 @@ $border-radius-xs: 4px;
     box-shadow:
       0 1px 2px rgba(15, 23, 42, 0.05),
       0 8px 28px rgba(15, 23, 42, 0.08);
-    backdrop-filter: saturate(150%) blur(16px);
-    -webkit-backdrop-filter: saturate(150%) blur(16px);
 
     &__link {
       display: flex;
@@ -194,7 +177,10 @@ $border-radius-xs: 4px;
       line-height: 1.45;
       color: $text-dark;
       margin: 0;
-      flex: 1;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 4;
+      overflow: hidden;
     }
 
     .crag {

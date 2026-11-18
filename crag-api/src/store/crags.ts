@@ -20,6 +20,11 @@ import type {
 } from '../types';
 import { cragsCol, membersCol, now, sectorsCol } from './collections';
 
+interface SectorCount {
+  _id: string;
+  sectorCount: number;
+}
+
 function compareSectorsByOrder(a: SectorDocument, b: SectorDocument): number {
   if (a.order !== b.order) return a.order - b.order;
   return a.name.localeCompare(b.name, undefined, { numeric: true });
@@ -41,8 +46,16 @@ async function hasWriteMembership(db: Db, cragId: string, userId: string): Promi
 }
 
 export async function listCrags(db: Db) {
-  const docs = await cragsCol(db).find().sort({ name: 1 }).toArray();
-  return docs.map(toCrag);
+  const [docs, counts] = await Promise.all([
+    cragsCol(db).find().sort({ name: 1 }).toArray(),
+    sectorsCol(db)
+      .aggregate<SectorCount>([
+        { $group: { _id: '$cragId', sectorCount: { $sum: 1 } } },
+      ])
+      .toArray(),
+  ]);
+  const countById = new Map(counts.map((row) => [row._id, row.sectorCount]));
+  return docs.map((doc) => toCrag(doc, countById.get(doc._id) ?? 0));
 }
 
 /** Inserts an empty crag and no `crag_members` row. */

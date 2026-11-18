@@ -32,7 +32,7 @@ export const siteConfig = {
     "climbing in Georgia, Georgia bouldering, bouldering Georgia, bouldering in Georgia, climbing Georgia, Georgia climbing guide, sport climbing Georgia, Caucasus climbing, Tbilisi climbing, Georgia rock climbing, free climbing guidebook Georgia",
 
   // ---- Visible-page copy (no sport climbing yet; the site only has
-  // bouldering content live). Currently rendered by CragSelector. ----
+  // bouldering content live). Currently rendered by Homepage. ----
   visibleTagline: "Free bouldering guidebooks across Georgia",
   // Kept around for future visible use; not rendered today.
   intro:

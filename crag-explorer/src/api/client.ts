@@ -1,5 +1,15 @@
 import type { CragMemberRole } from '@crag-to-all/shared-crag';
-import type { Crag, CragData, CragMapMarker, DescriptionSection, Image, LatLng, Route, Sector } from '../types';
+import type {
+  Crag,
+  CragData,
+  CragMapMarker,
+  CragSource,
+  DescriptionSection,
+  Image,
+  LatLng,
+  Route,
+  Sector,
+} from '../types';
 import { getAccessToken } from './auth';
 
 const CRAGS_PATH = '/api/crags';
@@ -106,14 +116,23 @@ async function readSectorResponse(response: Response): Promise<Sector> {
 }
 
 export interface CragPatch {
+  name?: string;
   description?: DescriptionSection[];
   markers?: readonly CragMapMarker[];
 }
 
 export interface CragPatchResult {
+  name?: string;
   description?: DescriptionSection[];
   markers?: CragMapMarker[];
   version: number;
+}
+
+export interface CragCreateInput {
+  id: string;
+  name: string;
+  source: CragSource;
+  externalId?: string;
 }
 
 export interface SectorPatch {
@@ -200,6 +219,7 @@ export async function patchCrag(
     );
   }
   const body = (await response.json()) as {
+    cragName?: unknown;
     description?: unknown;
     markers?: unknown;
     version?: unknown;
@@ -208,6 +228,12 @@ export async function patchCrag(
     throw new Error('Crag save returned an unexpected response');
   }
   const saved: CragPatchResult = { version: body.version };
+  if (patch.name !== undefined) {
+    if (typeof body.cragName !== 'string') {
+      throw new Error('Crag save returned an unexpected response');
+    }
+    saved.name = body.cragName;
+  }
   if (patch.description !== undefined) {
     if (!Array.isArray(body.description)) {
       throw new Error('Crag save returned an unexpected response');
@@ -221,6 +247,28 @@ export async function patchCrag(
     saved.markers = body.markers;
   }
   return saved;
+}
+
+export async function createCrag(input: CragCreateInput): Promise<void> {
+  const response = await apiFetch(CRAGS_PATH, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, `Failed to create crag (${response.status})`),
+    );
+  }
+}
+
+export async function deleteCrag(cragId: string): Promise<void> {
+  const response = await apiFetch(cragDocumentPath(cragId), { method: 'DELETE' });
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, `Failed to delete crag (${response.status})`),
+    );
+  }
 }
 
 export async function patchSector(

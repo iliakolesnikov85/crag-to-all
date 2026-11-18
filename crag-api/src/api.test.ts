@@ -137,8 +137,16 @@ describe('crag-api', () => {
 
     const catalog = await request(app).get('/api/crags');
     expect(catalog.body).toEqual([
-      { id: 'roshka', cragName: 'Roshka', source: 'explorer' },
+      {
+        id: 'roshka',
+        cragName: 'Roshka',
+        source: 'explorer',
+        sectorCount: 0,
+        version: 1,
+        updatedAt: expect.any(String),
+      },
     ]);
+    expect(catalog.body[0].updatedAt).toBe(new Date(catalog.body[0].updatedAt).toISOString());
 
     const crag = await request(app).get('/api/crags/roshka');
     expect(crag.status).toBe(200);
@@ -149,6 +157,23 @@ describe('crag-api', () => {
     expect(crag.body.protocolVersion).toBe(CRAG_DATA_PROTOCOL);
     expect(crag.body.source).toBe('explorer');
     expect(crag.body.externalId).toBeUndefined();
+  });
+
+  it('counts sectors on the catalog and leaves an empty crag at zero', async () => {
+    await write().post('/api/crags').send({ name: 'Roshka', id: 'roshka' });
+    await write().post('/api/crags').send({ name: 'Shulaveri', id: 'shulaveri' });
+    const sector = await write().post('/api/crags/roshka/sectors').send({
+      name: 'Cave',
+      geo: { lat: 1, lon: 2 },
+    });
+    expect(sector.status).toBe(201);
+
+    const catalog = await request(app).get('/api/crags');
+    expect(catalog.status).toBe(200);
+    expect(catalog.body).toEqual([
+      expect.objectContaining({ id: 'roshka', sectorCount: 1, version: 1 }),
+      expect.objectContaining({ id: 'shulaveri', sectorCount: 0, version: 1 }),
+    ]);
   });
 
   it('rejects a duplicate crag id with 409', async () => {
@@ -245,6 +270,54 @@ describe('crag-api', () => {
     expect(patched.body.description).toEqual([
       { subheader: 'Access', paragraphs: ['Walk in.'] },
     ]);
+
+    const catalog = await request(app).get('/api/crags');
+    expect(catalog.body[0].cragName).toBe('Roshka Valley');
+    expect(catalog.body[0].description).toBe('Walk in.');
+  });
+
+  it('puts a plain-text description excerpt on the catalog', async () => {
+    await write().post('/api/crags').send({ name: 'Roshka', id: 'roshka' });
+    const patched = await write().patch('/api/crags/roshka').send({
+      version: 1,
+      description: [{
+        subheader: 'Access',
+        paragraphs: ['<p>Walk in from the <strong>parking</strong>.</p>', 'Second paragraph.'],
+      }],
+    });
+    expect(patched.status).toBe(200);
+
+    const catalog = await request(app).get('/api/crags');
+    expect(catalog.body[0].description).toBe('Walk in from the parking.');
+    expect(catalog.body[0].description).not.toContain('Second paragraph');
+  });
+
+  it('limits the catalog excerpt and keeps escaped comparisons', async () => {
+    await write().post('/api/crags').send({ name: 'Roshka', id: 'roshka' });
+    const prefix = 'Walk 5 &lt; 10 minutes &amp; up. ';
+    const plainPrefix = 'Walk 5 < 10 minutes & up. ';
+    const filler = 'granite '.repeat(80);
+    const plain = `${plainPrefix}${filler}`.trim();
+    expect(plain.length).toBeGreaterThan(400);
+
+    const patched = await write().patch('/api/crags/roshka').send({
+      version: 1,
+      description: [{
+        subheader: 'Access',
+        paragraphs: [
+          '<p><br></p>',
+          `<p>${prefix}${filler}</p>`,
+          'Second paragraph stays off the catalog.',
+        ],
+      }],
+    });
+    expect(patched.status).toBe(200);
+
+    const catalog = await request(app).get('/api/crags');
+    expect(catalog.body[0].description).toBe(plain.slice(0, 400));
+    expect(catalog.body[0].description).toHaveLength(400);
+    expect(catalog.body[0].description.startsWith(plainPrefix.trim())).toBe(true);
+    expect(catalog.body[0].description).not.toContain('Second paragraph');
   });
 
   it('adds, replaces, and deletes sectors without touching other documents', async () => {
@@ -891,7 +964,14 @@ describe('crag-api', () => {
 
     const catalog = await request(app).get('/api/crags');
     expect(catalog.body).toEqual([
-      { id: 'roshka', cragName: 'Roshka', source: 'external' },
+      {
+        id: 'roshka',
+        cragName: 'Roshka',
+        source: 'external',
+        sectorCount: 1,
+        version: 1,
+        updatedAt: expect.any(String),
+      },
     ]);
   });
 
@@ -1048,7 +1128,14 @@ describe('crag-api', () => {
 
     const catalog = await request(app).get('/api/crags');
     expect(catalog.body).toEqual([
-      { id: 'roshka', cragName: 'Roshka', source: 'explorer' },
+      {
+        id: 'roshka',
+        cragName: 'Roshka',
+        source: 'explorer',
+        sectorCount: 0,
+        version: 1,
+        updatedAt: expect.any(String),
+      },
     ]);
   });
 
