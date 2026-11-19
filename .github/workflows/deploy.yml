@@ -97,7 +97,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pre-prod
-      url: https://crag-to-all.web.app
+      url: https://crags-for-all.web.app
     concurrency:
       group: pre-prod-deploy
       cancel-in-progress: false

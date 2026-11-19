@@ -117,13 +117,11 @@ export function createApp(db: Db, options: AppOptions = {}): Express {
     }),
   );
 
-  app.post(
-    '/api/crags',
-    authenticate,
-    requireSuperadmin(),
+  app.get(
+    '/api/crags/:cragId',
     asyncHandler(async (req, res) => {
-      const created = await createCrag(db, parseCreateCrag(req.body));
-      res.status(201).location(`/api/crags/${created.id}`).json(created);
+      const cragId = parseCragId(req.params.cragId);
+      res.json(await getAssembledCrag(db, cragId));
     }),
   );
 
@@ -147,11 +145,13 @@ export function createApp(db: Db, options: AppOptions = {}): Express {
     }),
   );
 
-  app.get(
-    '/api/crags/:cragId',
+  app.post(
+    '/api/crags',
+    authenticate,
+    requireSuperadmin(),
     asyncHandler(async (req, res) => {
-      const cragId = parseCragId(req.params.cragId);
-      res.json(await getAssembledCrag(db, cragId));
+      const created = await createCrag(db, parseCreateCrag(req.body));
+      res.status(201).location(`/api/crags/${created.id}`).json(created);
     }),
   );
 

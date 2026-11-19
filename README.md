@@ -1,4 +1,4 @@
-# Crag-to-All
+# Crags-for-All
 
 A web application for browsing climbing crags. Open it in a browser, or install it on a phone like a native app (it is a [progressive web app](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps)).
 

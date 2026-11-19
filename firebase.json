@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "crag-to-all",
+    "site": "crags-for-all",
     "public": "crag-explorer/dist",
     "ignore": [
       "firebase.json",
