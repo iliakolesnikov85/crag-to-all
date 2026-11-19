@@ -75,7 +75,7 @@ jobs:
       group: pre-prod-deploy
       cancel-in-progress: false
     steps:
-      - name: Roll out crag-api on App Hosting
+      - name: Roll out crags-for-all on App Hosting
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
@@ -85,7 +85,7 @@ jobs:
           fi
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-deployer.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-deployer.json"
-          npx --yes firebase-tools@15.28.2 apphosting:rollouts:create crag-api \
+          npx --yes firebase-tools@15.28.2 apphosting:rollouts:create crags-for-all \
             --git-commit "${{ github.sha }}" \
             --project crag-to-all \
             --force \
