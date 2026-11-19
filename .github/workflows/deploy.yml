@@ -25,6 +25,10 @@ jobs:
       - name: Build shared-crag package
         run: npm run build-shared-crag
 
+      - name: Build shared-firebase package
+        # dist/ is gitignored; main resolves to dist, so CI must compile first.
+        run: npm run build-shared-firebase
+
       - name: Cache MongoDB binaries
         uses: actions/cache@v4
         with:

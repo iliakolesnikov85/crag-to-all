@@ -10,7 +10,7 @@ import { SAMPLE_CRAG_ID, sampleCragData } from '../../test/fixtures/cragData';
 import type { Sector } from '../../types';
 import useDetailsEditors from './useDetailsEditors';
 
-vi.mock('../api/client', () => ({
+vi.mock('../../api/client', () => ({
   patchSector: vi.fn(),
 }));
 
