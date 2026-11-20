@@ -20,7 +20,7 @@ The rest of this document describes **v2**. Crag documents come from crag-api. I
 
 | Path                                             | Role                                             |
 | ------------------------------------------------ | ------------------------------------------------ |
-| [`crag-explorer/`](crag-explorer/)                           | Vite + React explorer (Netlify) |
+| [`crag-explorer/`](crag-explorer/)                           | Vite + React explorer (Firebase Hosting) |
 | [`crag-api/`](crag-api/)                                     | Local Express API (port 3010) + MongoDB documents |
 | [`packages/shared-crag/`](packages/shared-crag/)             | Shared TypeScript types, geo, Bézier, and GPX helpers |
 | [`packages/shared-firebase/`](packages/shared-firebase/)     | Firebase Admin SDK, Storage and Auth emulators, and the MongoDB client |
@@ -71,7 +71,7 @@ See [`crag-api/README.md`](crag-api/README.md) and [`crag-explorer/README.md`](c
 npm run build
 ```
 
-CI (`.github/workflows/deploy.yml`) tests `crag-api`, builds `shared-crag`, then deploys `crag-explorer` to Netlify.
+CI (`.github/workflows/deploy.yml`) tests `crag-api`, builds `shared-crag`, then deploys `crag-explorer` to Firebase Hosting.
 
 ## License
 

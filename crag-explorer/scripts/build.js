@@ -1,5 +1,4 @@
 import { execSync } from 'child_process';
-import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -39,14 +38,7 @@ async function main() {
     execSync('npx vite build', { stdio: 'inherit' });
     log('✅ Vite build complete', 'green');
     
-    // Step 3: Copy netlify.toml
-    log('📋 Copying netlify.toml...', 'blue');
-    const netlifySource = path.join(__dirname, '../netlify.toml');
-    const netlifyDest = path.join(__dirname, '../dist/netlify.toml');
-    fs.copyFileSync(netlifySource, netlifyDest);
-    log('✅ netlify.toml copied', 'green');
-    
-    // Step 4: Generate sitemap
+    // Step 3: Generate sitemap
     log('🗺️  Generating sitemap...', 'blue');
     const { main: sitemapMain } = await import('./sitemap-generator.js');
     const sitemapResult = sitemapMain();

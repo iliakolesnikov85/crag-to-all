@@ -271,7 +271,8 @@ function patchIndexHtml(summaries) {
     `<meta name="description" content="${meta.description}">`,
     `<meta name="keywords" content="${meta.keywords}">`,
     `<meta name="author" content="Crag Explorer">`,
-    `<meta name="robots" content="index, follow">`,
+    // Keep noindex until the site is public. Then switch this to "index, follow".
+    `<meta name="robots" content="noindex, nofollow">`,
     `<meta name="language" content="English">`,
     `<meta name="revisit-after" content="7 days">`,
 
