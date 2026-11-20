@@ -585,8 +585,8 @@ describe('SectorPage routes', () => {
         ],
       });
     });
-    const saved = vi.mocked(patchSector).mock.calls[0]?.[3].routes[0];
-    expect(saved.type).toBeUndefined();
+    const saved = vi.mocked(patchSector).mock.calls[0]?.[3]?.routes?.[0];
+    expect(saved?.type).toBeUndefined();
   });
 
   it('edits a route and keeps its images, videos, and id', async () => {

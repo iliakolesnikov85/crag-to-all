@@ -31,6 +31,10 @@ type RouteDrawState = {
   imageFile: string;
 };
 
+function rememberVersion(setVersion: (version: number) => void, saved: Sector) {
+  if (typeof saved.version === 'number') setVersion(saved.version);
+}
+
 function indexOfDrawnRoute(routes: readonly Route[], draw: RouteDrawState): number {
   const current = routes[draw.index];
   if (current?.id === draw.route.id) return draw.index;
@@ -70,7 +74,7 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
       }
     },
     onRouteSaved: (saved, route, mode) => {
-      if (routesSectorId === saved.id) setRoutesVersion(saved.version);
+      if (routesSectorId === saved.id) rememberVersion(setRoutesVersion, saved);
       if (mode !== 'add' || !drawImageFile) return;
       const index = saved.routes.findIndex((item) => item.id === route.id);
       const savedRoute = index >= 0 ? saved.routes[index] : undefined;
@@ -229,7 +233,7 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
         version: routesVersion,
         patch: { routes },
       });
-      setRoutesVersion(saved.version);
+      rememberVersion(setRoutesVersion, saved);
       if (target === 'line') setRouteDraw(null);
       return saved;
     } catch (error) {
@@ -249,7 +253,7 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
       onError: setRouteListError,
     });
     if (!saved) return;
-    setRoutesVersion(saved.version);
+    rememberVersion(setRoutesVersion, saved);
   };
 
   const handleRemoveFromImage = async (index: number) => {
@@ -292,7 +296,7 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
   };
 
   const rememberSavedSector = (targetId: string, saved: Sector) => {
-    if (routesSectorId === targetId) setRoutesVersion(saved.version);
+    if (routesSectorId === targetId) rememberVersion(setRoutesVersion, saved);
     editors.noteSaved(saved);
   };
 

@@ -151,22 +151,20 @@ function useDetailsEditors({
   };
 
   const noteSaved = (saved: Sector) => {
-    if (saved.id == null || typeof saved.version !== 'number') return;
+    const { id, version } = saved;
+    if (id == null || typeof version !== 'number') return;
     setRouteEdit((current) => {
-      if (!current || current.sectorId !== saved.id) return current;
-      if (current.mode === 'add') return { ...current, version: saved.version };
+      if (!current || current.sectorId !== id) return current;
+      if (current.mode === 'add') return { ...current, version };
       const atIndex = saved.routes[current.index];
       if (atIndex?.id === current.route.id) {
-        return { ...current, version: saved.version, route: atIndex };
+        return { ...current, version, route: atIndex };
       }
       const found = saved.routes.findIndex((route) => route.id === current.route.id);
-      if (found < 0) return { ...current, version: saved.version };
-      return {
-        ...current,
-        version: saved.version,
-        index: found,
-        route: saved.routes[found],
-      };
+      if (found < 0) return { ...current, version };
+      const route = saved.routes[found];
+      if (!route) return { ...current, version };
+      return { ...current, version, index: found, route };
     });
   };
 

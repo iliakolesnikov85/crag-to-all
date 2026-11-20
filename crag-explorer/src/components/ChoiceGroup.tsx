@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import { useId } from 'react';
 import './ChoiceGroup.scss';
 
 interface ChoiceOption<T extends string | number> {
