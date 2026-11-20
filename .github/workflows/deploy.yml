@@ -122,10 +122,18 @@ jobs:
         working-directory: crag-explorer
         env:
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_STORAGE_BUCKET_v2: crag-to-all
         run: |
           if [ -z "$VITE_API_BASE_URL" ]; then
             echo "Set the pre-prod variable VITE_API_BASE_URL to the App Hosting URL."
+            exit 1
+          fi
+          if [ -z "$VITE_FIREBASE_API_KEY" ] || [ -z "$VITE_FIREBASE_AUTH_DOMAIN" ] || [ -z "$VITE_FIREBASE_PROJECT_ID" ] || [ -z "$VITE_FIREBASE_APP_ID" ]; then
+            echo "Set the pre-prod variables VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, and VITE_FIREBASE_APP_ID from the Firebase web app config."
             exit 1
           fi
           npm run build

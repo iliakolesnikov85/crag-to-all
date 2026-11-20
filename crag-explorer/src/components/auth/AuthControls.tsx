@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAuthEmulator } from '../../auth/config';
+import { isAuthEnabled } from '../../auth/config';
 import { signOutCurrentUser } from '../../auth/firebaseAuth';
 import { useAuthSession } from '../../auth/useAuthSession';
 import Button from '../Button';
@@ -12,7 +12,11 @@ function AuthControls() {
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
 
-  if (!useAuthEmulator()) return null;
+  // Sign-in hides this dialog without clearing `open`. Clear it while signed in
+  // so Sign out does not show the dialog again.
+  if (account && open) setOpen(false);
+
+  if (!isAuthEnabled()) return null;
 
   const signOut = async () => {
     if (signingOut) return;

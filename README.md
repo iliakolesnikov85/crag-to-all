@@ -63,7 +63,7 @@ cd crag-explorer
 npm run dev-local
 ```
 
-See [`crag-api/README.md`](crag-api/README.md) and [`crag-explorer/README.md`](crag-explorer/README.md). `dev-local` signs in against the Auth emulator. Writes send that Firebase ID token as a bearer token. Reads stay anonymous. The explorer still shows edit controls for every signed-in user. The API allows an explorer-crag change when the ID token custom claim `superadmin` is boolean `true`, or when that user is an owner or admin. Extracted crags stay read-only. Production Authentication stays off. Phone auth stays off, and the project must not be upgraded to Identity Platform. Set `VITE_API_BASE_URL` (no trailing slash) on production builds once the API is public. Image upload uses the Storage emulator via Admin SDK.
+See [`crag-api/README.md`](crag-api/README.md) and [`crag-explorer/README.md`](crag-explorer/README.md). `dev-local` signs in against the Auth emulator. Writes send that Firebase ID token as a bearer token. Reads stay anonymous. The explorer still shows edit controls for every signed-in user. The API allows an explorer-crag change when the ID token custom claim `superadmin` is boolean `true`, or when that user is an owner or admin. Extracted crags stay read-only. A production explorer build signs in against Firebase Authentication when the web config is set. Phone auth stays off, and the project must not be upgraded to Identity Platform. Set `VITE_API_BASE_URL` (no trailing slash) on production builds once the API is public. Image upload uses the Storage emulator via Admin SDK.
 
 ## Build
 

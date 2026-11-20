@@ -8,7 +8,7 @@ Explorer proxies `/api` to `http://localhost:3010`.
 
 ## Local sign-in
 
-Identity for this slice is the Auth emulator on project `crag-to-all`, port **9099**. Start it with the Storage emulator from the repo root (`npm run emulator:start`, Java 21+). The UI is http://localhost:4000. The emulator does not send real mail. Password-reset messages show up there. Google sign-in in that UI is a fake account form.
+Identity for this slice is the Auth emulator on project `crag-to-all`, port **9099**. Start it with the Storage emulator from the repo root (`npm run emulator:start`, Java 21+). The UI is http://localhost:4000. The emulator does not send real mail. Password-reset messages show up there. Google and Facebook sign-in in that UI are fake account forms.
 
 `FIREBASE_USE_EMULATOR` defaults to `true`. The API then sets `FIREBASE_AUTH_EMULATOR_HOST` to `127.0.0.1:9099` before `initializeFirebase`, so `verifyIdToken` accepts emulator tokens without a service account.
 

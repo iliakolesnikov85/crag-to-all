@@ -14,7 +14,7 @@ This will install Firebase and Firebase Admin SDK dependencies.
 
 ### 2. Firebase Emulator (Local Development)
 
-For local development, one emulator process serves Storage and Authentication. That avoids costs and works offline. Production Authentication is not turned on.
+For local development, one emulator process serves Storage and Authentication. That avoids costs and works offline. The hosted explorer uses production Authentication for project `crag-to-all`.
 
 The emulators require **Java 21+** on PATH (`java -version`). Eclipse Temurin 21 works. Storage is the piece that needs Java.
 
@@ -31,7 +31,7 @@ npm run emulator:start
 
 Storage files and Auth accounts are copied into `emulator-data` a few seconds after they change. Ctrl-C does not have to finish for that copy to stick. The next start imports `emulator-data` again. `emulator-data` is gitignored, so accounts created here stay on this machine.
 
-The Auth emulator does not send real email. Password-reset messages show up in the emulator UI. Google sign-in in that UI is a fake account form, not a Google account. Phone authentication stays off.
+The Auth emulator does not send real email. Password-reset messages show up in the emulator UI. Google and Facebook sign-in in that UI are fake account forms, not real accounts. Phone authentication stays off.
 
 ### 3. Running the Scraper with Emulator
 
@@ -79,9 +79,9 @@ Behavior:
 
 ## Authentication
 
-Local sign-in uses the Auth emulator on `127.0.0.1:9099` for project `crag-to-all`. The methods are email/password and the emulator's fake Google provider. Production Authentication stays off for this slice: do not enable it in the Firebase console. Phone authentication stays off. Do not upgrade the project to Firebase Authentication with Identity Platform.
+Local sign-in uses the Auth emulator on `127.0.0.1:9099` for project `crag-to-all`. The methods are email/password and the emulator's fake Google and Facebook providers. Phone authentication stays off. Do not upgrade the project to Firebase Authentication with Identity Platform.
 
-`crag-explorer` signs in on `npm run dev-local` (`VITE_DEV_LOCAL=true`), which connects the client to `http://127.0.0.1:9099`. `npm run dev` and production builds do not initialize Firebase Auth and do not show sign-in. This slice has no production web config. On `dev-local`, the header **Sign in** dialog creates an account, signs in, starts Google sign-in, or requests a password reset. Reset messages appear in the emulator UI. See [`crag-explorer/README.md`](../../crag-explorer/README.md).
+`crag-explorer` signs in on `npm run dev-local` (`VITE_DEV_LOCAL=true`), which connects the client to `http://127.0.0.1:9099`. `npm run dev` leaves the production web config unset, so it does not initialize Firebase Auth and does not show sign-in. A production build uses `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, and `VITE_FIREBASE_APP_ID`, and the hosted site shows **Sign in**. Turn on Email/Password, Google, and Facebook in the Firebase console, and add `crags-for-all.web.app` and `crags-for-all.firebaseapp.com` as authorized domains. Facebook also needs the Meta app's App ID and App Secret on that provider. On `dev-local`, the header **Sign in** dialog creates an account, signs in with Google or Facebook, or requests a password reset. Reset messages appear in the emulator UI. On the hosted site, password reset sends a real email. See [`crag-explorer/README.md`](../../crag-explorer/README.md).
 
 `crag-api` writes require that user's ID token (`Authorization: Bearer`). Reads stay anonymous. With `FIREBASE_USE_EMULATOR` (the API default), `initializeFirebase` points Admin Auth at `FIREBASE_AUTH_EMULATOR_HOST` (default `127.0.0.1:9099`). `verifyFirebaseIdToken` then accepts emulator tokens without a service account. See [`crag-api/README.md`](../../crag-api/README.md).
 

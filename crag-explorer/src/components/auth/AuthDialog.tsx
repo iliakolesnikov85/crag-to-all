@@ -1,8 +1,12 @@
-import { useId, useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type FormEvent } from 'react';
+import { FaFacebook } from 'react-icons/fa';
+import { FcGoogle } from 'react-icons/fc';
+import { MdLockReset, MdLogin, MdPersonAdd } from 'react-icons/md';
 import {
   createAccount,
   sendPasswordReset,
   signInWithEmail,
+  signInWithFacebook,
   signInWithGoogle,
 } from '../../auth/firebaseAuth';
 import Button from '../Button';
@@ -10,6 +14,9 @@ import Modal from '../Modal';
 import './AuthDialog.scss';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const POPUP_WATCH_MS = 250;
+/** Facebook app setup is not ready. Turn this on after production launch. */
+const SHOW_FACEBOOK_SIGN_IN = false;
 
 type AuthMode = 'sign-in' | 'create' | 'reset';
 
@@ -26,6 +33,52 @@ function firebaseErrorCode(error: unknown): string {
 function isDismissedSignIn(error: unknown): boolean {
   const code = firebaseErrorCode(error);
   return code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request';
+}
+
+/** `null` means the browser refused to say whether the window is closed. */
+function isPopupClosed(popup: Window): boolean | null {
+  try {
+    return popup.closed;
+  } catch (error) {
+    console.warn('Could not read the sign-in window:', error);
+    return null;
+  }
+}
+
+/** Firebase keeps the sign-in promise pending for seconds after the window closes. */
+function watchSignInPopup(onClose: () => void): () => void {
+  let popup: Window | null = null;
+  let stopped = false;
+  let watch = 0;
+  const openWindow = window.open.bind(window);
+  const watchOpen: typeof window.open = (...args) => {
+    const next = openWindow(...args);
+    popup = next;
+    window.open = openWindow;
+    return next;
+  };
+  window.open = watchOpen;
+
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    window.clearInterval(watch);
+    if (window.open === watchOpen) window.open = openWindow;
+  };
+
+  watch = window.setInterval(() => {
+    if (!popup) return;
+    const closed = isPopupClosed(popup);
+    if (closed === null) {
+      stop();
+      return;
+    }
+    if (!closed) return;
+    stop();
+    onClose();
+  }, POPUP_WATCH_MS);
+
+  return stop;
 }
 
 /** Firebase wraps the server sentence as `Firebase: … (auth/code).`. */
@@ -46,11 +99,8 @@ function isUnknownResetAccount(code: string): boolean {
     || code === 'auth/wrong-password';
 }
 
-function authFailureMessage(error: unknown, mode: AuthMode, fallback: string): string {
+function authFailureMessage(error: unknown, fallback: string): string {
   const code = firebaseErrorCode(error);
-  if (mode === 'reset' && isUnknownResetAccount(code)) {
-    return 'No account uses that email.';
-  }
   switch (code) {
     case 'auth/invalid-email':
       return 'Enter a valid email address.';
@@ -60,13 +110,15 @@ function authFailureMessage(error: unknown, mode: AuthMode, fallback: string): s
       return firebasePasswordMessage(error) ?? 'That password was rejected. Try another one.';
     case 'auth/email-already-in-use':
       return 'An account with that email already exists. Sign in instead.';
+    case 'auth/account-exists-with-different-credential':
+      return 'An account already uses that email with a different sign-in method.';
     case 'auth/invalid-credential':
     case 'auth/invalid-login-credentials':
     case 'auth/user-not-found':
     case 'auth/wrong-password':
       return 'That email and password do not match.';
     case 'auth/popup-blocked':
-      return 'The browser blocked the Google sign-in window. Allow popups and try again.';
+      return 'The browser blocked the sign-in window. Allow popups and try again.';
     case 'auth/network-request-failed':
       return 'A network error occurred. Check your connection and try again.';
     case 'auth/operation-not-allowed':
@@ -89,6 +141,7 @@ function AuthDialog({ onClose }: AuthDialogProps) {
   const [error, setError] = useState<string | null>(null);
   const [resetSent, setResetSent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const actionId = useRef(0);
 
   const title = mode === 'create' ? 'Create account' : mode === 'reset' ? 'Reset password' : 'Sign in';
   const submitLabel = busy
@@ -106,6 +159,8 @@ function AuthDialog({ onClose }: AuthDialogProps) {
 
   const choose = (next: AuthMode) => {
     if (busy) return;
+    // A popup sign-in can still be finishing. Leave its result off this form.
+    actionId.current += 1;
     setMode(next);
     setError(null);
     setResetSent(false);
@@ -117,7 +172,7 @@ function AuthDialog({ onClose }: AuthDialogProps) {
       return;
     }
     console.error(`${action} failed:`, errorValue);
-    setError(authFailureMessage(errorValue, mode, fallback));
+    setError(authFailureMessage(errorValue, fallback));
   };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -135,6 +190,7 @@ function AuthDialog({ onClose }: AuthDialogProps) {
       return;
     }
 
+    const action = ++actionId.current;
     setBusy(true);
     try {
       if (mode === 'reset') {
@@ -148,7 +204,15 @@ function AuthDialog({ onClose }: AuthDialogProps) {
       }
       await signInWithEmail(trimmedEmail, password);
     } catch (errorValue) {
-      const action = mode === 'reset'
+      if (mode === 'reset' && isUnknownResetAccount(firebaseErrorCode(errorValue))) {
+        console.warn(
+          'Password reset found no account. The form still asks the user to check email:',
+          errorValue,
+        );
+        setResetSent(true);
+        return;
+      }
+      const actionName = mode === 'reset'
         ? 'Password reset'
         : mode === 'create'
           ? 'Create account'
@@ -158,23 +222,43 @@ function AuthDialog({ onClose }: AuthDialogProps) {
         : mode === 'create'
           ? 'Could not create the account. Try again.'
           : 'Could not sign in. Try again.';
-      fail(errorValue, action, fallback);
+      fail(errorValue, actionName, fallback);
     } finally {
-      setBusy(false);
+      if (actionId.current === action) setBusy(false);
     }
   };
 
-  const google = async () => {
+  const startPopupSignIn = async (
+    signIn: () => Promise<void>,
+    actionName: string,
+    fallback: string,
+  ) => {
     if (busy) return;
+    const action = ++actionId.current;
     setError(null);
     setResetSent(false);
     setBusy(true);
-    try {
-      await signInWithGoogle();
-    } catch (errorValue) {
-      fail(errorValue, 'Google sign-in', 'Google sign-in failed. Try again.');
-    } finally {
+    // Closing the window only releases the buttons. This attempt stays current
+    // until the user starts another one, so a later failure can still be shown.
+    const stopWatch = watchSignInPopup(() => {
+      if (actionId.current !== action) return;
       setBusy(false);
+    });
+    try {
+      await signIn();
+    } catch (errorValue) {
+      if (actionId.current !== action) {
+        if (isDismissedSignIn(errorValue)) {
+          console.warn(`${actionName} was closed before it finished:`, errorValue);
+        } else {
+          console.error(`${actionName} failed after the form moved on:`, errorValue);
+        }
+        return;
+      }
+      fail(errorValue, actionName, fallback);
+    } finally {
+      stopWatch();
+      if (actionId.current === action) setBusy(false);
     }
   };
 
@@ -258,12 +342,44 @@ function AuthDialog({ onClose }: AuthDialogProps) {
           </label>
         ) : null}
         <Button type="submit" fullWidth disabled={busy}>
+          {mode === 'sign-in' ? <MdLogin className="auth-form__icon" aria-hidden="true" /> : null}
+          {mode === 'create' ? <MdPersonAdd className="auth-form__icon" aria-hidden="true" /> : null}
+          {mode === 'reset' ? <MdLockReset className="auth-form__icon" aria-hidden="true" /> : null}
           {submitLabel}
         </Button>
         {mode === 'reset' ? null : (
-          <Button type="button" variant="secondary" fullWidth disabled={busy} onClick={() => void google()}>
-            Continue with Google
-          </Button>
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              fullWidth
+              disabled={busy}
+              onClick={() => void startPopupSignIn(
+                signInWithGoogle,
+                'Google sign-in',
+                'Google sign-in failed. Try again.',
+              )}
+            >
+              <FcGoogle className="auth-form__icon" aria-hidden="true" />
+              Continue with Google
+            </Button>
+            {SHOW_FACEBOOK_SIGN_IN ? (
+              <Button
+                type="button"
+                variant="secondary"
+                fullWidth
+                disabled={busy}
+                onClick={() => void startPopupSignIn(
+                  signInWithFacebook,
+                  'Facebook sign-in',
+                  'Facebook sign-in failed. Try again.',
+                )}
+              >
+                <FaFacebook className="auth-form__icon auth-form__icon--facebook" aria-hidden="true" />
+                Continue with Facebook
+              </Button>
+            ) : null}
+          </>
         )}
         <div className="auth-form__switch">
           {mode === 'sign-in' ? null : (

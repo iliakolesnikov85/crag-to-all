@@ -5,12 +5,22 @@ import {
   readIdToken,
   sendPasswordReset,
   signInWithEmail,
+  signInWithFacebook,
   signInWithGoogle,
   signOutCurrentUser,
   startAuthListener,
 } from './firebaseAuth';
 
 const firebaseMocks = vi.hoisted(() => {
+  class FacebookAuthProvider {
+    readonly scopes: string[] = [];
+
+    addScope(scope: string): this {
+      this.scopes.push(scope);
+      return this;
+    }
+  }
+
   class GoogleAuthProvider {}
 
   const authInstance: {
@@ -18,6 +28,7 @@ const firebaseMocks = vi.hoisted(() => {
   } = { currentUser: null };
 
   return {
+    FacebookAuthProvider,
     GoogleAuthProvider,
     authInstance,
     initializeApp: vi.fn(() => ({ name: '[DEFAULT]' })),
@@ -37,6 +48,17 @@ const firebaseMocks = vi.hoisted(() => {
       _error?: (failure: unknown) => void,
     ) => () => undefined),
     useAuthEmulator: vi.fn(() => true),
+    isAuthEnabled: vi.fn(() => true),
+    firebaseWebConfig: vi.fn((): {
+      apiKey: string;
+      authDomain: string;
+      projectId: string;
+      appId?: string;
+    } | null => ({
+      apiKey: 'demo-api-key',
+      authDomain: 'crag-to-all.firebaseapp.com',
+      projectId: 'crag-to-all',
+    })),
   };
 });
 
@@ -47,6 +69,7 @@ vi.mock('firebase/app', () => ({
 }));
 
 vi.mock('firebase/auth', () => ({
+  FacebookAuthProvider: firebaseMocks.FacebookAuthProvider,
   GoogleAuthProvider: firebaseMocks.GoogleAuthProvider,
   connectAuthEmulator: firebaseMocks.connectAuthEmulator,
   createUserWithEmailAndPassword: firebaseMocks.createUserWithEmailAndPassword,
@@ -59,26 +82,32 @@ vi.mock('firebase/auth', () => ({
   updateProfile: firebaseMocks.updateProfile,
 }));
 
+const DEMO_WEB_CONFIG = {
+  apiKey: 'demo-api-key',
+  authDomain: 'crag-to-all.firebaseapp.com',
+  projectId: 'crag-to-all',
+};
+
 vi.mock('./config', () => ({
   AUTH_EMULATOR_URL: 'http://127.0.0.1:9099',
   useAuthEmulator: firebaseMocks.useAuthEmulator,
+  isAuthEnabled: firebaseMocks.isAuthEnabled,
+  firebaseWebConfig: firebaseMocks.firebaseWebConfig,
 }));
 
 describe('firebaseAuth', () => {
   it('connects the Auth emulator once and signs in against it', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     firebaseMocks.useAuthEmulator.mockReturnValue(true);
+    firebaseMocks.isAuthEnabled.mockReturnValue(true);
+    firebaseMocks.firebaseWebConfig.mockReturnValue(DEMO_WEB_CONFIG);
 
     try {
       await expect(readIdToken()).resolves.toBeNull();
       await signInWithEmail('ada@example.com', 'secret1');
 
       expect(firebaseMocks.initializeApp).toHaveBeenCalledTimes(1);
-      expect(firebaseMocks.initializeApp).toHaveBeenCalledWith({
-        apiKey: 'demo-api-key',
-        authDomain: 'crag-to-all.firebaseapp.com',
-        projectId: 'crag-to-all',
-      });
+      expect(firebaseMocks.initializeApp).toHaveBeenCalledWith(DEMO_WEB_CONFIG);
       expect(firebaseMocks.connectAuthEmulator).toHaveBeenCalledTimes(1);
       expect(firebaseMocks.connectAuthEmulator).toHaveBeenCalledWith(
         firebaseMocks.authInstance,
@@ -104,9 +133,15 @@ describe('firebaseAuth', () => {
       );
 
       await signInWithGoogle();
-      const popupCall = firebaseMocks.signInWithPopup.mock.calls[0];
-      expect(popupCall?.[0]).toBe(firebaseMocks.authInstance);
-      expect(popupCall?.[1]).toBeInstanceOf(firebaseMocks.GoogleAuthProvider);
+      const googleCall = firebaseMocks.signInWithPopup.mock.calls[0];
+      expect(googleCall?.[0]).toBe(firebaseMocks.authInstance);
+      expect(googleCall?.[1]).toBeInstanceOf(firebaseMocks.GoogleAuthProvider);
+
+      await signInWithFacebook();
+      const facebookCall = firebaseMocks.signInWithPopup.mock.calls[1];
+      expect(facebookCall?.[0]).toBe(firebaseMocks.authInstance);
+      expect(facebookCall?.[1]).toBeInstanceOf(firebaseMocks.FacebookAuthProvider);
+      expect((facebookCall?.[1] as { scopes: string[] }).scopes).toEqual(['email']);
 
       await sendPasswordReset('ada@example.com');
       expect(firebaseMocks.sendPasswordResetEmail).toHaveBeenCalledWith(
@@ -191,14 +226,52 @@ describe('firebaseAuth', () => {
     } finally {
       firebaseMocks.authInstance.currentUser = null;
       firebaseMocks.useAuthEmulator.mockReturnValue(true);
+      firebaseMocks.isAuthEnabled.mockReturnValue(true);
+      firebaseMocks.firebaseWebConfig.mockReturnValue(DEMO_WEB_CONFIG);
       setAuthAccount(null);
       error.mockRestore();
     }
   });
 
-  it('does not contact Firebase Auth when the local emulator is off', async () => {
+  it('signs in against the production web config without the Auth emulator', async () => {
+    vi.resetModules();
+    const productionConfig = {
+      apiKey: 'real-api-key',
+      authDomain: 'crag-to-all.firebaseapp.com',
+      projectId: 'crag-to-all',
+      appId: '1:123:web:abc',
+    };
+    firebaseMocks.useAuthEmulator.mockReturnValue(false);
+    firebaseMocks.isAuthEnabled.mockReturnValue(true);
+    firebaseMocks.firebaseWebConfig.mockReturnValue(productionConfig);
+    firebaseMocks.connectAuthEmulator.mockClear();
+    firebaseMocks.initializeApp.mockClear();
+    firebaseMocks.getAuth.mockClear();
+    firebaseMocks.signInWithEmailAndPassword.mockClear();
+
+    const auth = await import('./firebaseAuth');
+    try {
+      await auth.signInWithEmail('ada@example.com', 'secret1');
+      expect(firebaseMocks.initializeApp).toHaveBeenCalledTimes(1);
+      expect(firebaseMocks.initializeApp).toHaveBeenCalledWith(productionConfig);
+      expect(firebaseMocks.connectAuthEmulator).not.toHaveBeenCalled();
+      expect(firebaseMocks.signInWithEmailAndPassword).toHaveBeenCalledWith(
+        firebaseMocks.authInstance,
+        'ada@example.com',
+        'secret1',
+      );
+    } finally {
+      firebaseMocks.useAuthEmulator.mockReturnValue(true);
+      firebaseMocks.isAuthEnabled.mockReturnValue(true);
+      firebaseMocks.firebaseWebConfig.mockReturnValue(DEMO_WEB_CONFIG);
+    }
+  });
+
+  it('does not contact Firebase Auth when sign-in is not configured', async () => {
     vi.resetModules();
     firebaseMocks.useAuthEmulator.mockReturnValue(false);
+    firebaseMocks.isAuthEnabled.mockReturnValue(false);
+    firebaseMocks.firebaseWebConfig.mockReturnValue(null);
     firebaseMocks.connectAuthEmulator.mockClear();
     firebaseMocks.initializeApp.mockClear();
     firebaseMocks.getAuth.mockClear();
@@ -213,14 +286,15 @@ describe('firebaseAuth', () => {
     const auth = await import('./firebaseAuth');
     try {
       await expect(auth.signInWithEmail('ada@example.com', 'secret1')).rejects.toThrow(
-        /local Auth emulator/,
+        /not configured/,
       );
       await expect(auth.createAccount('ada@example.com', 'secret1')).rejects.toThrow(
-        /local Auth emulator/,
+        /not configured/,
       );
-      await expect(auth.signInWithGoogle()).rejects.toThrow(/local Auth emulator/);
-      await expect(auth.sendPasswordReset('ada@example.com')).rejects.toThrow(/local Auth emulator/);
-      await expect(auth.signOutCurrentUser()).rejects.toThrow(/local Auth emulator/);
+      await expect(auth.signInWithGoogle()).rejects.toThrow(/not configured/);
+      await expect(auth.signInWithFacebook()).rejects.toThrow(/not configured/);
+      await expect(auth.sendPasswordReset('ada@example.com')).rejects.toThrow(/not configured/);
+      await expect(auth.signOutCurrentUser()).rejects.toThrow(/not configured/);
       await expect(auth.readIdToken()).resolves.toBeNull();
       auth.startAuthListener()();
 
@@ -236,6 +310,8 @@ describe('firebaseAuth', () => {
       expect(firebaseMocks.onAuthStateChanged).not.toHaveBeenCalled();
     } finally {
       firebaseMocks.useAuthEmulator.mockReturnValue(true);
+      firebaseMocks.isAuthEnabled.mockReturnValue(true);
+      firebaseMocks.firebaseWebConfig.mockReturnValue(DEMO_WEB_CONFIG);
     }
   });
 });

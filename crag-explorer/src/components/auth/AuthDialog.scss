@@ -54,3 +54,13 @@
   flex-wrap: wrap;
   gap: 0.5rem;
 }
+
+.auth-form__icon {
+  flex-shrink: 0;
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.auth-form__icon--facebook {
+  color: #1877f2;
+}

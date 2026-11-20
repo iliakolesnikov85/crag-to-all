@@ -1,5 +1,6 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from 'firebase/app';
 import {
+  FacebookAuthProvider,
   GoogleAuthProvider,
   connectAuthEmulator,
   createUserWithEmailAndPassword,
@@ -13,17 +14,11 @@ import {
   type Auth,
   type User,
 } from 'firebase/auth';
-import { AUTH_EMULATOR_URL, useAuthEmulator } from './config';
+import { AUTH_EMULATOR_URL, firebaseWebConfig, isAuthEnabled, useAuthEmulator } from './config';
 import { readMemberships } from './memberships';
 import { setAuthAccount, type AuthAccount } from './session';
 
-const FIREBASE_CONFIG = {
-  apiKey: 'demo-api-key',
-  authDomain: 'crag-to-all.firebaseapp.com',
-  projectId: 'crag-to-all',
-};
-
-const AUTH_EMULATOR_ONLY = 'Sign-in is only available when the local Auth emulator is enabled.';
+const AUTH_NOT_CONFIGURED = 'Sign-in is not configured.';
 
 let firebaseApp: FirebaseApp | null = null;
 let auth: Auth | null = null;
@@ -36,35 +31,37 @@ function emulatorAlreadyConnected(error: unknown): boolean {
     && (error as { code: unknown }).code === 'auth/emulator-config-failed';
 }
 
-function assertAuthEmulator(): void {
-  if (!useAuthEmulator()) {
-    throw new Error(AUTH_EMULATOR_ONLY);
-  }
-}
-
 function firebaseApplication(): FirebaseApp {
   if (firebaseApp) return firebaseApp;
   if (getApps().length > 0) {
     firebaseApp = getApp();
     return firebaseApp;
   }
-  firebaseApp = initializeApp(FIREBASE_CONFIG);
+  const config = firebaseWebConfig();
+  if (!config) {
+    throw new Error(AUTH_NOT_CONFIGURED);
+  }
+  firebaseApp = initializeApp(config);
   return firebaseApp;
 }
 
 function getFirebaseAuth(): Auth {
-  assertAuthEmulator();
+  if (!isAuthEnabled()) {
+    throw new Error(AUTH_NOT_CONFIGURED);
+  }
   if (auth) return auth;
   const next = getAuth(firebaseApplication());
-  try {
-    connectAuthEmulator(next, AUTH_EMULATOR_URL, { disableWarnings: true });
-  } catch (error) {
-    if (!emulatorAlreadyConnected(error)) {
-      console.error('Failed to connect sign-in:', error);
-      throw error;
+  if (useAuthEmulator()) {
+    try {
+      connectAuthEmulator(next, AUTH_EMULATOR_URL, { disableWarnings: true });
+    } catch (error) {
+      if (!emulatorAlreadyConnected(error)) {
+        console.error('Failed to connect sign-in:', error);
+        throw error;
+      }
+      // Vite can reload this module after the Auth instance is already connected.
+      console.warn('Sign-in was already connected:', error);
     }
-    // Vite can reload this module after the Auth instance is already connected.
-    console.warn('Sign-in was already connected:', error);
   }
   auth = next;
   return auth;
@@ -111,14 +108,14 @@ async function publishAuthAccount(user: User, generation: number): Promise<void>
 }
 
 export async function readIdToken(): Promise<string | null> {
-  if (!useAuthEmulator()) return null;
+  if (!isAuthEnabled()) return null;
   const current = getFirebaseAuth().currentUser;
   if (!current) return null;
   return current.getIdToken();
 }
 
 export function startAuthListener(): () => void {
-  if (!useAuthEmulator()) {
+  if (!isAuthEnabled()) {
     return () => undefined;
   }
   return onAuthStateChanged(
@@ -154,6 +151,12 @@ export async function createAccount(
 
 export async function signInWithGoogle(): Promise<void> {
   await signInWithPopup(getFirebaseAuth(), new GoogleAuthProvider());
+}
+
+export async function signInWithFacebook(): Promise<void> {
+  const provider = new FacebookAuthProvider();
+  provider.addScope('email');
+  await signInWithPopup(getFirebaseAuth(), provider);
 }
 
 export async function sendPasswordReset(email: string): Promise<void> {
