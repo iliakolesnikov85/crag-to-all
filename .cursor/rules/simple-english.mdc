@@ -1,0 +1,19 @@
+---
+description: Write replies to the user in simple English
+alwaysApply: true
+---
+
+# Simple English
+
+Write every reply to the user in simple English.
+
+- Use short sentences and common words.
+- Say one idea at a time.
+- Explain a technical word the first time you use it, if a plain word would not do.
+- Keep code, file names, and error text exact. Do not simplify those.
+- Stay precise. Simple does not mean vague.
+
+```text
+❌ The implementation leverages a sophisticated caching strategy to optimize latency.
+✅ The code stores results so the next call is faster.
+```
