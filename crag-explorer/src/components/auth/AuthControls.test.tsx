@@ -49,6 +49,22 @@ function openSignIn(): HTMLElement {
   return screen.getByRole('dialog', { name: 'Sign in' });
 }
 
+/** `Window.closed` is read-only, so tests flip a getter instead. */
+function fakeSignInWindow(): { popup: Window; close: () => void } {
+  let closed = false;
+  const popup = {} as Window;
+  Object.defineProperty(popup, 'closed', {
+    configurable: true,
+    get: () => closed,
+  });
+  return {
+    popup,
+    close: () => {
+      closed = true;
+    },
+  };
+}
+
 describe('AuthControls', () => {
   beforeEach(() => {
     vi.mocked(signInWithEmail).mockReset();
@@ -275,7 +291,7 @@ describe('AuthControls', () => {
   });
 
   it('unlocks the dialog when the Google window closes', async () => {
-    const popup = { closed: false } as Window;
+    const { popup, close } = fakeSignInWindow();
     const originalOpen = window.open;
     const open = vi.fn(() => popup);
     window.open = open as typeof window.open;
@@ -291,7 +307,7 @@ describe('AuthControls', () => {
         expect(open).toHaveBeenCalled();
       });
       expect(within(dialog).getByRole('button', { name: 'Please wait...' })).toBeDisabled();
-      popup.closed = true;
+      close();
       await waitFor(() => {
         expect(within(dialog).getByRole('button', { name: 'Sign in' })).toBeEnabled();
       });
@@ -304,7 +320,7 @@ describe('AuthControls', () => {
 
   it('shows a real Google error after the window has closed', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const popup = { closed: false } as Window;
+    const { popup, close } = fakeSignInWindow();
     const originalOpen = window.open;
     const open = vi.fn(() => popup);
     window.open = open as typeof window.open;
@@ -322,7 +338,7 @@ describe('AuthControls', () => {
       await waitFor(() => {
         expect(open).toHaveBeenCalled();
       });
-      popup.closed = true;
+      close();
       await waitFor(() => {
         expect(within(dialog).getByRole('button', { name: 'Sign in' })).toBeEnabled();
       });
@@ -341,7 +357,7 @@ describe('AuthControls', () => {
 
   it('drops a late Google error after the user leaves the sign-in form', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const popup = { closed: false } as Window;
+    const { popup, close } = fakeSignInWindow();
     const originalOpen = window.open;
     const open = vi.fn(() => popup);
     window.open = open as typeof window.open;
@@ -359,7 +375,7 @@ describe('AuthControls', () => {
       await waitFor(() => {
         expect(open).toHaveBeenCalled();
       });
-      popup.closed = true;
+      close();
       await waitFor(() => {
         expect(within(dialog).getByRole('button', { name: 'Sign in' })).toBeEnabled();
       });
@@ -382,7 +398,7 @@ describe('AuthControls', () => {
 
   it('drops a late Google error after the user starts email sign-in', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const popup = { closed: false } as Window;
+    const { popup, close } = fakeSignInWindow();
     const originalOpen = window.open;
     const open = vi.fn(() => popup);
     window.open = open as typeof window.open;
@@ -406,7 +422,7 @@ describe('AuthControls', () => {
       await waitFor(() => {
         expect(open).toHaveBeenCalled();
       });
-      popup.closed = true;
+      close();
       await waitFor(() => {
         expect(within(dialog).getByRole('button', { name: 'Sign in' })).toBeEnabled();
       });
@@ -441,7 +457,7 @@ describe('AuthControls', () => {
 
   it('drops a late Google error after the user sends a password reset', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const popup = { closed: false } as Window;
+    const { popup, close } = fakeSignInWindow();
     const originalOpen = window.open;
     const open = vi.fn(() => popup);
     window.open = open as typeof window.open;
@@ -459,7 +475,7 @@ describe('AuthControls', () => {
       await waitFor(() => {
         expect(open).toHaveBeenCalled();
       });
-      popup.closed = true;
+      close();
       await waitFor(() => {
         expect(within(dialog).getByRole('button', { name: 'Sign in' })).toBeEnabled();
       });
