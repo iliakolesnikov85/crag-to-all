@@ -44,6 +44,7 @@ function signIn(superadmin: boolean): void {
   const account: AuthAccount = {
     uid: superadmin ? 'super-user' : 'member-user',
     email: 'editor@example.com',
+    emailVerified: true,
     superadmin,
     roles: superadmin ? null : {},
     getIdToken: async () => 'token',

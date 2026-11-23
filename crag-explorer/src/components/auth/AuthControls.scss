@@ -29,20 +29,6 @@
   font-weight: 600;
 }
 
-.auth-controls__row .btn {
-  flex-shrink: 0;
-}
-
-.auth-controls__error {
-  margin: 0;
-  padding: 0.2rem 0.45rem;
-  border-radius: 6px;
-  background: #fff3cd;
-  color: #856404;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
 @media (max-width: 768px) {
   .auth-controls__row {
     font-size: 0.8rem;

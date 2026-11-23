@@ -31,6 +31,7 @@ export async function ensureIndexes(db: Db): Promise<void> {
       unique: true,
       partialFilterExpression: { externalId: { $type: 'string' } },
     },
+    undefined,
   );
   await sectorsCol(db).createIndex({ cragId: 1 });
   try {
@@ -40,6 +41,7 @@ export async function ensureIndexes(db: Db): Promise<void> {
         unique: true,
         partialFilterExpression: { nameKey: { $type: 'string' } },
       },
+      undefined,
     );
   } catch (error) {
     if (isDuplicateKeyError(error)) {
@@ -50,5 +52,5 @@ export async function ensureIndexes(db: Db): Promise<void> {
     throw error;
   }
   await membersCol(db).createIndex({ userId: 1 });
-  await membersCol(db).createIndex({ cragId: 1, userId: 1 }, { unique: true });
+  await membersCol(db).createIndex({ cragId: 1, userId: 1 }, { unique: true }, undefined);
 }

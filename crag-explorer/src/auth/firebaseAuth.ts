@@ -6,6 +6,7 @@ import {
   createUserWithEmailAndPassword,
   getAuth,
   onAuthStateChanged,
+  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -16,13 +17,31 @@ import {
 } from 'firebase/auth';
 import { AUTH_EMULATOR_URL, firebaseWebConfig, isAuthEnabled, useAuthEmulator } from './config';
 import { readMemberships } from './memberships';
-import { setAuthAccount, type AuthAccount } from './session';
+import { getAuthAccount, setAuthAccount, type AuthAccount } from './session';
 
 const AUTH_NOT_CONFIGURED = 'Sign-in is not configured.';
 
 let firebaseApp: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let sessionGeneration = 0;
+
+function visibleDisplayName(value: string | null | undefined): string | null {
+  const name = value?.trim() ?? '';
+  return name || null;
+}
+
+/**
+ * Copies a saved name onto the signed-in account.
+ * Sign-in can store a blank name before createAccount finishes updateProfile.
+ */
+function publishDisplayName(uid: string, displayName: string | null): void {
+  const existing = getAuthAccount();
+  if (!existing || existing.uid !== uid) return;
+  setAuthAccount({
+    ...existing,
+    displayName,
+  });
+}
 
 function emulatorAlreadyConnected(error: unknown): boolean {
   return !!error
@@ -83,6 +102,8 @@ async function toAuthAccount(user: User): Promise<AuthAccount> {
   return {
     uid: user.uid,
     email: user.email,
+    displayName: visibleDisplayName(user.displayName),
+    emailVerified: user.emailVerified === true,
     superadmin,
     roles,
     getIdToken: () => user.getIdToken(),
@@ -100,6 +121,8 @@ async function publishAuthAccount(user: User, generation: number): Promise<void>
     setAuthAccount({
       uid: user.uid,
       email: user.email,
+      displayName: visibleDisplayName(user.displayName),
+      emailVerified: user.emailVerified === true,
       superadmin: false,
       roles: null,
       getIdToken: () => user.getIdToken(),
@@ -144,9 +167,59 @@ export async function createAccount(
   displayName = '',
 ): Promise<void> {
   const credential = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
-  const name = displayName.trim();
-  if (!name) return;
-  await updateProfile(credential.user, { displayName: name });
+  const name = visibleDisplayName(displayName);
+  if (name) {
+    await updateProfile(credential.user, { displayName: name });
+    publishDisplayName(credential.user.uid, name);
+  }
+  try {
+    await sendEmailVerification(credential.user);
+  } catch (error) {
+    // The account exists. Profile can send the link again.
+    console.error('Failed to send the verification email:', error);
+  }
+}
+
+export async function updateDisplayName(displayName: string): Promise<void> {
+  const current = getFirebaseAuth().currentUser;
+  if (!current) {
+    throw new Error('Sign in before changing your name.');
+  }
+  const name = visibleDisplayName(displayName);
+  await updateProfile(current, { displayName: name });
+  publishDisplayName(current.uid, name);
+}
+
+export async function sendVerificationEmail(): Promise<void> {
+  const current = getFirebaseAuth().currentUser;
+  if (!current) {
+    throw new Error('Sign in before sending a verification email.');
+  }
+  await sendEmailVerification(current);
+}
+
+/** Reloads the Firebase user and keeps memberships already stored on the session. */
+export async function refreshEmailVerified(): Promise<void> {
+  if (!isAuthEnabled()) return;
+  const current = getFirebaseAuth().currentUser;
+  if (!current || current.emailVerified) return;
+  try {
+    await current.reload();
+  } catch (error) {
+    console.error('Failed to refresh email verification:', error);
+    return;
+  }
+  // reload() updates this user in place. Read it again so emailVerified is not
+  // still typed as the false value from the check above.
+  const refreshed = getFirebaseAuth().currentUser;
+  if (!refreshed?.emailVerified) return;
+  const existing = getAuthAccount();
+  if (!existing || existing.uid !== refreshed.uid) return;
+  setAuthAccount({
+    ...existing,
+    email: refreshed.email,
+    emailVerified: true,
+  });
 }
 
 export async function signInWithGoogle(): Promise<void> {

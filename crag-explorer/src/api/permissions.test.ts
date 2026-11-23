@@ -7,6 +7,7 @@ function signIn(uid: string, roles: AuthAccount['roles']): void {
   setAuthAccount({
     uid,
     email: `${uid}@example.com`,
+    emailVerified: true,
     superadmin: false,
     roles,
     getIdToken: async () => 'token',

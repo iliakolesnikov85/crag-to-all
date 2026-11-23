@@ -50,6 +50,7 @@ describe('TeamPage', () => {
     setAuthAccount({
       uid: 'admin-user',
       email: 'admin@example.com',
+      emailVerified: true,
       superadmin: false,
       roles: { roshka: 'admin' },
       getIdToken: async () => 'token',

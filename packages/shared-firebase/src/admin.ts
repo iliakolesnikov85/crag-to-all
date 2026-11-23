@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from 'fs';
-import { isAbsolute, resolve } from 'path';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { App, cert, getApps, initializeApp, type ServiceAccount } from 'firebase-admin/app';
 
 const DEFAULT_STORAGE_BUCKET = 'crag-to-all';
@@ -29,29 +29,18 @@ function assertServiceAccountJson(parsed: unknown): asserts parsed is {
   }
 }
 
-/** Relative paths in .env are resolved from cwd first, then from this package and typical app folders. */
+/** Uses this path only. A relative path is resolved from the current directory. */
 function resolveServiceAccountKeyPath(keyPath: string): string {
-  if (isAbsolute(keyPath)) {
-    return keyPath;
-  }
-  const cwd = process.cwd();
-  const candidates = [
-    resolve(cwd, keyPath),
-    resolve(cwd, '..', '..', 'crag-extract', keyPath),
-    resolve(cwd, 'crag-extract', keyPath)
-  ];
-  for (const p of candidates) {
-    if (existsSync(p)) {
-      return p;
-    }
-  }
-  return resolve(cwd, keyPath);
+  return resolve(keyPath);
 }
 
 function parseServiceAccountFromEnv(): ServiceAccount {
   const rawFromEnv = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  const keyPath = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_PATH;
+  const keyPath = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_PATH?.trim();
 
+  // Do not search the disk for firebase-account.json. The server receives
+  // FIREBASE_SERVICE_ACCOUNT_KEY from Secret Manager. A local key file is used
+  // only when FIREBASE_SERVICE_ACCOUNT_KEY_PATH points at it.
   if (!rawFromEnv && !keyPath) {
     throw new Error(
       'Missing Firebase service account credentials. Set FIREBASE_SERVICE_ACCOUNT_KEY or FIREBASE_SERVICE_ACCOUNT_KEY_PATH.'

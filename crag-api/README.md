@@ -22,10 +22,10 @@ Superadmin is the custom claim `superadmin` on the Firebase Auth user. The API s
 
 In the Auth emulator UI (http://localhost:4000): Authentication, edit the user, Custom claims, save `{ "superadmin": true }` with a JSON boolean.
 
-The production Firebase console user page has no claims field. From this folder, with `FIREBASE_SERVICE_ACCOUNT_KEY` or `FIREBASE_SERVICE_ACCOUNT_KEY_PATH` set (see [`packages/shared-firebase/.env.example`](../packages/shared-firebase/.env.example)), and after `shared-firebase` is built:
+The production Firebase console user page has no claims field. From this folder, after `shared-firebase` is built, pass the service account JSON file:
 
 ```bash
-npm run set-superadmin -- <uid>
+npm run set-superadmin -- <uid> <service-account.json>
 ```
 
 That calls `setCustomUserClaims` with `superadmin` set to boolean `true` and keeps any other custom claims. It uses the service account and ignores `FIREBASE_AUTH_EMULATOR_HOST`, so it does not update the Auth emulator.

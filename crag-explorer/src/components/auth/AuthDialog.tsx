@@ -341,6 +341,11 @@ function AuthDialog({ onClose }: AuthDialogProps) {
             />
           </label>
         ) : null}
+        {mode === 'create' ? (
+          <p className="auth-form__hint">
+            We email you a link to verify this account.
+          </p>
+        ) : null}
         <Button type="submit" fullWidth disabled={busy}>
           {mode === 'sign-in' ? <MdLogin className="auth-form__icon" aria-hidden="true" /> : null}
           {mode === 'create' ? <MdPersonAdd className="auth-form__icon" aria-hidden="true" /> : null}

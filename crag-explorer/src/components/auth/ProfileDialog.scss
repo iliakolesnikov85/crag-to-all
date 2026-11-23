@@ -1,0 +1,84 @@
+.profile-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.profile-dialog__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.profile-dialog__label {
+  font-weight: 600;
+  color: #333;
+}
+
+.profile-dialog__email {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 0;
+  color: #333;
+  overflow-wrap: anywhere;
+}
+
+.profile-dialog__name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.profile-dialog__input {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  color: #333;
+  background: #fff;
+
+  &:focus {
+    outline: 2px solid #1976d2;
+    outline-offset: 1px;
+  }
+}
+
+.profile-dialog__name-row .btn {
+  flex-shrink: 0;
+}
+
+.profile-dialog__action {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.profile-dialog__hint,
+.profile-dialog__notice,
+.profile-dialog__error {
+  margin: 0;
+}
+
+.profile-dialog__hint {
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.profile-dialog__notice {
+  color: #1b5e20;
+}
+
+.profile-dialog__error {
+  color: #c62828;
+}
+
+@media (max-width: 480px) {
+  .profile-dialog__name-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

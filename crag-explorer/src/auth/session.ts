@@ -3,6 +3,10 @@ import type { CragMemberRole } from '@crag-to-all/shared-crag';
 export interface AuthAccount {
   uid: string;
   email: string | null;
+  /** Shown name. Null when the user has not set one. */
+  displayName?: string | null;
+  /** True after the user clicks the Firebase verification link, or signs in with a provider that already verified the email. */
+  emailVerified: boolean;
   /** True only when the ID token claim `superadmin` is the boolean `true`. */
   superadmin: boolean;
   /**
@@ -38,6 +42,8 @@ export function setAuthAccount(next: AuthAccount | null): void {
   if (
     account?.uid === next?.uid
     && account?.email === next?.email
+    && account?.displayName === next?.displayName
+    && account?.emailVerified === next?.emailVerified
     && account?.superadmin === next?.superadmin
     && account?.roles === next?.roles
   ) return;

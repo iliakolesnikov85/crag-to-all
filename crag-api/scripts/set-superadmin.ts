@@ -1,3 +1,4 @@
+import { existsSync } from 'fs';
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import { initializeFirebase, setSuperadminClaim } from '@crag-to-all/shared-firebase';
@@ -13,18 +14,26 @@ for (const envFile of envFiles) {
   dotenv.config({ path: envFile });
 }
 
-function readUid(argv: readonly string[]): string | null {
+function readArgs(argv: readonly string[]): { uid: string; keyPath: string } | null {
   const uid = argv[2]?.trim() ?? '';
-  if (argv.length !== 3 || !uid || /\s/.test(uid)) {
+  const keyPath = argv[3]?.trim() ?? '';
+  if (argv.length !== 4 || !uid || /\s/.test(uid) || !keyPath) {
     return null;
   }
-  return uid;
+  return { uid, keyPath };
 }
 
 async function main(): Promise<void> {
-  const uid = readUid(process.argv);
-  if (!uid) {
-    console.error('Usage: npm run set-superadmin -- <uid>');
+  const args = readArgs(process.argv);
+  if (!args) {
+    console.error('Usage: npm run set-superadmin -- <uid> <service-account.json>');
+    process.exitCode = 1;
+    return;
+  }
+  const { uid, keyPath } = args;
+  const keyFile = resolve(keyPath);
+  if (!existsSync(keyFile)) {
+    console.error(`Could not read the service account file (${keyFile}).`);
     process.exitCode = 1;
     return;
   }
@@ -38,6 +47,8 @@ async function main(): Promise<void> {
     );
   }
 
+  delete process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  process.env.FIREBASE_SERVICE_ACCOUNT_KEY_PATH = keyFile;
   initializeFirebase(false);
   const { projectId } = await setSuperadminClaim(uid);
   console.log(

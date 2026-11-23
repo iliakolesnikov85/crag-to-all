@@ -20,7 +20,10 @@ vi.mock('../../auth/config', () => ({
 vi.mock('../../auth/firebaseAuth', () => ({
   createAccount: vi.fn(),
   readIdToken: vi.fn(),
+  refreshEmailVerified: vi.fn(),
   sendPasswordReset: vi.fn(),
+  sendVerificationEmail: vi.fn(),
+  updateDisplayName: vi.fn(),
   signInWithEmail: vi.fn(),
   signInWithFacebook: vi.fn(),
   signInWithGoogle: vi.fn(),
@@ -31,6 +34,7 @@ vi.mock('../../auth/firebaseAuth', () => ({
 const ada: AuthAccount = {
   uid: 'ada',
   email: 'ada@example.com',
+  emailVerified: true,
   superadmin: false,
   roles: null,
   getIdToken: async () => 'token',
@@ -97,7 +101,8 @@ describe('AuthControls', () => {
       setAuthAccount(ada);
     });
     expect(screen.getByText('ada@example.com')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send verification email' })).not.toBeInTheDocument();
   });
 
   it('signs in with email and password', async () => {
@@ -191,6 +196,7 @@ describe('AuthControls', () => {
     openSignIn();
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
     const dialog = screen.getByRole('dialog', { name: 'Create account' });
+    expect(within(dialog).getByText('We email you a link to verify this account.')).toBeInTheDocument();
     fireEvent.change(within(dialog).getByLabelText('Email'), {
       target: { value: 'ada@example.com' },
     });
@@ -593,39 +599,12 @@ describe('AuthControls', () => {
     vi.mocked(signOutCurrentUser).mockImplementation(async () => {
       setAuthAccount(null);
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
     });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  });
-
-  it('signs out', async () => {
-    setAuthAccount(ada);
-    vi.mocked(signOutCurrentUser).mockImplementation(async () => {
-      setAuthAccount(null);
-    });
-    renderHeader();
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
-    });
-    expect(signOutCurrentUser).toHaveBeenCalledTimes(1);
-  });
-
-  it('logs a failed sign-out', async () => {
-    setAuthAccount(ada);
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const failure = new Error('still here');
-    vi.mocked(signOutCurrentUser).mockRejectedValue(failure);
-    renderHeader();
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not sign out. Try again.');
-    expect(error).toHaveBeenCalledWith('Sign-out failed:', failure);
-    expect(screen.getByText('ada@example.com')).toBeInTheDocument();
-    error.mockRestore();
   });
 });

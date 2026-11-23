@@ -3,12 +3,15 @@ import { getAuthAccount, isSignedIn, setAuthAccount } from './session';
 import {
   createAccount,
   readIdToken,
+  refreshEmailVerified,
   sendPasswordReset,
+  sendVerificationEmail,
   signInWithEmail,
   signInWithFacebook,
   signInWithGoogle,
   signOutCurrentUser,
   startAuthListener,
+  updateDisplayName,
 } from './firebaseAuth';
 
 const firebaseMocks = vi.hoisted(() => {
@@ -24,7 +27,13 @@ const firebaseMocks = vi.hoisted(() => {
   class GoogleAuthProvider {}
 
   const authInstance: {
-    currentUser: { getIdToken: () => Promise<string> } | null;
+    currentUser: {
+      uid?: string;
+      email?: string | null;
+      emailVerified?: boolean;
+      reload?: () => Promise<void>;
+      getIdToken: () => Promise<string>;
+    } | null;
   } = { currentUser: null };
 
   return {
@@ -40,6 +49,7 @@ const firebaseMocks = vi.hoisted(() => {
     createUserWithEmailAndPassword: vi.fn(async () => ({ user: { uid: 'new-user' } })),
     updateProfile: vi.fn(async () => undefined),
     signInWithPopup: vi.fn(async (_auth: unknown, _provider: object) => ({})),
+    sendEmailVerification: vi.fn(async () => undefined),
     sendPasswordResetEmail: vi.fn(async () => undefined),
     signOut: vi.fn(async () => undefined),
     onAuthStateChanged: vi.fn((
@@ -75,6 +85,7 @@ vi.mock('firebase/auth', () => ({
   createUserWithEmailAndPassword: firebaseMocks.createUserWithEmailAndPassword,
   getAuth: firebaseMocks.getAuth,
   onAuthStateChanged: firebaseMocks.onAuthStateChanged,
+  sendEmailVerification: firebaseMocks.sendEmailVerification,
   sendPasswordResetEmail: firebaseMocks.sendPasswordResetEmail,
   signInWithEmailAndPassword: firebaseMocks.signInWithEmailAndPassword,
   signInWithPopup: firebaseMocks.signInWithPopup,
@@ -126,11 +137,13 @@ describe('firebaseAuth', () => {
         'secret1',
       );
       expect(firebaseMocks.updateProfile).not.toHaveBeenCalled();
+      expect(firebaseMocks.sendEmailVerification).toHaveBeenCalledWith({ uid: 'new-user' });
       await createAccount('named@example.com', 'secret1', '  Ada Lovelace  ');
       expect(firebaseMocks.updateProfile).toHaveBeenCalledWith(
         { uid: 'new-user' },
         { displayName: 'Ada Lovelace' },
       );
+      expect(firebaseMocks.sendEmailVerification).toHaveBeenCalledTimes(2);
 
       await signInWithGoogle();
       const googleCall = firebaseMocks.signInWithPopup.mock.calls[0];
@@ -161,6 +174,8 @@ describe('firebaseAuth', () => {
       type FirebaseUser = {
         uid: string;
         email: string | null;
+        displayName?: string | null;
+        emailVerified?: boolean;
         getIdToken: () => Promise<string>;
         getIdTokenResult: (forceRefresh?: boolean) => Promise<{ claims: { superadmin?: unknown } }>;
       };
@@ -185,12 +200,16 @@ describe('firebaseAuth', () => {
       observer?.({
         uid: 'user-1',
         email: 'ada@example.com',
+        displayName: '  Ada  ',
+        emailVerified: true,
         getIdToken: async () => 'token',
         getIdTokenResult: superadminToken,
       });
       await vi.waitFor(() => {
         expect(getAuthAccount()?.superadmin).toBe(true);
       });
+      expect(getAuthAccount()?.emailVerified).toBe(true);
+      expect(getAuthAccount()?.displayName).toBe('Ada');
       expect(superadminToken).toHaveBeenCalledWith(true);
       onError?.(new Error('listener down'));
       expect(error).toHaveBeenCalledWith('Firebase Auth state failed:', expect.any(Error));
@@ -209,6 +228,7 @@ describe('firebaseAuth', () => {
       observer?.({
         uid: 'user-2',
         email: 'bea@example.com',
+        emailVerified: false,
         getIdToken: async () => 'token',
         getIdTokenResult: async () => {
           throw new Error('claims unavailable');
@@ -218,6 +238,8 @@ describe('firebaseAuth', () => {
         expect(getAuthAccount()?.uid).toBe('user-2');
       });
       expect(getAuthAccount()?.superadmin).toBe(false);
+      expect(getAuthAccount()?.emailVerified).toBe(false);
+      expect(getAuthAccount()?.displayName).toBeNull();
       expect(error).toHaveBeenCalledWith('Failed to read sign-in claims:', expect.any(Error));
       observer?.(null);
       expect(isSignedIn()).toBe(false);
@@ -279,6 +301,7 @@ describe('firebaseAuth', () => {
     firebaseMocks.createUserWithEmailAndPassword.mockClear();
     firebaseMocks.updateProfile.mockClear();
     firebaseMocks.signInWithPopup.mockClear();
+    firebaseMocks.sendEmailVerification.mockClear();
     firebaseMocks.sendPasswordResetEmail.mockClear();
     firebaseMocks.signOut.mockClear();
     firebaseMocks.onAuthStateChanged.mockClear();
@@ -294,6 +317,9 @@ describe('firebaseAuth', () => {
       await expect(auth.signInWithGoogle()).rejects.toThrow(/not configured/);
       await expect(auth.signInWithFacebook()).rejects.toThrow(/not configured/);
       await expect(auth.sendPasswordReset('ada@example.com')).rejects.toThrow(/not configured/);
+      await expect(auth.sendVerificationEmail()).rejects.toThrow(/not configured/);
+      await expect(auth.updateDisplayName('Ada')).rejects.toThrow(/not configured/);
+      await expect(auth.refreshEmailVerified()).resolves.toBeUndefined();
       await expect(auth.signOutCurrentUser()).rejects.toThrow(/not configured/);
       await expect(auth.readIdToken()).resolves.toBeNull();
       auth.startAuthListener()();
@@ -305,6 +331,7 @@ describe('firebaseAuth', () => {
       expect(firebaseMocks.createUserWithEmailAndPassword).not.toHaveBeenCalled();
       expect(firebaseMocks.updateProfile).not.toHaveBeenCalled();
       expect(firebaseMocks.signInWithPopup).not.toHaveBeenCalled();
+      expect(firebaseMocks.sendEmailVerification).not.toHaveBeenCalled();
       expect(firebaseMocks.sendPasswordResetEmail).not.toHaveBeenCalled();
       expect(firebaseMocks.signOut).not.toHaveBeenCalled();
       expect(firebaseMocks.onAuthStateChanged).not.toHaveBeenCalled();
@@ -312,6 +339,182 @@ describe('firebaseAuth', () => {
       firebaseMocks.useAuthEmulator.mockReturnValue(true);
       firebaseMocks.isAuthEnabled.mockReturnValue(true);
       firebaseMocks.firebaseWebConfig.mockReturnValue(DEMO_WEB_CONFIG);
+    }
+  });
+
+  it('keeps the new account when the verification email fails', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const failure = new Error('mail down');
+    firebaseMocks.sendEmailVerification.mockRejectedValueOnce(failure);
+    try {
+      await expect(createAccount('new@example.com', 'secret1')).resolves.toBeUndefined();
+      expect(error).toHaveBeenCalledWith('Failed to send the verification email:', failure);
+    } finally {
+      firebaseMocks.sendEmailVerification.mockResolvedValue(undefined);
+      error.mockRestore();
+    }
+  });
+
+  it('sends a verification email for the signed-in user', async () => {
+    const currentUser = {
+      getIdToken: async () => 'id-token',
+      emailVerified: false,
+    };
+    firebaseMocks.authInstance.currentUser = currentUser;
+    try {
+      await sendVerificationEmail();
+      expect(firebaseMocks.sendEmailVerification).toHaveBeenCalledWith(currentUser);
+    } finally {
+      firebaseMocks.authInstance.currentUser = null;
+    }
+  });
+
+  it('marks the signed-in account verified without dropping memberships', async () => {
+    const roles = { roshka: 'admin' as const };
+    setAuthAccount({
+      uid: 'user-1',
+      email: 'ada@example.com',
+      emailVerified: false,
+      superadmin: false,
+      roles,
+      getIdToken: async () => 'token',
+    });
+    const user = {
+      uid: 'user-1',
+      email: 'ada@example.com',
+      emailVerified: false,
+      getIdToken: async () => 'token',
+      reload: vi.fn(async () => {
+        user.emailVerified = true;
+      }),
+    };
+    firebaseMocks.authInstance.currentUser = user;
+    try {
+      await refreshEmailVerified();
+      expect(user.reload).toHaveBeenCalledTimes(1);
+      expect(getAuthAccount()?.emailVerified).toBe(true);
+      expect(getAuthAccount()?.roles).toBe(roles);
+    } finally {
+      firebaseMocks.authInstance.currentUser = null;
+      setAuthAccount(null);
+    }
+  });
+
+  it('keeps the create-account name when sign-in already stored a blank name', async () => {
+    const roles = { roshka: 'admin' as const };
+    setAuthAccount({
+      uid: 'new-user',
+      email: 'named@example.com',
+      displayName: null,
+      emailVerified: false,
+      superadmin: false,
+      roles,
+      getIdToken: async () => 'token',
+    });
+    try {
+      await createAccount('named@example.com', 'secret1', '  Ada Lovelace  ');
+      expect(firebaseMocks.updateProfile).toHaveBeenCalledWith(
+        { uid: 'new-user' },
+        { displayName: 'Ada Lovelace' },
+      );
+      expect(getAuthAccount()?.displayName).toBe('Ada Lovelace');
+      expect(getAuthAccount()?.roles).toBe(roles);
+    } finally {
+      setAuthAccount(null);
+    }
+  });
+
+  it('keeps the create-account name when the sign-in listener stored a blank name first', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('no api'));
+    type CreatedUser = {
+      uid: string;
+      email: string;
+      displayName: string | null;
+      emailVerified: boolean;
+      getIdToken: () => Promise<string>;
+      getIdTokenResult: () => Promise<{ claims: { superadmin: boolean } }>;
+    };
+    let observer: ((user: CreatedUser | null) => void) | undefined;
+    firebaseMocks.onAuthStateChanged.mockImplementation((
+      _auth: unknown,
+      next: (user: CreatedUser | null) => void,
+    ) => {
+      observer = next;
+      return () => {
+        observer = undefined;
+      };
+    });
+    const user = {
+      uid: 'new-user',
+      email: 'named@example.com',
+      displayName: null,
+      emailVerified: false,
+      getIdToken: async () => 'token',
+      getIdTokenResult: async () => ({ claims: { superadmin: false } }),
+    };
+    firebaseMocks.createUserWithEmailAndPassword.mockImplementation(async () => {
+      observer?.(user);
+      await vi.waitFor(() => {
+        expect(getAuthAccount()?.uid).toBe('new-user');
+      });
+      expect(getAuthAccount()?.displayName).toBeNull();
+      return { user };
+    });
+    const stop = startAuthListener();
+    try {
+      await createAccount('named@example.com', 'secret1', '  Ada Lovelace  ');
+      expect(getAuthAccount()?.displayName).toBe('Ada Lovelace');
+      expect(getAuthAccount()?.emailVerified).toBe(false);
+    } finally {
+      stop();
+      setAuthAccount(null);
+      firebaseMocks.createUserWithEmailAndPassword.mockImplementation(async () => ({ user: { uid: 'new-user' } }));
+      firebaseMocks.onAuthStateChanged.mockImplementation(() => () => undefined);
+      fetchSpy.mockRestore();
+      error.mockRestore();
+    }
+  });
+
+  it('skips the verification email when saving the new name fails', async () => {
+    const failure = new Error('profile down');
+    firebaseMocks.updateProfile.mockRejectedValueOnce(failure);
+    firebaseMocks.sendEmailVerification.mockClear();
+    try {
+      await expect(createAccount('named@example.com', 'secret1', 'Ada')).rejects.toBe(failure);
+      expect(firebaseMocks.sendEmailVerification).not.toHaveBeenCalled();
+    } finally {
+      firebaseMocks.updateProfile.mockResolvedValue(undefined);
+    }
+  });
+
+  it('saves the display name on the signed-in account', async () => {
+    await expect(updateDisplayName('Ada')).rejects.toThrow(/Sign in before/);
+    setAuthAccount({
+      uid: 'user-1',
+      email: 'ada@example.com',
+      emailVerified: true,
+      superadmin: false,
+      roles: { roshka: 'admin' },
+      getIdToken: async () => 'token',
+    });
+    const currentUser = {
+      uid: 'user-1',
+      email: 'ada@example.com',
+      getIdToken: async () => 'token',
+    };
+    firebaseMocks.authInstance.currentUser = currentUser;
+    try {
+      await updateDisplayName('  Ada  ');
+      expect(firebaseMocks.updateProfile).toHaveBeenCalledWith(currentUser, { displayName: 'Ada' });
+      expect(getAuthAccount()?.displayName).toBe('Ada');
+      expect(getAuthAccount()?.roles).toEqual({ roshka: 'admin' });
+      await updateDisplayName('   ');
+      expect(firebaseMocks.updateProfile).toHaveBeenLastCalledWith(currentUser, { displayName: null });
+      expect(getAuthAccount()?.displayName).toBeNull();
+    } finally {
+      firebaseMocks.authInstance.currentUser = null;
+      setAuthAccount(null);
     }
   });
 });

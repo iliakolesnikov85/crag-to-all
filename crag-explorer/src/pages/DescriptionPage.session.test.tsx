@@ -54,6 +54,7 @@ describe('DescriptionPage session', () => {
     signIn({
       uid: 'visitor',
       email: 'visitor@example.com',
+      emailVerified: true,
       superadmin: false,
       roles: {},
       getIdToken: async () => 'token',
@@ -67,6 +68,7 @@ describe('DescriptionPage session', () => {
     signIn({
       uid: 'admin-user',
       email: 'admin@example.com',
+      emailVerified: true,
       superadmin: false,
       roles: { roshka: 'admin' },
       getIdToken: async () => 'token',

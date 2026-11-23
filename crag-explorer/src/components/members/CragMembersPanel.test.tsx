@@ -34,6 +34,7 @@ const members = [
 function signIn(account: Pick<AuthAccount, 'uid' | 'superadmin' | 'roles'>): void {
   setAuthAccount({
     email: `${account.uid}@example.com`,
+    emailVerified: true,
     getIdToken: async () => 'token',
     ...account,
   });
