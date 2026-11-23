@@ -48,7 +48,23 @@ describe('crag-api', () => {
     const authorization = { Authorization: `Bearer ${TEST_TOKEN}` };
     return {
       get: (path: string) => request(target).get(path).set(authorization),
-      post: (path: string) => request(target).post(path).set(authorization),
+      // Older tests read a new crag with no token. Those crags are published after create.
+      post: (path: string) => {
+        const sent = request(target).post(path).set(authorization);
+        if (path !== '/api/crags') return sent;
+        return {
+          send: async (body: object) => {
+            const res = await sent.send(body);
+            if (res.status === 201 && typeof res.body?.id === 'string') {
+              await db.collection('crags').updateOne(
+                { _id: res.body.id },
+                { $set: { published: true } },
+              );
+            }
+            return res;
+          },
+        };
+      },
       put: (path: string) => request(target).put(path).set(authorization),
       patch: (path: string) => request(target).patch(path).set(authorization),
       delete: (path: string) => request(target).delete(path).set(authorization),
@@ -142,6 +158,7 @@ describe('crag-api', () => {
         cragName: 'Roshka',
         source: 'explorer',
         sectorCount: 0,
+        published: true,
         version: 1,
         updatedAt: expect.any(String),
       },
@@ -251,21 +268,34 @@ describe('crag-api', () => {
   it('patches crag-level fields and returns 409 on a stale version', async () => {
     await write().post('/api/crags').send({ name: 'Roshka', id: 'roshka' });
 
+    const publishedOnContent = await write().patch('/api/crags/roshka').send({
+      version: 1,
+      published: true,
+    });
+    expect(publishedOnContent.status).toBe(400);
+    expect(publishedOnContent.body.error).toBe('invalid_request');
+
     const stale = await write()
-      .patch('/api/crags/roshka')
+      .patch('/api/crags/roshka/settings')
       .send({ version: 99, name: 'Nope' });
     expect(stale.status).toBe(409);
     expect(stale.body).toEqual({ error: 'version_conflict', currentVersion: 1 });
 
+    const renamed = await write()
+      .patch('/api/crags/roshka/settings')
+      .send({ version: 1, name: 'Roshka Valley' });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.version).toBe(2);
+    expect(renamed.body.cragName).toBe('Roshka Valley');
+
     const patched = await write()
       .patch('/api/crags/roshka')
       .send({
-        version: 1,
-        name: 'Roshka Valley',
+        version: 2,
         description: [{ subheader: 'Access', paragraphs: ['Walk in.'] }],
       });
     expect(patched.status).toBe(200);
-    expect(patched.body.version).toBe(2);
+    expect(patched.body.version).toBe(3);
     expect(patched.body.cragName).toBe('Roshka Valley');
     expect(patched.body.description).toEqual([
       { subheader: 'Access', paragraphs: ['Walk in.'] },
@@ -939,7 +969,6 @@ describe('crag-api', () => {
 
     const cragPatch = await write().patch('/api/crags/roshka').send({
       version: 1,
-      name: 'Renamed',
       markers: [{ type: 'parking_space', info: 'Lot', geo: { lat: 44, lon: 6 } }],
     });
     expect(cragPatch.status).toBe(403);
@@ -947,6 +976,13 @@ describe('crag-api', () => {
       error: 'read_only',
       message: 'An extracted crag is read-only',
     });
+
+    const renamed = await write().patch('/api/crags/roshka/settings').send({
+      version: 1,
+      name: 'Renamed',
+    });
+    expect(renamed.status).toBe(403);
+    expect(renamed.body.error).toBe('read_only');
 
     const assembled = await request(app).get('/api/crags/roshka');
     expect(assembled.status).toBe(200);
@@ -969,6 +1005,7 @@ describe('crag-api', () => {
         cragName: 'Roshka',
         source: 'external',
         sectorCount: 1,
+        published: true,
         version: 1,
         updatedAt: expect.any(String),
       },
@@ -1023,7 +1060,7 @@ describe('crag-api', () => {
   );
 
   it.each(['owner', 'admin'] as const)(
-    'rejects a crag %s renaming the crag',
+    'rejects a crag %s changing the name or published flag',
     async (role) => {
       await write().post('/api/crags').send({ name: 'Roshka', id: 'roshka' });
       await db.collection('crag_members').insertOne({
@@ -1037,7 +1074,21 @@ describe('crag-api', () => {
         emailVerified: true,
         superadmin: false,
       });
-      const res = await request(memberApp)
+      const renamed = await request(memberApp)
+        .patch('/api/crags/roshka/settings')
+        .set('Authorization', 'Bearer member-token')
+        .send({ version: 1, name: 'Roshka Valley' });
+      expect(renamed.status).toBe(403);
+      expect(renamed.body).toEqual({ error: 'forbidden' });
+
+      const published = await request(memberApp)
+        .patch('/api/crags/roshka/settings')
+        .set('Authorization', 'Bearer member-token')
+        .send({ version: 1, published: true });
+      expect(published.status).toBe(403);
+      expect(published.body).toEqual({ error: 'forbidden' });
+
+      const mixed = await request(memberApp)
         .patch('/api/crags/roshka')
         .set('Authorization', 'Bearer member-token')
         .send({
@@ -1045,8 +1096,9 @@ describe('crag-api', () => {
           name: 'Roshka Valley',
           description: [{ subheader: 'Access', paragraphs: ['Walk in.'] }],
         });
-      expect(res.status).toBe(403);
-      expect(res.body).toEqual({ error: 'forbidden' });
+      expect(mixed.status).toBe(400);
+      expect(mixed.body.error).toBe('invalid_request');
+
       const stored = await db.collection('crags').findOne({ _id: 'roshka' });
       expect(stored?.name).toBe('Roshka');
       expect(stored?.version).toBe(1);
@@ -1057,7 +1109,7 @@ describe('crag-api', () => {
   it('rejects a patch that includes opentopoTilePack', async () => {
     await write().post('/api/crags').send({ name: 'Roshka', id: 'roshka' });
     const res = await write()
-      .patch('/api/crags/roshka')
+      .patch('/api/crags/roshka/settings')
       .send({ version: 1, name: 'Roshka Valley', opentopoTilePack: null });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('invalid_request');
@@ -1077,7 +1129,10 @@ describe('crag-api', () => {
     const res = await request(stranger)
       .patch('/api/crags/roshka')
       .set('Authorization', 'Bearer stranger-token')
-      .send({ version: 1, name: 'Nope' });
+      .send({
+        version: 1,
+        description: [{ subheader: 'Access', paragraphs: ['Walk in.'] }],
+      });
     expect(res.status).toBe(403);
     expect(res.body).toEqual({ error: 'forbidden' });
   });
@@ -1098,7 +1153,10 @@ describe('crag-api', () => {
     const res = await request(memberApp)
       .patch('/api/crags/roshka')
       .set('Authorization', 'Bearer member-token')
-      .send({ version: 1, name: 'Nope' });
+      .send({
+        version: 1,
+        description: [{ subheader: 'Access', paragraphs: ['Walk in.'] }],
+      });
     expect(res.status).toBe(403);
     expect(res.body).toEqual({ error: 'forbidden' });
   });
@@ -1133,6 +1191,7 @@ describe('crag-api', () => {
         cragName: 'Roshka',
         source: 'explorer',
         sectorCount: 0,
+        published: true,
         version: 1,
         updatedAt: expect.any(String),
       },
@@ -1237,7 +1296,10 @@ describe('crag-api', () => {
     const res = await request(ownerApp)
       .patch('/api/crags/roshka')
       .set('Authorization', 'Bearer owner-token')
-      .send({ version: 1, name: 'Renamed' });
+      .send({
+        version: 1,
+        description: [{ subheader: 'Access', paragraphs: ['Walk in.'] }],
+      });
     expect(res.status).toBe(403);
     expect(res.body).toEqual({
       error: 'read_only',
@@ -2029,7 +2091,11 @@ describe('crag-api', () => {
 
     const anonymousWrites = [
       () => request(app).post('/api/crags').send({ name: 'Roshka', id: 'roshka' }),
-      () => request(app).patch('/api/crags/roshka').send({ version: 1, name: 'Nope' }),
+      () => request(app).patch('/api/crags/roshka').send({
+        version: 1,
+        description: [{ subheader: 'Access', paragraphs: ['Nope'] }],
+      }),
+      () => request(app).patch('/api/crags/roshka/settings').send({ version: 1, name: 'Nope' }),
       () => request(app).delete('/api/crags/roshka'),
       () => request(app).get('/api/crags/roshka/members'),
       () => request(app).get('/api/crags/roshka/accounts').query({ email: 'a@b.co' }),
@@ -2065,5 +2131,289 @@ describe('crag-api', () => {
     expect(after.status).toBe(200);
     expect(after.body).toEqual([]);
     expect(uploaded.size).toBe(0);
+  });
+
+  function userApp(uid: string) {
+    return appFor({
+      uid,
+      email: `${uid}@example.com`,
+      emailVerified: true,
+      superadmin: false,
+    });
+  }
+
+  async function createDraft(name: string, id: string) {
+    return request(app)
+      .post('/api/crags')
+      .set('Authorization', `Bearer ${TEST_TOKEN}`)
+      .send({ name, id });
+  }
+
+  it('hides a new crag from anonymous readers and other users', async () => {
+    const created = await createDraft('Roshka', 'roshka');
+    expect(created.status).toBe(201);
+    expect(created.body.published).toBe(false);
+    const stored = await db.collection('crags').findOne({ _id: 'roshka' });
+    expect(stored?.published).toBe(false);
+
+    expect((await request(app).get('/api/crags')).body).toEqual([]);
+    expect((await request(app).get('/api/crags/roshka')).status).toBe(404);
+    expect((await request(app).get('/api/crags/roshka/gpx')).status).toBe(404);
+
+    const badToken = await request(app).get('/api/crags').set('Authorization', 'Bearer wrong-token');
+    expect(badToken.status).toBe(401);
+
+    const superCatalog = await write().get('/api/crags');
+    expect(superCatalog.body).toEqual([
+      expect.objectContaining({ id: 'roshka', published: false }),
+    ]);
+    expect((await write().get('/api/crags/roshka')).status).toBe(200);
+
+    await db.collection('crags').insertOne({
+      _id: 'public-crag',
+      name: 'Public',
+      source: 'explorer',
+      protocolVersion: CRAG_DATA_PROTOCOL,
+      description: [],
+      trails: [],
+      markers: [],
+      version: 1,
+      updatedAt: new Date(),
+    });
+    await db.collection('crag_members').insertMany([
+      { cragId: 'roshka', userId: 'owner-user', role: 'owner' },
+      { cragId: 'roshka', userId: 'admin-user', role: 'admin' },
+      { cragId: 'public-crag', userId: 'other-owner', role: 'owner' },
+    ]);
+
+    const ids = async (uid: string) => {
+      const catalog = await request(userApp(uid))
+        .get('/api/crags')
+        .set('Authorization', `Bearer ${uid}-token`);
+      expect(catalog.status).toBe(200);
+      return catalog.body.map((crag: { id: string }) => crag.id).sort();
+    };
+    expect(await ids('owner-user')).toEqual(['public-crag', 'roshka']);
+    expect(await ids('admin-user')).toEqual(['public-crag', 'roshka']);
+    expect(await ids('stranger')).toEqual(['public-crag']);
+    expect(await ids('other-owner')).toEqual(['public-crag']);
+
+    const ownerOpen = await request(userApp('owner-user'))
+      .get('/api/crags/roshka')
+      .set('Authorization', 'Bearer owner-token');
+    expect(ownerOpen.status).toBe(200);
+    const adminGpx = await request(userApp('admin-user'))
+      .get('/api/crags/roshka/gpx')
+      .set('Authorization', 'Bearer admin-token');
+    expect(adminGpx.status).toBe(200);
+    const strangerOpen = await request(userApp('stranger'))
+      .get('/api/crags/roshka')
+      .set('Authorization', 'Bearer stranger-token');
+    expect(strangerOpen.status).toBe(404);
+
+    const strangerApp = userApp('stranger');
+    const strangerAuth = { Authorization: 'Bearer stranger-token' };
+    const notFoundBody = { error: 'not_found', message: 'crag not found' };
+    const contentPatch = {
+      version: 1,
+      description: [{ subheader: 'Access', paragraphs: ['Walk in.'] }],
+    };
+    async function expectHiddenLikeMissing(
+      run: (id: string) => PromiseLike<{ status: number; body: unknown }>,
+    ) {
+      const hidden = await run('roshka');
+      const missing = await run('no-such-crag');
+      expect(hidden.status).toBe(404);
+      expect(hidden.body).toEqual(notFoundBody);
+      expect(missing.status).toBe(404);
+      expect(missing.body).toEqual(hidden.body);
+    }
+    await expectHiddenLikeMissing((id) => (
+      request(strangerApp).patch(`/api/crags/${id}`).set(strangerAuth).send(contentPatch)
+    ));
+    await expectHiddenLikeMissing((id) => (
+      request(strangerApp).get(`/api/crags/${id}/members`).set(strangerAuth)
+    ));
+    await expectHiddenLikeMissing((id) => (
+      request(strangerApp).get(`/api/crags/${id}/accounts`).query({ email: 'a@b.co' }).set(strangerAuth)
+    ));
+    await expectHiddenLikeMissing((id) => (
+      request(strangerApp).put(`/api/crags/${id}/members/user-a`).set(strangerAuth).send({ role: 'admin' })
+    ));
+    await expectHiddenLikeMissing((id) => (
+      request(strangerApp).delete(`/api/crags/${id}/members/user-a`).set(strangerAuth)
+    ));
+    await expectHiddenLikeMissing((id) => (
+      request(strangerApp).post(`/api/crags/${id}/sectors`).set(strangerAuth).send({ name: 'Cave' })
+    ));
+    await expectHiddenLikeMissing((id) => (
+      request(strangerApp).put(`/api/crags/${id}/sectors/cave-1`).set(strangerAuth).send({
+        version: 1,
+        name: 'Cave',
+      })
+    ));
+    await expectHiddenLikeMissing((id) => (
+      request(strangerApp).patch(`/api/crags/${id}/sectors/cave-1`).set(strangerAuth).send({
+        version: 1,
+        geo: { lat: 1, lon: 2 },
+      })
+    ));
+    await expectHiddenLikeMissing((id) => (
+      request(strangerApp).delete(`/api/crags/${id}/sectors/cave-1`).set(strangerAuth)
+    ));
+    await expectHiddenLikeMissing((id) => (
+      request(strangerApp).post(`/api/crags/${id}/images`).set(strangerAuth)
+    ));
+    async function expectForbiddenEitherWay(
+      run: (id: string) => PromiseLike<{ status: number; body: unknown }>,
+    ) {
+      const hidden = await run('roshka');
+      const missing = await run('no-such-crag');
+      expect(hidden.status).toBe(403);
+      expect(hidden.body).toEqual({ error: 'forbidden' });
+      expect(missing.status).toBe(403);
+      expect(missing.body).toEqual(hidden.body);
+    }
+    await expectForbiddenEitherWay((id) => (
+      request(strangerApp).patch(`/api/crags/${id}/settings`).set(strangerAuth).send({
+        version: 1,
+        published: true,
+      })
+    ));
+    await expectForbiddenEitherWay((id) => (
+      request(strangerApp).delete(`/api/crags/${id}`).set(strangerAuth)
+    ));
+    expect(await db.collection('crags').findOne({ _id: 'roshka' })).not.toBeNull();
+    const otherOwner = await request(userApp('other-owner'))
+      .patch('/api/crags/roshka')
+      .set('Authorization', 'Bearer other-owner-token')
+      .send(contentPatch);
+    expect(otherOwner.status).toBe(404);
+    expect(otherOwner.body).toEqual(notFoundBody);
+
+    const ownerEdit = await request(userApp('owner-user'))
+      .patch('/api/crags/roshka')
+      .set('Authorization', 'Bearer owner-token')
+      .send(contentPatch);
+    expect(ownerEdit.status).toBe(200);
+    const adminMembers = await request(userApp('admin-user'))
+      .get('/api/crags/roshka/members')
+      .set('Authorization', 'Bearer admin-token');
+    expect(adminMembers.status).toBe(200);
+    const adminLookup = await request(userApp('admin-user'))
+      .get('/api/crags/roshka/accounts')
+      .query({ email: 'a@b.co' })
+      .set('Authorization', 'Bearer admin-token');
+    expect(adminLookup.status).toBe(403);
+    expect(adminLookup.body).toEqual({ error: 'forbidden' });
+
+    const ownerPatch = await request(userApp('owner-user'))
+      .patch('/api/crags/roshka/settings')
+      .set('Authorization', 'Bearer owner-token')
+      .send({ version: 1, published: true });
+    expect(ownerPatch.status).toBe(403);
+    expect(ownerPatch.body).toEqual({ error: 'forbidden' });
+  });
+
+  it('lets a superadmin publish and unpublish an external crag', async () => {
+    await db.collection('crags').insertOne({
+      _id: 'roshka',
+      name: 'Roshka',
+      source: 'external',
+      protocolVersion: CRAG_DATA_PROTOCOL,
+      description: [],
+      trails: [],
+      markers: [],
+      externalId: '35366',
+      published: true,
+      version: 1,
+      updatedAt: new Date(),
+    });
+
+    const unpublished = await write().patch('/api/crags/roshka/settings').send({
+      version: 1,
+      published: false,
+    });
+    expect(unpublished.status).toBe(200);
+    expect(unpublished.body.published).toBe(false);
+    expect(unpublished.body.version).toBe(2);
+    expect((await request(app).get('/api/crags/roshka')).status).toBe(404);
+    expect((await request(app).get('/api/crags/roshka/gpx')).status).toBe(404);
+
+    const stranger = userApp('stranger');
+    const strangerAuth = { Authorization: 'Bearer stranger-token' };
+    const hiddenContent = await request(stranger)
+      .patch('/api/crags/roshka')
+      .set(strangerAuth)
+      .send({
+        version: 2,
+        description: [{ subheader: 'Access', paragraphs: ['Walk in.'] }],
+      });
+    expect(hiddenContent.status).toBe(404);
+    expect(hiddenContent.body).toEqual({ error: 'not_found', message: 'crag not found' });
+    const hiddenMembers = await request(stranger)
+      .get('/api/crags/roshka/members')
+      .set(strangerAuth);
+    expect(hiddenMembers.status).toBe(404);
+    expect(hiddenMembers.body).toEqual({ error: 'not_found', message: 'crag not found' });
+
+    await db.collection('crag_members').insertOne({
+      cragId: 'roshka',
+      userId: 'owner-user',
+      role: 'owner',
+    });
+    const ownerContent = await request(userApp('owner-user'))
+      .patch('/api/crags/roshka')
+      .set('Authorization', 'Bearer owner-token')
+      .send({
+        version: 2,
+        description: [{ subheader: 'Access', paragraphs: ['Walk in.'] }],
+      });
+    expect(ownerContent.status).toBe(403);
+    expect(ownerContent.body.error).toBe('read_only');
+
+    const superContent = await write().patch('/api/crags/roshka').send({
+      version: 2,
+      description: [{ subheader: 'Access', paragraphs: ['Walk in.'] }],
+    });
+    expect(superContent.status).toBe(403);
+    expect(superContent.body.error).toBe('read_only');
+
+    const renamed = await write().patch('/api/crags/roshka/settings').send({
+      version: 2,
+      name: 'Renamed',
+    });
+    expect(renamed.status).toBe(403);
+    expect(renamed.body.error).toBe('read_only');
+
+    const published = await write().patch('/api/crags/roshka/settings').send({
+      version: 2,
+      published: true,
+    });
+    expect(published.status).toBe(200);
+    expect(published.body.published).toBe(true);
+    const catalog = await request(app).get('/api/crags');
+    expect(catalog.body).toEqual([
+      expect.objectContaining({ id: 'roshka', published: true, source: 'external' }),
+    ]);
+  });
+
+  it('keeps a crag public when published is missing', async () => {
+    await db.collection('crags').insertOne({
+      _id: 'legacy',
+      name: 'Legacy',
+      source: 'external',
+      protocolVersion: CRAG_DATA_PROTOCOL,
+      description: [],
+      trails: [],
+      markers: [],
+      version: 1,
+      updatedAt: new Date(),
+    });
+    const catalog = await request(app).get('/api/crags');
+    expect(catalog.body).toEqual([
+      expect.objectContaining({ id: 'legacy', published: true }),
+    ]);
+    expect((await request(app).get('/api/crags/legacy')).status).toBe(200);
   });
 });

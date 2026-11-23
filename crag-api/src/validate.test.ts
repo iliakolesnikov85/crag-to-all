@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HttpError } from './http';
-import { parseCragId, parseCragPatch, parseCreateCrag, parseSectorPatch, parseSectorWrite } from './validate';
+import { parseCragContentPatch, parseCragId, parseCragSettingsPatch, parseCreateCrag, parseSectorPatch, parseSectorWrite } from './validate';
 
 describe('validate', () => {
   it('requires an explicit lowercase id and defaults source to explorer', () => {
@@ -58,12 +58,26 @@ describe('validate', () => {
   });
 
   it('rejects opentopoTilePack on a crag patch', () => {
-    try {
-      parseCragPatch({ version: 1, opentopoTilePack: null });
-      throw new Error('expected parseCragPatch to throw');
-    } catch (error) {
-      expect(error).toBeInstanceOf(HttpError);
-      expect((error as HttpError).status).toBe(400);
+    const bodies = [
+      () => parseCragContentPatch({
+        version: 1,
+        description: [],
+        opentopoTilePack: null,
+      }),
+      () => parseCragSettingsPatch({
+        version: 1,
+        name: 'Roshka',
+        opentopoTilePack: null,
+      }),
+    ];
+    for (const parse of bodies) {
+      try {
+        parse();
+        throw new Error('expected the crag patch parser to throw');
+      } catch (error) {
+        expect(error).toBeInstanceOf(HttpError);
+        expect((error as HttpError).status).toBe(400);
+      }
     }
   });
 
@@ -72,9 +86,46 @@ describe('validate', () => {
   });
 
   it('rejects a PATCH that only sends version', () => {
+    for (const parse of [parseCragContentPatch, parseCragSettingsPatch]) {
+      try {
+        parse({ version: 1 });
+        throw new Error('expected the crag patch parser to throw');
+      } catch (error) {
+        expect(error).toBeInstanceOf(HttpError);
+        expect((error as HttpError).status).toBe(400);
+      }
+    }
+  });
+
+  it('keeps name and published off the content patch', () => {
+    expect(parseCragContentPatch({
+      version: 1,
+      description: [{ subheader: 'Access', paragraphs: ['Walk in.'] }],
+    })).toEqual({
+      version: 1,
+      description: [{ subheader: 'Access', paragraphs: ['Walk in.'] }],
+    });
     try {
-      parseCragPatch({ version: 1 });
-      throw new Error('expected parseCragPatch to throw');
+      parseCragContentPatch({ version: 1, name: 'Roshka', published: true });
+      throw new Error('expected parseCragContentPatch to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(HttpError);
+      expect((error as HttpError).status).toBe(400);
+    }
+  });
+
+  it('keeps description off the settings patch', () => {
+    expect(parseCragSettingsPatch({ version: 2, name: ' Roshka ', published: false })).toEqual({
+      version: 2,
+      name: 'Roshka',
+      published: false,
+    });
+    try {
+      parseCragSettingsPatch({
+        version: 1,
+        description: [{ subheader: 'Access', paragraphs: ['Walk in.'] }],
+      });
+      throw new Error('expected parseCragSettingsPatch to throw');
     } catch (error) {
       expect(error).toBeInstanceOf(HttpError);
       expect((error as HttpError).status).toBe(400);

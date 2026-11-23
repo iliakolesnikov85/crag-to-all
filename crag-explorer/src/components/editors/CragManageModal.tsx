@@ -7,7 +7,7 @@ import {
   validateCragId,
   validateCragName,
 } from '@crag-to-all/shared-crag';
-import type { CragCreateInput } from '../../api/client';
+import type { CragCreateInput, CragSettingsPatch } from '../../api/client';
 import type { Crag, CragSource } from '../../types';
 import Button from '../Button';
 import Modal from '../Modal';
@@ -26,7 +26,7 @@ interface CragManageModalProps {
   error: string | null;
   onClose: () => void;
   onCreate: (input: CragCreateInput) => void;
-  onRename: (name: string) => void;
+  onSave: (input: CragSettingsPatch) => void;
 }
 
 const CragManageModal: React.FC<CragManageModalProps> = ({
@@ -36,21 +36,22 @@ const CragManageModal: React.FC<CragManageModalProps> = ({
   error,
   onClose,
   onCreate,
-  onRename,
+  onSave,
 }) => {
   const formId = useId().replace(/:/g, '');
   const idField = `${formId}-id`;
   const nameField = `${formId}-name`;
   const sourceField = `${formId}-source`;
   const externalField = `${formId}-external`;
+  const publishedField = `${formId}-published`;
   const editedCrag = mode === 'edit' ? crag : null;
   const readOnly = editedCrag?.source === 'external';
-  const [id, setId] = useState(editedCrag?.id ?? '');
+  const savedPublished = editedCrag?.published !== false;
+  const [id, setId] = useState('');
   const [name, setName] = useState(editedCrag?.cragName ?? '');
-  const [source, setSource] = useState<CragSource>(
-    editedCrag?.source === 'external' ? 'external' : 'explorer',
-  );
+  const [source, setSource] = useState<CragSource>('explorer');
   const [externalId, setExternalId] = useState('');
+  const [published, setPublished] = useState(savedPublished);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   const handleClose = () => {
@@ -69,19 +70,28 @@ const CragManageModal: React.FC<CragManageModalProps> = ({
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (saving || readOnly) return;
+    if (saving) return;
     if (editedCrag) {
+      const publishedChanged = published !== savedPublished;
+      if (readOnly) {
+        if (publishedChanged) onSave({ published });
+        else onClose();
+        return;
+      }
       const nameResult = validateCragName(name);
       if (!nameResult.ok) {
         setFieldErrors({ name: nameResult.error });
         return;
       }
-      if (nameResult.value === editedCrag.cragName) {
+      const nameChanged = nameResult.value !== editedCrag.cragName;
+      if (!nameChanged && !publishedChanged) {
         onClose();
         return;
       }
-      setFieldErrors({});
-      onRename(nameResult.value);
+      onSave({
+        ...(nameChanged ? { name: nameResult.value } : {}),
+        ...(publishedChanged ? { published } : {}),
+      });
       return;
     }
     const idResult = validateCragId(id);
@@ -95,21 +105,23 @@ const CragManageModal: React.FC<CragManageModalProps> = ({
       setFieldErrors(errors);
       return;
     }
-    setFieldErrors({});
-    const input: CragCreateInput = {
+    onCreate({
       id: idResult.value,
       name: nameResult.value,
       source,
-    };
-    if (externalResult?.ok) input.externalId = externalResult.value;
-    onCreate(input);
+      ...(externalResult?.ok ? { externalId: externalResult.value } : {}),
+    });
   };
 
   const title = mode === 'create' ? 'Add crag' : readOnly ? 'Crag' : 'Edit crag';
-  const shownSource = editedCrag ? (editedCrag.source ?? 'explorer') : source;
-  const canSave = !saving && !readOnly && name.trim().length > 0
-    && (editedCrag != null || id.trim().length > 0)
-    && (editedCrag != null || source !== 'external' || externalId.trim().length > 0);
+  const nameReady = name.trim().length > 0;
+  const canSave = !saving && (
+    editedCrag
+      ? readOnly || nameReady
+      : nameReady
+        && id.trim().length > 0
+        && (source !== 'external' || externalId.trim().length > 0)
+  );
 
   return (
     <Modal
@@ -120,13 +132,11 @@ const CragManageModal: React.FC<CragManageModalProps> = ({
       footer={
         <>
           <Button type="button" variant="secondary" onClick={handleClose} disabled={saving}>
-            {readOnly ? 'Close' : 'Cancel'}
+            Cancel
           </Button>
-          {readOnly ? null : (
-            <Button type="submit" form={formId} disabled={!canSave}>
-              {saving ? 'Saving...' : 'Save'}
-            </Button>
-          )}
+          <Button type="submit" form={formId} disabled={!canSave}>
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
         </>
       }
     >
@@ -164,23 +174,18 @@ const CragManageModal: React.FC<CragManageModalProps> = ({
             </p>
           ) : null}
         </div>
-        {editedCrag ? (
-          <div className="crag-manage-form__field">
-            <label className="crag-manage-form__label" htmlFor={sourceField}>
-              Source
-            </label>
+        <div className="crag-manage-form__field">
+          <label className="crag-manage-form__label" htmlFor={sourceField}>
+            Source
+          </label>
+          {editedCrag ? (
             <input
               id={sourceField}
               className="crag-manage-form__input"
-              value={shownSource}
+              value={editedCrag.source ?? 'explorer'}
               disabled
             />
-          </div>
-        ) : (
-          <div className="crag-manage-form__field">
-            <label className="crag-manage-form__label" htmlFor={sourceField}>
-              Source
-            </label>
+          ) : (
             <select
               id={sourceField}
               className="crag-manage-form__input"
@@ -195,8 +200,8 @@ const CragManageModal: React.FC<CragManageModalProps> = ({
               <option value="explorer">explorer</option>
               <option value="external">external</option>
             </select>
-          </div>
-        )}
+          )}
+        </div>
         {readOnly ? null : (
           <div className="crag-manage-form__field">
             <label className="crag-manage-form__label" htmlFor={nameField}>
@@ -223,6 +228,19 @@ const CragManageModal: React.FC<CragManageModalProps> = ({
             ) : null}
           </div>
         )}
+        {editedCrag ? (
+          <label className="crag-manage-form__check" htmlFor={publishedField}>
+            <input
+              id={publishedField}
+              className="crag-manage-form__check-input"
+              type="checkbox"
+              checked={published}
+              disabled={saving}
+              onChange={(event) => setPublished(event.target.checked)}
+            />
+            Published
+          </label>
+        ) : null}
         {editedCrag == null && source === 'external' ? (
           <div className="crag-manage-form__field">
             <label className="crag-manage-form__label" htmlFor={externalField}>

@@ -15,9 +15,10 @@ import {
 import { z, ZodError } from 'zod';
 import { badRequest } from './http';
 import type {
+  CragContentPatchInput,
   CragCreateInput,
   CragMemberRole,
-  CragPatchInput,
+  CragSettingsPatchInput,
   SectorPatch,
   SectorWriteInput,
 } from './types';
@@ -162,21 +163,30 @@ const createCragBodySchema = z
     { message: CRAG_EXTERNAL_ID_FORBIDDEN_MESSAGE, path: ['externalId'] },
   );
 
-const cragPatchSchema = z
+const cragContentPatchSchema = z
   .strictObject({
     version: versionSchema,
-    name: cragString(validateCragName).optional(),
     description: z.array(descriptionSchema).optional(),
     trails: z.array(trailSchema).optional(),
     markers: z.array(markerSchema).optional(),
   })
   .refine(
     (patch) =>
-      patch.name !== undefined ||
       patch.description !== undefined ||
       patch.trails !== undefined ||
       patch.markers !== undefined,
-    { message: 'PATCH body must include at least one crag field besides version' },
+    { message: 'PATCH body must include description, trails, or markers' },
+  );
+
+const cragSettingsPatchSchema = z
+  .strictObject({
+    version: versionSchema,
+    name: cragString(validateCragName).optional(),
+    published: z.boolean().optional(),
+  })
+  .refine(
+    (patch) => patch.name !== undefined || patch.published !== undefined,
+    { message: 'PATCH body must include name or published' },
   );
 
 const sectorBodySchema = z.object({
@@ -296,8 +306,12 @@ function parseCreateCrag(body: unknown): CragCreateInput {
   return input;
 }
 
-function parseCragPatch(body: unknown): CragPatchInput {
-  return parseWith(cragPatchSchema, body);
+function parseCragContentPatch(body: unknown): CragContentPatchInput {
+  return parseWith(cragContentPatchSchema, body);
+}
+
+function parseCragSettingsPatch(body: unknown): CragSettingsPatchInput {
+  return parseWith(cragSettingsPatchSchema, body);
 }
 
 function parseSectorWrite(body: unknown): SectorWriteInput {
@@ -326,8 +340,9 @@ function parseReplaceSector(body: unknown): { version: number; sector: SectorWri
 }
 
 export {
+  parseCragContentPatch,
   parseCragId,
-  parseCragPatch,
+  parseCragSettingsPatch,
   parseCreateCrag,
   parseAccountEmail,
   parseMemberRole,

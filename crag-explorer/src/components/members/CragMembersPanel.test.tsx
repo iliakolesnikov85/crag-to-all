@@ -24,7 +24,7 @@ vi.mock('../../api/client', async () => {
   };
 });
 
-const explorerCrag: Crag = { id: 'roshka', cragName: 'Roshka', source: 'explorer' };
+const explorerCrag: Crag = { id: 'roshka', cragName: 'Roshka', source: 'explorer', published: true };
 
 const members = [
   { userId: 'admin-1', role: 'admin' as const, email: 'ada@example.com', name: 'Ada' },
@@ -70,7 +70,7 @@ describe('CragMembersPanel', () => {
 
   it('stays hidden on an extracted crag', () => {
     signIn({ uid: 'owner-user', superadmin: false, roles: { shulaveri: 'owner' } });
-    renderPanel({ id: 'shulaveri', cragName: 'Shulaveri', source: 'external' });
+    renderPanel({ id: 'shulaveri', cragName: 'Shulaveri', source: 'external', published: true });
     expect(screen.queryByRole('heading', { name: 'Authors' })).not.toBeInTheDocument();
   });
 

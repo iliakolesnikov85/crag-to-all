@@ -11,7 +11,7 @@ describe('NotFound', () => {
       <MemoryRouter>
         <CragContext.Provider
           value={{
-            crag: { id: SAMPLE_CRAG_ID, cragName: 'Test Crag' },
+            crag: { id: SAMPLE_CRAG_ID, cragName: 'Test Crag', published: true },
             getUrl: (url: string) => `/test-crag${url}`,
           }}
         >

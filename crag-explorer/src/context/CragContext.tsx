@@ -7,7 +7,7 @@ export interface CragContextType {
 }
 
 export const CragContext = createContext<CragContextType>({
-  crag: { id: '', cragName: '' },
+  crag: { id: '', cragName: '', published: true },
   getUrl: () => {
     throw new Error('getUrl not implemented');
   },

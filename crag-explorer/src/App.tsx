@@ -12,7 +12,8 @@ import {
   SectorPage,
   RoutePage,
   DownloadPage,
-  TeamPage,
+  AboutPage,
+  AuthorsPage,
   NotFound,
   Homepage,
   BetaVideos,
@@ -26,7 +27,7 @@ import { CragContext, useCrag, type CragContextType } from './context/CragContex
 import { FilterContext, useFilterState } from './context/FilterContext';
 
 const EMPTY_CRAG_CONTEXT: CragContextType = {
-  crag: { id: '', cragName: '' },
+  crag: { id: '', cragName: '', published: true },
   getUrl: () => {
     throw new Error('getUrl not implemented');
   },
@@ -95,7 +96,7 @@ const AppContent: React.FC = () => {
           path={`/download`}
           element={<DownloadPage cragData={cragData} />}
         />
-        <Route path={`/team`} element={<TeamPage />} />
+        <Route path={`/authors`} element={<AuthorsPage />} />
         <Route
           path={`/sector/:sectorName`}
           element={
@@ -138,6 +139,7 @@ export const AppRoutes: React.FC = () => {
   } else if (crags.length === 0) {
     page = (
       <Routes>
+        <Route path="/about" element={<AboutPage />} />
         <Route path="/crag-manage" element={<CragManagePage />} />
         <Route
           path="*"
@@ -152,6 +154,7 @@ export const AppRoutes: React.FC = () => {
   } else {
     page = (
       <Routes>
+        <Route path="/about" element={<AboutPage />} />
         <Route path="/crag-manage" element={<CragManagePage />} />
         <Route path="/" element={<Homepage crags={crags} />} />
         {crags.map((item) => (

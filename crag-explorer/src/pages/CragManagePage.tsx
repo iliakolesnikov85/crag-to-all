@@ -3,8 +3,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   createCrag,
   deleteCrag,
-  patchCrag,
+  patchCragSettings,
   type CragCreateInput,
+  type CragSettingsPatch,
 } from '../api/client';
 import { queryKeys } from '../api/queryClient';
 import { useCragsQuery } from '../api/useCragsQuery';
@@ -41,9 +42,9 @@ const CragManagePage: React.FC = () => {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const refreshCrag = async (cragId?: string) => {
-    await queryClient.invalidateQueries({ queryKey: queryKeys.crags });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.cragsAll });
     if (cragId) {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.crag(cragId) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.cragAll(cragId) });
     }
   };
 
@@ -58,16 +59,16 @@ const CragManagePage: React.FC = () => {
     },
   });
 
-  const saveName = useMutation({
-    mutationFn: (input: { cragId: string; version: number; name: string }) => (
-      patchCrag(input.cragId, input.version, { name: input.name })
+  const saveEdit = useMutation({
+    mutationFn: (input: { cragId: string; version: number; patch: CragSettingsPatch }) => (
+      patchCragSettings(input.cragId, input.version, input.patch)
     ),
     onSuccess: async (_saved, input) => {
       await refreshCrag(input.cragId);
       setEditor(null);
     },
     onError: (error) => {
-      console.error('Failed to rename crag:', error);
+      console.error('Failed to save crag:', error);
     },
   });
 
@@ -83,12 +84,12 @@ const CragManagePage: React.FC = () => {
 
   if (account?.superadmin !== true) return <NotFound />;
 
-  const busy = saveCreate.isPending || saveName.isPending || removeCrag.isPending;
+  const busy = saveCreate.isPending || saveEdit.isPending || removeCrag.isPending;
   const crags = cragsQuery.data ?? [];
 
   const openEditor = (next: Editor) => {
     saveCreate.reset();
-    saveName.reset();
+    saveEdit.reset();
     setActionError(null);
     setEditorSession((value) => value + 1);
     setEditor(next);
@@ -118,20 +119,21 @@ const CragManagePage: React.FC = () => {
     saveCreate.mutate(input);
   };
 
-  const handleRename = (name: string) => {
+  const handleSave = (patch: CragSettingsPatch) => {
     if (busy || editor?.mode !== 'edit') return;
     const crag = editor.crag;
     if (typeof crag.version !== 'number') {
-      setActionError('Reload the page before renaming this crag.');
+      setActionError('Reload the page before saving this crag.');
       return;
     }
+    if (patch.name === undefined && patch.published === undefined) return;
     setActionError(null);
-    saveName.mutate({ cragId: crag.id, version: crag.version, name });
+    saveEdit.mutate({ cragId: crag.id, version: crag.version, patch });
   };
 
   const modalError = editor?.mode === 'create'
     ? errorText(saveCreate.error, 'Could not create the crag.')
-    : actionError ?? errorText(saveName.error, 'Could not rename the crag.');
+    : actionError ?? errorText(saveEdit.error, 'Could not save the crag.');
 
   return (
     <div className="page crag-manage">
@@ -159,6 +161,7 @@ const CragManagePage: React.FC = () => {
               <th>Name</th>
               <th>Source</th>
               <th>Sectors</th>
+              <th>Published</th>
               <th>Updated</th>
               <th className="crag-manage__actions">Actions</th>
             </tr>
@@ -170,6 +173,7 @@ const CragManagePage: React.FC = () => {
                 <td>{crag.cragName}</td>
                 <td>{crag.source ?? ''}</td>
                 <td>{typeof crag.sectorCount === 'number' ? crag.sectorCount : ''}</td>
+                <td>{crag.published === false ? 'No' : 'Yes'}</td>
                 <td title={crag.updatedAt}>{formatUpdatedAt(crag.updatedAt)}</td>
                 <td className="crag-manage__actions">
                   <div className="crag-manage__action-buttons">
@@ -212,14 +216,14 @@ const CragManagePage: React.FC = () => {
           key={editorSession}
           mode={editor.mode}
           crag={editor.mode === 'edit' ? editor.crag : null}
-          saving={saveCreate.isPending || saveName.isPending}
+          saving={saveCreate.isPending || saveEdit.isPending}
           error={modalError}
           onClose={() => {
             if (busy) return;
             setEditor(null);
           }}
           onCreate={handleCreate}
-          onRename={handleRename}
+          onSave={handleSave}
         />
       ) : null}
     </div>

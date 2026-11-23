@@ -18,6 +18,8 @@ export interface AuthAccount {
 }
 
 let account: AuthAccount | null = null;
+/** False until the first sign-in answer. A refresh starts here, before Firebase restores the user. */
+let authReady = false;
 const listeners = new Set<() => void>();
 
 function notify(): void {
@@ -38,16 +40,27 @@ export function isSignedIn(): boolean {
   return account !== null;
 }
 
+export function isAuthReady(): boolean {
+  return authReady;
+}
+
+/** Sign-in has not answered yet. The next `setAuthAccount` marks it ready. */
+export function setAuthPending(): void {
+  if (!authReady) return;
+  authReady = false;
+  notify();
+}
+
 export function setAuthAccount(next: AuthAccount | null): void {
-  if (
-    account?.uid === next?.uid
+  const sameAccount = account?.uid === next?.uid
     && account?.email === next?.email
     && account?.displayName === next?.displayName
     && account?.emailVerified === next?.emailVerified
     && account?.superadmin === next?.superadmin
-    && account?.roles === next?.roles
-  ) return;
+    && account?.roles === next?.roles;
+  if (sameAccount && authReady) return;
   account = next;
+  authReady = true;
   notify();
 }
 

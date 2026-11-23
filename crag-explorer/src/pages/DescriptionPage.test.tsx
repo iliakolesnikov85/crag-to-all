@@ -36,7 +36,7 @@ vi.mock('../components/RichTextInput', () => ({
 const CRAG_ID = 'shulaveri';
 
 const cragValue = {
-  crag: { id: CRAG_ID, cragName: 'Shulaveri' },
+  crag: { id: CRAG_ID, cragName: 'Shulaveri', published: true },
   getUrl: (url: string) => url,
 };
 

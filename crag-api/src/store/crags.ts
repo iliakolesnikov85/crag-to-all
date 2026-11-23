@@ -18,7 +18,9 @@ import type {
   CragResponse,
   SectorDocument,
 } from '../types';
+import { canReadCrag, hasWriteMembership, isPublicCrag } from './access';
 import { cragsCol, membersCol, now, sectorsCol } from './collections';
+import { listCallerMemberships } from './members';
 
 interface SectorCount {
   _id: string;
@@ -37,25 +39,25 @@ function duplicateKeyField(error: unknown): string | undefined {
   return Object.keys(pattern)[0];
 }
 
-async function hasWriteMembership(db: Db, cragId: string, userId: string): Promise<boolean> {
-  const member = await membersCol(db).findOne(
-    { cragId, userId },
-    { projection: { role: 1 } },
-  );
-  return member?.role === 'owner' || member?.role === 'admin';
-}
-
-export async function listCrags(db: Db) {
-  const [docs, counts] = await Promise.all([
+export async function listCrags(db: Db, caller: AuthCaller | null) {
+  const [docs, counts, staffIds] = await Promise.all([
     cragsCol(db).find().sort({ name: 1 }).toArray(),
     sectorsCol(db)
       .aggregate<SectorCount>([
         { $group: { _id: '$cragId', sectorCount: { $sum: 1 } } },
       ])
       .toArray(),
+    caller && !caller.superadmin
+      ? listCallerMemberships(db, caller).then((rows) => new Set(rows.map((row) => row.cragId)))
+      : Promise.resolve(null),
   ]);
   const countById = new Map(counts.map((row) => [row._id, row.sectorCount]));
-  return docs.map((doc) => toCrag(doc, countById.get(doc._id) ?? 0));
+  const visible = docs.filter((doc) => {
+    if (isPublicCrag(doc)) return true;
+    if (!caller || !staffIds) return caller?.superadmin === true;
+    return staffIds.has(doc._id);
+  });
+  return visible.map((doc) => toCrag(doc, countById.get(doc._id) ?? 0));
 }
 
 /** Inserts an empty crag and no `crag_members` row. */
@@ -69,6 +71,7 @@ export async function createCrag(db: Db, input: CragCreateInput): Promise<CragRe
     description: [],
     trails: [],
     markers: [],
+    published: false,
     version: 1,
     updatedAt,
   };
@@ -88,17 +91,28 @@ export async function createCrag(db: Db, input: CragCreateInput): Promise<CragRe
   return toCragResponse(doc);
 }
 
-export async function getAssembledCrag(db: Db, cragId: string): Promise<CragData> {
+export async function loadCrag(db: Db, cragId: string): Promise<CragDocument> {
   const crag = await cragsCol(db).findOne({ _id: cragId });
   if (!crag) throw notFound('crag');
+  return crag;
+}
+
+export async function getAssembledCrag(
+  db: Db,
+  cragId: string,
+  caller: AuthCaller | null,
+): Promise<CragData> {
+  const crag = await loadCrag(db, cragId);
+  if (!(await canReadCrag(db, crag, caller))) throw notFound('crag');
   const sectors = await sectorsCol(db).find({ cragId }).toArray();
   sectors.sort(compareSectorsByOrder);
   return toCragData(crag, sectors);
 }
 
 /**
- * The crag exists and this caller may change it.
- * Extracted crags stay read-only for every role, including a superadmin.
+ * The crag exists and this caller may change its content.
+ * A hidden crag is not found when this caller cannot read it.
+ * An extracted crag is read-only for every role that can see it.
  * An explorer crag allows a superadmin, or a `crag_members` owner or admin.
  */
 export async function requireWritableCrag(
@@ -106,8 +120,8 @@ export async function requireWritableCrag(
   cragId: string,
   caller: AuthCaller,
 ): Promise<CragDocument> {
-  const crag = await cragsCol(db).findOne({ _id: cragId });
-  if (!crag) throw notFound('crag');
+  const crag = await loadCrag(db, cragId);
+  if (!(await canReadCrag(db, crag, caller))) throw notFound('crag');
   if (crag.source === 'external') {
     throw readOnly('An extracted crag is read-only');
   }
@@ -129,6 +143,7 @@ export async function patchCrag(
 
   const $set: Omit<Partial<CragDocument>, '_id'> = { updatedAt: now() };
   if (patch.name !== undefined) $set.name = patch.name;
+  if (patch.published !== undefined) $set.published = patch.published;
   if (patch.description !== undefined) $set.description = patch.description;
   if (patch.trails !== undefined) $set.trails = patch.trails;
   if (patch.markers !== undefined) $set.markers = patch.markers;

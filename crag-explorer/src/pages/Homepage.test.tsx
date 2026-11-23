@@ -11,10 +11,11 @@ import {
 } from '../utils/offline';
 import Homepage from './Homepage';
 
-const DOWNLOADED: Crag = { id: SAMPLE_CRAG_ID, cragName: 'Test Crag' };
+const DOWNLOADED: Crag = { id: SAMPLE_CRAG_ID, cragName: 'Test Crag', published: true };
 const UNDOWNLOADED: Crag = {
   id: 'other-crag',
   cragName: 'Other Crag',
+  published: true,
   description: 'Sandstone bouldering with short approaches and plenty of new lines.',
 };
 const crags = [DOWNLOADED, UNDOWNLOADED];
@@ -58,6 +59,29 @@ describe('Homepage offline disable', () => {
     expect(
       screen.getByText('Test Crag').closest('.crag-card')?.querySelector('.crag-card__body'),
     ).toBeNull();
+    expect(screen.queryByText('Unpublished')).not.toBeInTheDocument();
+  });
+
+  it('shows an Unpublished badge on cards for unpublished crags', () => {
+    const unpublished: Crag = {
+      id: 'draft-crag',
+      cragName: 'Draft Crag',
+      published: false,
+    };
+
+    render(
+      <AppOnlineProvider>
+        <MemoryRouter>
+          <Homepage crags={[DOWNLOADED, unpublished]} />
+        </MemoryRouter>
+      </AppOnlineProvider>,
+    );
+
+    const badge = screen.getByText('Unpublished');
+    expect(badge.closest('.crag-card')).toHaveTextContent('Draft Crag');
+    expect(screen.getByText('Test Crag').closest('.crag-card')).not.toHaveTextContent(
+      'Unpublished',
+    );
   });
 
   it('disables undownloaded crags while offline and leaves saved ones openable', async () => {

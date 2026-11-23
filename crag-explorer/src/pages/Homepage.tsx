@@ -9,6 +9,7 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import OfflineStatusBadge, {
   OfflineBadgeState,
 } from '../components/OfflineStatusBadge';
+import UnpublishedBadge from '../components/UnpublishedBadge';
 import { siteConfig, cragConfigs } from '../../scripts/seo-config.js';
 
 interface HomepageProps {
@@ -108,6 +109,7 @@ const Homepage: React.FC<HomepageProps> = ({ crags }) => {
               key={crag.id}
               className={`crag-card${disabled ? ' crag-card--disabled' : ''}`}
             >
+              {crag.published === false && <UnpublishedBadge variant="card" />}
               {showBadge && (
                 <OfflineStatusBadge
                   state={badgeState}

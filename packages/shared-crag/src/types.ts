@@ -140,6 +140,11 @@ export interface Crag {
   source?: CragSource;
   /** Sectors stored for this crag. Present on catalog responses. */
   sectorCount?: number;
+  /**
+   * False when the crag is hidden from people who do not manage it.
+   * The catalog always sends a boolean. A missing stored value is true.
+   */
+  published: boolean;
   /** Present on catalog responses. */
   updatedAt?: string;
   /** Present on catalog responses. Used to rename without loading the crag. */

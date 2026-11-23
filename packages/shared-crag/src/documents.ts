@@ -18,6 +18,11 @@ export interface CragDocument {
   description: DescriptionSection[];
   trails: CragMapTrail[];
   markers: CragMapMarker[];
+  /**
+   * Absent on older documents. Absent or true means the crag is public.
+   * New writes always set true or false.
+   */
+  published?: boolean;
   opentopoTilePack?: OpenTopoTilePackInfo;
   /** Upstream crag id. Omitted from API responses. */
   externalId?: string;

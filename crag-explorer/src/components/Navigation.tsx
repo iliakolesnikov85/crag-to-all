@@ -1,32 +1,41 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router';
+import { useCanEditCrag } from '../auth/useAuthSession';
 import { useCrag } from '../context/CragContext';
 import './Navigation.scss';
+
+interface NavTab {
+  path: string;
+  label: string;
+}
 
 const Navigation: React.FC = () => {
   const location = useLocation();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const { getUrl } = useCrag();
-  
-  const mainTabs = [
+  const { crag, getUrl } = useCrag();
+  const showAuthors = useCanEditCrag(crag);
+
+  const mainTabs: NavTab[] = [
     { path: `/routes`, label: 'Routes' },
     { path: `/map`, label: 'Map' },
     { path: `/download`, label: 'Download' }
   ];
 
-  const dropdownTabs = [
+  const authorsTab: NavTab = { path: `/authors`, label: 'Authors' };
+
+  const dropdownTabs: NavTab[] = [
     { path: `/overview`, label: 'Overview' },
     { path: `/description`, label: 'Description' },
-    { path: `/team`, label: 'Team' }
+    ...(showAuthors ? [authorsTab] : []),
   ];
 
-  const allTabs = [
+  const allTabs: NavTab[] = [
     { path: `/overview`, label: 'Overview' },
     { path: `/routes`, label: 'Routes' },
     { path: `/map`, label: 'Map' },
     { path: `/download`, label: 'Download' },
     { path: `/description`, label: 'Description' },
-    { path: `/team`, label: 'Team' }
+    ...(showAuthors ? [authorsTab] : []),
   ];
 
   const closeDropdown = () => {

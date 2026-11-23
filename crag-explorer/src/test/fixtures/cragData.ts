@@ -41,7 +41,7 @@ export const SAMPLE_CRAG_ID = 'test-crag';
 export const SAMPLE_IMAGE_FILE = WALL_IMAGE;
 
 export const sampleCrags: Crag[] = [
-  { id: SAMPLE_CRAG_ID, cragName: 'Test Crag' },
+  { id: SAMPLE_CRAG_ID, cragName: 'Test Crag', published: true },
 ];
 
 export const sampleCragData: CragData = {

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createCrag, deleteCrag, listCrags, patchCrag } from '../api/client';
+import { createCrag, deleteCrag, listCrags, patchCragSettings } from '../api/client';
 import { setAuthAccount, type AuthAccount } from '../auth/session';
 import { AppOnlineProvider } from '../context/AppOnlineContext';
 import { chooseConfirm, withQueryClient } from '../test/helpers';
@@ -15,7 +15,7 @@ vi.mock('../api/client', async () => {
     listCrags: vi.fn(),
     createCrag: vi.fn(),
     deleteCrag: vi.fn(),
-    patchCrag: vi.fn(),
+    patchCragSettings: vi.fn(),
   };
 });
 
@@ -27,6 +27,7 @@ const crags: Crag[] = [
     cragName: 'Roshka',
     source: 'explorer',
     sectorCount: 2,
+    published: true,
     updatedAt,
     version: 4,
   },
@@ -35,6 +36,7 @@ const crags: Crag[] = [
     cragName: 'Empty',
     source: 'external',
     sectorCount: 0,
+    published: false,
     updatedAt,
     version: 1,
   },
@@ -70,7 +72,7 @@ describe('CragManagePage', () => {
     vi.mocked(listCrags).mockResolvedValue(crags);
     vi.mocked(createCrag).mockReset();
     vi.mocked(deleteCrag).mockReset();
-    vi.mocked(patchCrag).mockReset();
+    vi.mocked(patchCragSettings).mockReset();
   });
 
   it('shows the catalog columns for a superadmin', async () => {
@@ -82,6 +84,7 @@ describe('CragManagePage', () => {
     expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Source' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Sectors' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Published' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Updated' })).toBeInTheDocument();
 
     const row = screen.getByRole('row', { name: /roshka/i });
@@ -89,6 +92,8 @@ describe('CragManagePage', () => {
     expect(within(row).getByText('Roshka')).toBeInTheDocument();
     expect(within(row).getByText('explorer')).toBeInTheDocument();
     expect(within(row).getByText('2')).toBeInTheDocument();
+    expect(within(row).getByText('Yes')).toBeInTheDocument();
+    expect(within(row).queryByRole('button', { name: 'Unpublish Roshka' })).not.toBeInTheDocument();
     expect(within(row).getByTitle(updatedAt)).toBeInTheDocument();
   });
 
@@ -136,7 +141,7 @@ describe('CragManagePage', () => {
     ];
     let saved = false;
     vi.mocked(listCrags).mockImplementation(async () => (saved ? renamed : crags));
-    vi.mocked(patchCrag).mockImplementation(async () => {
+    vi.mocked(patchCragSettings).mockImplementation(async () => {
       saved = true;
       return { name: 'Roshka Valley', version: 5 };
     });
@@ -150,7 +155,7 @@ describe('CragManagePage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
-      expect(patchCrag).toHaveBeenCalledWith('roshka', 4, { name: 'Roshka Valley' });
+      expect(patchCragSettings).toHaveBeenCalledWith('roshka', 4, { name: 'Roshka Valley' });
     });
     expect(await screen.findByRole('cell', { name: 'Roshka Valley' })).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -160,7 +165,7 @@ describe('CragManagePage', () => {
     signIn(true);
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const message = 'This crag was updated somewhere else. Reload the page and try again.';
-    vi.mocked(patchCrag).mockRejectedValue(new Error(message));
+    vi.mocked(patchCragSettings).mockRejectedValue(new Error(message));
     renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Roshka' }));
@@ -171,7 +176,7 @@ describe('CragManagePage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(message);
-    expect(patchCrag).toHaveBeenCalledWith('roshka', 4, { name: 'Roshka Valley' });
+    expect(patchCragSettings).toHaveBeenCalledWith('roshka', 4, { name: 'Roshka Valley' });
     expect(screen.getByRole('dialog', { name: 'Edit crag' })).toBeInTheDocument();
     errorSpy.mockRestore();
   });
@@ -188,8 +193,9 @@ describe('CragManagePage', () => {
     expect(within(dialog).getByLabelText('Source')).toBeDisabled();
     expect(within(dialog).queryByLabelText('Name')).not.toBeInTheDocument();
     expect(within(dialog).getByText('An extracted crag is read-only.')).toBeInTheDocument();
-    expect(within(dialog).queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
-    expect(within(dialog).getAllByRole('button', { name: 'Close' })).toHaveLength(2);
+    expect(within(dialog).getByRole('checkbox', { name: 'Published' })).not.toBeChecked();
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 
   it('rejects the reserved crag id before creating', async () => {
@@ -220,6 +226,35 @@ describe('CragManagePage', () => {
 
     await waitFor(() => {
       expect(deleteCrag).toHaveBeenCalledWith('empty-crag');
+    });
+  });
+
+  it('saves published from the edit dialog', async () => {
+    signIn(true);
+    vi.mocked(patchCragSettings).mockResolvedValue({ version: 5 });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Roshka' }));
+    const roshkaDialog = screen.getByRole('dialog', { name: 'Edit crag' });
+    const roshkaPublished = within(roshkaDialog).getByRole('checkbox', { name: 'Published' });
+    expect(roshkaPublished).toBeChecked();
+    fireEvent.click(roshkaPublished);
+    fireEvent.click(within(roshkaDialog).getByRole('button', { name: 'Save' }));
+    await waitFor(() => {
+      expect(patchCragSettings).toHaveBeenCalledWith('roshka', 4, { published: false });
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Empty' }));
+    const emptyDialog = screen.getByRole('dialog', { name: 'Crag' });
+    const emptyPublished = within(emptyDialog).getByRole('checkbox', { name: 'Published' });
+    expect(emptyPublished).not.toBeChecked();
+    fireEvent.click(emptyPublished);
+    fireEvent.click(within(emptyDialog).getByRole('button', { name: 'Save' }));
+    await waitFor(() => {
+      expect(patchCragSettings).toHaveBeenCalledWith('empty-crag', 1, { published: true });
     });
   });
 });

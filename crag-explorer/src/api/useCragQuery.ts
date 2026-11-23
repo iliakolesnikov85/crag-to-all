@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
+import { useAuthSession } from '../auth/useAuthSession';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import type { CragData } from '../types';
 import { isCragOffline, loadCragDataJson } from '../utils/offline';
@@ -27,11 +28,13 @@ async function queryCragData(cragId: string, online: boolean): Promise<CragData>
 
 export function useCragQuery(cragId: string | null) {
   const online = useOnlineStatus();
+  const account = useAuthSession();
+  const uid = account?.uid ?? null;
   const onlineRef = useRef(online);
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: queryKeys.crag(cragId ?? ''),
+    queryKey: queryKeys.crag(cragId ?? '', uid),
     enabled: Boolean(cragId),
     queryFn: () => {
       if (!cragId) throw new Error('Failed to load crag data');
@@ -43,8 +46,8 @@ export function useCragQuery(cragId: string | null) {
     if (onlineRef.current === online) return;
     onlineRef.current = online;
     if (!cragId) return;
-    void queryClient.invalidateQueries({ queryKey: queryKeys.crag(cragId) });
-  }, [online, cragId, queryClient]);
+    void queryClient.invalidateQueries({ queryKey: queryKeys.crag(cragId, uid) });
+  }, [online, cragId, queryClient, uid]);
 
   return query;
 }

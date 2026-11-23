@@ -3,7 +3,7 @@ import cors from 'cors';
 import express, { type Express, type Request, type RequestHandler } from 'express';
 import type { Db } from '@crag-to-all/shared-firebase';
 import { attachAccountProfiles, lookupVerifiedAccount } from './accounts';
-import { asyncHandler, errorHandler, forbidden, storageFailed, storageUnavailable, unauthorized } from './http';
+import { asyncHandler, errorHandler, forbidden, readOnly, storageFailed, storageUnavailable, unauthorized } from './http';
 import {
   cragImageStoragePath,
   imageUploadMiddleware,
@@ -19,6 +19,7 @@ import {
   listCallerMemberships,
   listCrags,
   listMembers,
+  loadCrag,
   patchCrag,
   patchSector,
   replaceSector,
@@ -27,7 +28,7 @@ import {
   upsertMember,
 } from './store';
 import type { AuthCaller, AuthDirectory, CragDocument, IdTokenVerifier, ImageStorage, ImageUploadResponse } from './types';
-import { parseAccountEmail, parseCragId, parseCreateCrag, parseCragPatch, parseMemberRole, parseMemberUserId, parseReplaceSector, parseSectorPatch, parseSectorId, parseSectorWrite } from './validate';
+import { parseAccountEmail, parseCragContentPatch, parseCragId, parseCragSettingsPatch, parseCreateCrag, parseMemberRole, parseMemberUserId, parseReplaceSector, parseSectorPatch, parseSectorId, parseSectorWrite } from './validate';
 
 function readBearerToken(header: string | undefined): string | null {
   if (!header) return null;
@@ -50,6 +51,35 @@ function loadedCaller(req: Request): AuthCaller {
     throw unauthorized();
   }
   return req.caller;
+}
+
+/**
+ * Sets `req.caller` from a bearer token.
+ * When `allowAnonymous` is true, a missing Authorization header continues with no caller.
+ */
+function bearerAuth(auth: IdTokenVerifier | undefined, allowAnonymous: boolean): RequestHandler {
+  return asyncHandler(async (req, _res, next) => {
+    const header = req.get('authorization');
+    if (allowAnonymous && header === undefined) {
+      next();
+      return;
+    }
+    const token = readBearerToken(header);
+    if (!token) {
+      throw unauthorized();
+    }
+    if (!auth) {
+      console.error('Rejected a request because no ID token verifier is configured');
+      throw unauthorized();
+    }
+    try {
+      req.caller = await auth.verifyIdToken(token);
+    } catch (error) {
+      console.error('Rejected a request because the ID token could not be verified:', error);
+      throw unauthorized();
+    }
+    next();
+  });
 }
 
 function requireCragWrite(db: Db): RequestHandler {
@@ -77,30 +107,9 @@ export interface AppOptions {
   accounts?: AuthDirectory;
 }
 
-export function requireAuth(auth: IdTokenVerifier | undefined): RequestHandler {
-  return asyncHandler(async (req, _res, next) => {
-    const token = readBearerToken(req.get('authorization'));
-    if (!token) {
-      throw unauthorized();
-    }
-    if (!auth) {
-      console.error('Rejected a crag write because no ID token verifier is configured');
-      throw unauthorized();
-    }
-    let caller: AuthCaller;
-    try {
-      caller = await auth.verifyIdToken(token);
-    } catch (error) {
-      console.error('Rejected a crag write because the ID token could not be verified:', error);
-      throw unauthorized();
-    }
-    req.caller = caller;
-    next();
-  });
-}
-
 export function createApp(db: Db, options: AppOptions = {}): Express {
-  const authenticate = requireAuth(options.auth);
+  const authenticate = bearerAuth(options.auth, false);
+  const readCaller = bearerAuth(options.auth, true);
   const writableCrag = requireCragWrite(db);
   const app = express();
   app.use(cors());
@@ -112,24 +121,27 @@ export function createApp(db: Db, options: AppOptions = {}): Express {
 
   app.get(
     '/api/crags',
-    asyncHandler(async (_req, res) => {
-      res.json(await listCrags(db));
+    readCaller,
+    asyncHandler(async (req, res) => {
+      res.json(await listCrags(db, req.caller ?? null));
     }),
   );
 
   app.get(
     '/api/crags/:cragId',
+    readCaller,
     asyncHandler(async (req, res) => {
       const cragId = parseCragId(req.params.cragId);
-      res.json(await getAssembledCrag(db, cragId));
+      res.json(await getAssembledCrag(db, cragId, req.caller ?? null));
     }),
   );
 
   app.get(
     '/api/crags/:cragId/gpx',
+    readCaller,
     asyncHandler(async (req, res) => {
       const cragId = parseCragId(req.params.cragId);
-      const crag = await getAssembledCrag(db, cragId);
+      const crag = await getAssembledCrag(db, cragId, req.caller ?? null);
       const xml = generateGPX(
         crag.sectors,
         crag.trails ?? [],
@@ -160,11 +172,23 @@ export function createApp(db: Db, options: AppOptions = {}): Express {
     authenticate,
     writableCrag,
     asyncHandler(async (req, res) => {
-      const patch = parseCragPatch(req.body);
-      if (patch.name !== undefined && !loadedCaller(req).superadmin) {
-        throw forbidden();
-      }
+      const patch = parseCragContentPatch(req.body);
       res.json(await patchCrag(db, loadedCrag(req), patch));
+    }),
+  );
+
+  /** Name and published. A superadmin may publish an extracted crag, but not rename it. */
+  app.patch(
+    '/api/crags/:cragId/settings',
+    authenticate,
+    requireSuperadmin(),
+    asyncHandler(async (req, res) => {
+      const patch = parseCragSettingsPatch(req.body);
+      const crag = await loadCrag(db, parseCragId(req.params.cragId));
+      if (patch.name !== undefined && crag.source === 'external') {
+        throw readOnly('An extracted crag is read-only');
+      }
+      res.json(await patchCrag(db, crag, patch));
     }),
   );
 

@@ -14,7 +14,7 @@ vi.mock('../api/client', () => ({
 }));
 
 const cragValue = {
-  crag: { id: SAMPLE_CRAG_ID, cragName: 'Test Crag' },
+  crag: { id: SAMPLE_CRAG_ID, cragName: 'Test Crag', published: true },
   getUrl: (url: string) => url,
 };
 

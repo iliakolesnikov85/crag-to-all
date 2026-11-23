@@ -1,11 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRef } from 'react';
+import { useAuthReady, useAuthSession } from '../auth/useAuthSession';
 import { useAppOnline } from '../context/AppOnlineContext';
 import { getOfflineCragIndex, putOfflineCragIndex } from '../utils/offline';
 import { listCrags } from './client';
 import { queryKeys } from './queryClient';
 
 export function useCragsQuery() {
+  const authReady = useAuthReady();
+  const account = useAuthSession();
+  const uid = account?.uid ?? null;
   const { markNetworkLimited, markNetworkOk } = useAppOnline();
   const markNetworkLimitedRef = useRef(markNetworkLimited);
   const markNetworkOkRef = useRef(markNetworkOk);
@@ -13,7 +17,10 @@ export function useCragsQuery() {
   markNetworkOkRef.current = markNetworkOk;
 
   return useQuery({
-    queryKey: queryKeys.crags,
+    queryKey: queryKeys.crags(uid),
+    // Unpublished crags are hidden until we know who is signed in.
+    // Loading earlier builds routes from the public list and flashes a 404.
+    enabled: authReady,
     queryFn: async ({ signal }) => {
       try {
         const data = await listCrags({

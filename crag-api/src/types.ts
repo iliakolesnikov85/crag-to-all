@@ -27,8 +27,14 @@ export interface CragCreateInput {
   externalId?: string;
 }
 
+export type CragContentPatchInput = Pick<CragDocument, 'version'> &
+  Partial<Pick<CragDocument, 'description' | 'trails' | 'markers'>>;
+
+export type CragSettingsPatchInput = Pick<CragDocument, 'version'> &
+  Partial<Pick<CragDocument, 'name' | 'published'>>;
+
 export type CragPatchInput = Pick<CragDocument, 'version'> &
-  Partial<Pick<CragDocument, 'name' | 'description' | 'trails' | 'markers'>>;
+  Partial<Pick<CragDocument, 'name' | 'description' | 'trails' | 'markers' | 'published'>>;
 
 export type SectorWriteInput = Omit<Sector, 'id' | 'order' | 'version' | 'updatedAt'>;
 
@@ -113,6 +119,8 @@ export interface CragResponse {
   description: DescriptionSection[];
   trails: CragMapTrail[];
   markers: CragMapMarker[];
+  /** True when the stored value is missing. */
+  published: boolean;
   opentopoTilePack?: OpenTopoTilePackInfo;
   version: number;
   updatedAt: string;

@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup } from '@testing-library/react';
 import { setAuthAccount } from '../auth/session';
 import { IDBFactory } from 'fake-indexeddb';
-import { afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
 
 const UNMOCKED_FETCH = 'fetch is not mocked in tests';
 
@@ -138,6 +138,12 @@ Object.defineProperty(window, 'scrollTo', {
   configurable: true,
   writable: true,
   value: () => {},
+});
+
+beforeEach(() => {
+  act(() => {
+    setAuthAccount(null);
+  });
 });
 
 afterEach(async () => {

@@ -4,6 +4,7 @@ export {
   deleteCrag,
   getAssembledCrag,
   listCrags,
+  loadCrag,
   patchCrag,
   requireWritableCrag,
 } from './crags';

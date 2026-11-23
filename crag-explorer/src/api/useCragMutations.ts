@@ -1,12 +1,13 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { getAuthAccount } from '../auth/session';
 import type { CragData, Sector } from '../types';
 import {
   createSector,
   deleteSector,
   patchCrag,
   patchSector,
-  type CragPatch,
-  type CragPatchResult,
+  type CragContentPatch,
+  type CragContentPatchResult,
   type CreateSectorInput,
   type SectorPatch,
 } from './client';
@@ -15,8 +16,12 @@ import { queryKeys } from './queryClient';
 // A crag refetch that started before this write can resolve later and replace the
 // cache with the older document. Cancel that fetch before applying the response.
 // Cancellation reverts it to the pre-fetch snapshot; the write then runs on top.
+function cragQueryKey(cragId: string) {
+  return queryKeys.crag(cragId, getAuthAccount()?.uid ?? null);
+}
+
 function cancelInFlightCragFetch(queryClient: QueryClient, cragId: string): Promise<void> {
-  return queryClient.cancelQueries({ queryKey: queryKeys.crag(cragId), exact: true });
+  return queryClient.cancelQueries({ queryKey: cragQueryKey(cragId), exact: true });
 }
 
 function writeCragData(
@@ -25,7 +30,7 @@ function writeCragData(
   write: (current: CragData) => CragData,
 ): void {
   void cancelInFlightCragFetch(queryClient, cragId);
-  queryClient.setQueryData<CragData>(queryKeys.crag(cragId), (current) =>
+  queryClient.setQueryData<CragData>(cragQueryKey(cragId), (current) =>
     current ? write(current) : current,
   );
 }
@@ -33,11 +38,10 @@ function writeCragData(
 function applyCragPatch(
   queryClient: QueryClient,
   cragId: string,
-  saved: CragPatchResult,
+  saved: CragContentPatchResult,
 ): void {
   writeCragData(queryClient, cragId, (current) => ({
     ...current,
-    ...(saved.name !== undefined ? { name: saved.name } : {}),
     ...(saved.description !== undefined ? { description: saved.description } : {}),
     ...(saved.markers !== undefined ? { markers: saved.markers } : {}),
     version: saved.version,
@@ -71,7 +75,7 @@ function removeSector(queryClient: QueryClient, cragId: string, sectorId: string
 export function usePatchCrag(cragId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ version, ...patch }: { version: number } & CragPatch) =>
+    mutationFn: ({ version, ...patch }: { version: number } & CragContentPatch) =>
       patchCrag(cragId, version, patch),
     onMutate: () => cancelInFlightCragFetch(queryClient, cragId),
     onSuccess: (saved) => {

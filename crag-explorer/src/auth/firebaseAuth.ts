@@ -17,7 +17,7 @@ import {
 } from 'firebase/auth';
 import { AUTH_EMULATOR_URL, firebaseWebConfig, isAuthEnabled, useAuthEmulator } from './config';
 import { readMemberships } from './memberships';
-import { getAuthAccount, setAuthAccount, type AuthAccount } from './session';
+import { getAuthAccount, isAuthReady, setAuthAccount, type AuthAccount } from './session';
 
 const AUTH_NOT_CONFIGURED = 'Sign-in is not configured.';
 
@@ -139,6 +139,7 @@ export async function readIdToken(): Promise<string | null> {
 
 export function startAuthListener(): () => void {
   if (!isAuthEnabled()) {
+    setAuthAccount(null);
     return () => undefined;
   }
   return onAuthStateChanged(
@@ -153,6 +154,7 @@ export function startAuthListener(): () => void {
     },
     (error) => {
       console.error('Firebase Auth state failed:', error);
+      if (!isAuthReady()) setAuthAccount(null);
     },
   );
 }

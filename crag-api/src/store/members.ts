@@ -1,12 +1,21 @@
 import type { Db } from '@crag-to-all/shared-firebase';
 import { forbidden, notFound, readOnly } from '../http';
 import type { AuthCaller, CragMemberResponse, CragMemberRole } from '../types';
+import { canReadCrag } from './access';
 import { cragsCol, membersCol } from './collections';
 
-/** The crag must exist and be an explorer crag. Extracted crags stay read-only for every role. */
-async function requireExplorerCrag(db: Db, cragId: string): Promise<void> {
-  const crag = await cragsCol(db).findOne({ _id: cragId }, { projection: { source: 1 } });
+/**
+ * The crag must exist and be an explorer crag.
+ * A hidden crag is not found when this caller cannot read it.
+ * Extracted crags stay read-only for every role that can see them.
+ */
+async function requireExplorerCrag(db: Db, cragId: string, caller: AuthCaller): Promise<void> {
+  const crag = await cragsCol(db).findOne(
+    { _id: cragId },
+    { projection: { source: 1, published: 1 } },
+  );
   if (!crag) throw notFound('crag');
+  if (!(await canReadCrag(db, crag, caller))) throw notFound('crag');
   if (crag.source === 'external') {
     throw readOnly('An extracted crag is read-only');
   }
@@ -18,7 +27,7 @@ async function requireMemberRole(
   caller: AuthCaller,
   roles: readonly CragMemberRole[],
 ): Promise<void> {
-  await requireExplorerCrag(db, cragId);
+  await requireExplorerCrag(db, cragId, caller);
   if (caller.superadmin) return;
   const member = await membersCol(db).findOne(
     { cragId, userId: caller.uid },

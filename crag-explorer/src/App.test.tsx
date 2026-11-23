@@ -3,9 +3,10 @@ import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { getCragApiUrl, getCragsApiUrl } from './api/client';
 import { AppRoutes } from './App';
+import { setAuthAccount, setAuthPending } from './auth/session';
 import { signInTestUser } from './test/authAccount';
 import { AppOnlineProvider } from './context/AppOnlineContext';
-import { SAMPLE_CRAG_ID, sampleCrags } from './test/fixtures/cragData';
+import { SAMPLE_CRAG_ID, sampleCragData, sampleCrags } from './test/fixtures/cragData';
 import { jsonResponse, requestUrl, withQueryClient } from './test/helpers';
 import { getOfflineCragIndex, putOfflineCragIndex } from './utils/offline';
 
@@ -42,6 +43,30 @@ describe('App load', () => {
 
     expect(await screen.findByText('Test Crag')).toBeInTheDocument();
     expect(await getOfflineCragIndex()).toEqual(sampleCrags);
+  });
+
+  it('replaces a signed-in offline index after the signed-out catalog loads', async () => {
+    signInTestUser();
+    const visible = { id: SAMPLE_CRAG_ID, cragName: 'Test Crag', published: true };
+    const hidden = { id: 'draft', cragName: 'Draft Crag', published: false };
+    let signedIn = true;
+    vi.mocked(fetch).mockImplementation(() => (
+      Promise.resolve(jsonResponse(signedIn ? [visible, hidden] : [visible]))
+    ));
+
+    renderApp('/');
+
+    expect(await screen.findByRole('heading', { name: 'Draft Crag' })).toBeInTheDocument();
+    expect(await getOfflineCragIndex()).toEqual([visible, hidden]);
+
+    signedIn = false;
+    act(() => {
+      setAuthAccount(null);
+    });
+
+    expect(await screen.findByRole('heading', { name: 'Test Crag' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Draft Crag' })).not.toBeInTheDocument();
+    expect(await getOfflineCragIndex()).toEqual([visible]);
   });
 
   it('uses the cached index and marks the network limited when fetch fails', async () => {
@@ -125,6 +150,51 @@ describe('App load', () => {
     expect(await getOfflineCragIndex()).toBeUndefined();
   });
 
+  it('keeps a crag page on the loading screen until sign-in is known', async () => {
+    setAuthPending();
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = requestUrl(input);
+      if (url === getCragsApiUrl()) {
+        return Promise.resolve(jsonResponse(sampleCrags));
+      }
+      if (url === getCragApiUrl(SAMPLE_CRAG_ID)) {
+        return Promise.resolve(jsonResponse(sampleCragData));
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${url}`));
+    });
+
+    renderApp(`/${SAMPLE_CRAG_ID}/routes`);
+
+    expect(screen.getByText('Loading crags list...')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Page Not Found' })).not.toBeInTheDocument();
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+
+    act(() => {
+      signInTestUser();
+    });
+
+    expect(await screen.findByText('Classic')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Page Not Found' })).not.toBeInTheDocument();
+  });
+
+  it('keeps crag management on the loading screen until sign-in is known', async () => {
+    setAuthPending();
+    vi.mocked(fetch).mockImplementation(() => Promise.resolve(jsonResponse([])));
+
+    renderApp('/crag-manage');
+
+    expect(screen.getByText('Loading crags list...')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Page Not Found' })).not.toBeInTheDocument();
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+
+    act(() => {
+      signInTestUser();
+    });
+
+    expect(await screen.findByRole('button', { name: 'Add crag' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Page Not Found' })).not.toBeInTheDocument();
+  });
+
   it('opens crag management from an empty catalog for a superadmin', async () => {
     signInTestUser();
     vi.mocked(fetch).mockImplementation(() => Promise.resolve(jsonResponse([])));
@@ -132,6 +202,19 @@ describe('App load', () => {
 
     expect(await screen.findByRole('button', { name: 'Add crag' })).toBeInTheDocument();
     expect(screen.getByText('No crags yet.')).toBeInTheDocument();
+  });
+
+  it('opens the about page from the footer link path', async () => {
+    mockIndexOk();
+    renderApp('/about');
+
+    expect(
+      await screen.findByRole('heading', { name: 'About Roshka Team' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Created by Roshka Team' })).toHaveAttribute(
+      'href',
+      '/about',
+    );
   });
 
   it('hides crag management from visitors who are not superadmins', async () => {

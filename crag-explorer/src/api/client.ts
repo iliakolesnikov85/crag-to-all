@@ -115,16 +115,25 @@ async function readSectorResponse(response: Response): Promise<Sector> {
   return body as Sector;
 }
 
-export interface CragPatch {
-  name?: string;
+export interface CragContentPatch {
   description?: DescriptionSection[];
   markers?: readonly CragMapMarker[];
 }
 
-export interface CragPatchResult {
-  name?: string;
+export interface CragContentPatchResult {
   description?: DescriptionSection[];
   markers?: CragMapMarker[];
+  version: number;
+}
+
+export interface CragSettingsPatch {
+  name?: string;
+  published?: boolean;
+}
+
+export interface CragSettingsPatchResult {
+  name?: string;
+  published?: boolean;
   version: number;
 }
 
@@ -206,8 +215,8 @@ export async function getCrag(cragId: string, init?: RequestInit): Promise<CragD
 export async function patchCrag(
   cragId: string,
   version: number,
-  patch: CragPatch,
-): Promise<CragPatchResult> {
+  patch: CragContentPatch,
+): Promise<CragContentPatchResult> {
   const response = await apiFetch(cragDocumentPath(cragId), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -219,7 +228,6 @@ export async function patchCrag(
     );
   }
   const body = (await response.json()) as {
-    cragName?: unknown;
     description?: unknown;
     markers?: unknown;
     version?: unknown;
@@ -227,13 +235,7 @@ export async function patchCrag(
   if (typeof body.version !== 'number') {
     throw new Error('Crag save returned an unexpected response');
   }
-  const saved: CragPatchResult = { version: body.version };
-  if (patch.name !== undefined) {
-    if (typeof body.cragName !== 'string') {
-      throw new Error('Crag save returned an unexpected response');
-    }
-    saved.name = body.cragName;
-  }
+  const saved: CragContentPatchResult = { version: body.version };
   if (patch.description !== undefined) {
     if (!Array.isArray(body.description)) {
       throw new Error('Crag save returned an unexpected response');
@@ -245,6 +247,45 @@ export async function patchCrag(
       throw new Error('Crag save returned an unexpected response');
     }
     saved.markers = body.markers;
+  }
+  return saved;
+}
+
+export async function patchCragSettings(
+  cragId: string,
+  version: number,
+  patch: CragSettingsPatch,
+): Promise<CragSettingsPatchResult> {
+  const response = await apiFetch(`${cragDocumentPath(cragId)}/settings`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ version, ...patch }),
+  });
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, `Failed to save crag (${response.status})`),
+    );
+  }
+  const body = (await response.json()) as {
+    cragName?: unknown;
+    published?: unknown;
+    version?: unknown;
+  };
+  if (typeof body.version !== 'number') {
+    throw new Error('Crag save returned an unexpected response');
+  }
+  const saved: CragSettingsPatchResult = { version: body.version };
+  if (patch.name !== undefined) {
+    if (typeof body.cragName !== 'string') {
+      throw new Error('Crag save returned an unexpected response');
+    }
+    saved.name = body.cragName;
+  }
+  if (patch.published !== undefined) {
+    if (typeof body.published !== 'boolean') {
+      throw new Error('Crag save returned an unexpected response');
+    }
+    saved.published = body.published;
   }
   return saved;
 }

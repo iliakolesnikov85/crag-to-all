@@ -18,8 +18,12 @@ function buildQueryClient(): QueryClient {
 }
 
 export const queryKeys = {
-  crags: ['crags'] as const,
-  crag: (cragId: string) => ['crag', cragId] as const,
+  /** Matches every signed-in and signed-out catalog query. */
+  cragsAll: ['crags'] as const,
+  crags: (uid: string | null) => ['crags', uid] as const,
+  /** Matches every viewer's copy of this crag. */
+  cragAll: (cragId: string) => ['crag', cragId] as const,
+  crag: (cragId: string, uid: string | null = null) => ['crag', cragId, uid] as const,
   cragMembers: (cragId: string) => ['crag-members', cragId] as const,
 };
 
