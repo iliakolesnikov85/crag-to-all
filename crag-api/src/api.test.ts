@@ -159,6 +159,7 @@ describe('crag-api', () => {
         source: 'explorer',
         sectorCount: 0,
         published: true,
+        country: 'GE',
         version: 1,
         updatedAt: expect.any(String),
       },
@@ -174,6 +175,23 @@ describe('crag-api', () => {
     expect(crag.body.protocolVersion).toBe(CRAG_DATA_PROTOCOL);
     expect(crag.body.source).toBe('explorer');
     expect(crag.body.externalId).toBeUndefined();
+  });
+
+  it('stores Georgia when create omits country and rejects an unknown code', async () => {
+    const created = await write().post('/api/crags').send({ name: 'Roshka', id: 'roshka' });
+    expect(created.status).toBe(201);
+    expect(created.body.country).toBe('GE');
+    const stored = await db.collection('crags').findOne({ _id: 'roshka' });
+    expect(stored?.country).toBe('GE');
+
+    const unknown = await write().post('/api/crags').send({
+      name: 'Other',
+      id: 'other',
+      country: 'ZZ',
+    });
+    expect(unknown.status).toBe(400);
+    expect(unknown.body.error).toBe('invalid_request');
+    expect(await db.collection('crags').countDocuments({ _id: 'other' })).toBe(0);
   });
 
   it('counts sectors on the catalog and leaves an empty crag at zero', async () => {
@@ -228,6 +246,25 @@ describe('crag-api', () => {
     const stored = await db.collection('crags').findOne({ _id: 'roshka' });
     expect(stored?.externalId).toBe('35366');
     expect(stored?.source).toBe('external');
+
+    const adminCatalog = await write().get('/api/crags');
+    expect(adminCatalog.body).toEqual([
+      expect.objectContaining({ id: 'roshka', externalId: '35366' }),
+    ]);
+    const publicCatalog = await request(app).get('/api/crags');
+    expect(publicCatalog.body[0].id).toBe('roshka');
+    expect(publicCatalog.body[0].externalId).toBeUndefined();
+    await db.collection('crag_members').insertOne({
+      cragId: 'roshka',
+      userId: 'owner-user',
+      role: 'owner',
+    });
+    const ownerCatalog = await request(userApp('owner-user'))
+      .get('/api/crags')
+      .set('Authorization', 'Bearer owner-token');
+    expect(ownerCatalog.status).toBe(200);
+    expect(ownerCatalog.body[0].id).toBe('roshka');
+    expect(ownerCatalog.body[0].externalId).toBeUndefined();
 
     const explorer = await write().post('/api/crags').send({
       id: 'other',
@@ -1192,6 +1229,7 @@ describe('crag-api', () => {
         source: 'explorer',
         sectorCount: 0,
         published: true,
+        country: 'GE',
         version: 1,
         updatedAt: expect.any(String),
       },
@@ -2415,5 +2453,44 @@ describe('crag-api', () => {
       expect.objectContaining({ id: 'legacy', published: true }),
     ]);
     expect((await request(app).get('/api/crags/legacy')).status).toBe(200);
+  });
+
+  it('lets a superadmin set the country on an extracted crag', async () => {
+    await db.collection('crags').insertOne({
+      _id: 'roshka',
+      name: 'Roshka',
+      source: 'external',
+      protocolVersion: CRAG_DATA_PROTOCOL,
+      description: [],
+      trails: [],
+      markers: [],
+      externalId: '35366',
+      published: true,
+      version: 1,
+      updatedAt: new Date(),
+    });
+
+    const renamed = await write().patch('/api/crags/roshka/settings').send({
+      version: 1,
+      name: 'Renamed',
+    });
+    expect(renamed.status).toBe(403);
+    expect(renamed.body.error).toBe('read_only');
+
+    const country = await write().patch('/api/crags/roshka/settings').send({
+      version: 1,
+      country: 'fr',
+    });
+    expect(country.status).toBe(200);
+    expect(country.body.country).toBe('FR');
+    expect(country.body.version).toBe(2);
+    const stored = await db.collection('crags').findOne({ _id: 'roshka' });
+    expect(stored?.country).toBe('FR');
+    expect(stored?.name).toBe('Roshka');
+
+    const catalog = await request(app).get('/api/crags');
+    expect(catalog.body).toEqual([
+      expect.objectContaining({ id: 'roshka', country: 'FR', source: 'external' }),
+    ]);
   });
 });

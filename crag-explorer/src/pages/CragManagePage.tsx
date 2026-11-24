@@ -126,7 +126,11 @@ const CragManagePage: React.FC = () => {
       setActionError('Reload the page before saving this crag.');
       return;
     }
-    if (patch.name === undefined && patch.published === undefined) return;
+    if (
+      patch.name === undefined
+      && patch.published === undefined
+      && patch.country === undefined
+    ) return;
     setActionError(null);
     saveEdit.mutate({ cragId: crag.id, version: crag.version, patch });
   };

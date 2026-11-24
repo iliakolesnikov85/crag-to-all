@@ -23,8 +23,13 @@ export interface CragDocument {
    * New writes always set true or false.
    */
   published?: boolean;
+  /**
+   * ISO 3166-1 alpha-2 code.
+   * Absent on older documents. New creates always set it.
+   */
+  country?: string;
   opentopoTilePack?: OpenTopoTilePackInfo;
-  /** Upstream crag id. Omitted from API responses. */
+  /** Upstream crag id. A superadmin catalog includes it. Other responses omit it. */
   externalId?: string;
   version: number;
   updatedAt: Date;

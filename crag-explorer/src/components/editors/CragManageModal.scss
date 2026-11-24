@@ -67,3 +67,62 @@
   margin: 0;
   color: #555;
 }
+
+.crag-manage-form__country {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.crag-manage-form__flag {
+  width: 1.25rem;
+  height: 0.95rem;
+  flex: 0 0 auto;
+  object-fit: cover;
+}
+
+.crag-manage-form__countries {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  max-height: 12rem;
+  overflow: auto;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.crag-manage-form__country-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.35rem 0.7rem;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: #333;
+  text-align: left;
+  cursor: pointer;
+
+  &.is-active,
+  &:hover {
+    background: #e3f2fd;
+  }
+}
+
+.crag-manage-form__country-name {
+  flex: 1 1 auto;
+}
+
+.crag-manage-form__country-code,
+.crag-manage-form__country-tld {
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.crag-manage-form__country-empty {
+  padding: 0.35rem 0.7rem;
+  color: #666;
+  font-size: 0.85rem;
+}

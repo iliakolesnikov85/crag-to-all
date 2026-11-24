@@ -35,6 +35,16 @@ export default defineConfig({
         globPatterns: [
           '**/*.{js,css,html,ico,svg,webp,jpg,jpeg,png,woff2}',
         ],
+        // Keep Workbox's default skips, and do not precache country flags.
+        globIgnores: [
+          '**/node_modules/**/*',
+          'sw.js',
+          'workbox-*.js',
+          'worker-*.js',
+          '**/*.map',
+          '**/*.{map,LICENSE.txt}',
+          'flags/**',
+        ],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),

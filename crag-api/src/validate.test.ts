@@ -8,6 +8,7 @@ describe('validate', () => {
       name: 'Roshka Valley',
       cragId: 'roshka-valley',
       source: 'explorer',
+      country: 'GE',
     });
     for (const body of [
       { name: 'Roshka Valley' },
@@ -34,6 +35,7 @@ describe('validate', () => {
       cragId: 'roshka',
       source: 'external',
       externalId: '35366',
+      country: 'GE',
     });
     try {
       parseCreateCrag({ id: 'Roshka', name: 'Roshka' });
@@ -111,6 +113,29 @@ describe('validate', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(HttpError);
       expect((error as HttpError).status).toBe(400);
+    }
+  });
+
+  it('defaults a missing country to Georgia and stores an explicit code', () => {
+    expect(parseCreateCrag({ id: 'roshka', name: 'Roshka', country: ' fr ' })).toEqual({
+      name: 'Roshka',
+      cragId: 'roshka',
+      source: 'explorer',
+      country: 'FR',
+    });
+    expect(parseCragSettingsPatch({ version: 3, country: 'ge' })).toEqual({
+      version: 3,
+      country: 'GE',
+    });
+    try {
+      parseCreateCrag({ id: 'roshka', name: 'Roshka', country: 'ZZ' });
+      throw new Error('expected parseCreateCrag to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(HttpError);
+      expect((error as HttpError).status).toBe(400);
+      expect((error as HttpError).message).toBe(
+        'country: Country must be an ISO 3166-1 alpha-2 code',
+      );
     }
   });
 

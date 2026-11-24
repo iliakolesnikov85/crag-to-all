@@ -12,9 +12,52 @@ Two major versions. Refer to a change as **v1** or **v2** when it belongs to one
 
 **v1** is `main`, and what [roshkaclimb.ge](https://roshkaclimb.ge/) runs in production. External crags only. Crag documents, images, GPX, PDF guides, and map tiles come from public Firebase Storage. There is no API and no database.
 
-**v2** is this branch (`managed-crags`). It keeps external crags and adds explorer crags that can be authored in the app: Firebase Auth, MongoDB through `crag-api`, and an explorer admin UI. It runs locally (API, MongoDB, and the Auth and Storage emulators) and is not deployed to a real environment yet.
+**v2** is this branch (`managed-crags`). It keeps external crags and adds explorer crags that can be authored in the app: Firebase Auth, MongoDB through `crag-api`, and an explorer admin UI. It runs locally, and a manual pre-prod rollout can deploy it. The live site is still v1.
 
-The rest of this document describes **v2**. Crag documents come from crag-api. Images, GPX, PDF guides, and map tiles are served from Firebase Storage.
+The rest of this document describes **v2**. Crag documents and GPX come from `crag-api`. Images and map-tile packs come from Firebase Storage. PDF links still point at Storage. The daily job does not upload PDFs.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph firebase [Firebase]
+    frontend["Frontend (React)"]
+    api["API (Node.js)"]
+    auth[Firebase Auth]
+    storage["Firebase Storage (topo images, map tiles, backups)"]
+  end
+  subgraph atlas [MongoDB Atlas]
+    mongo[(MongoDB)]
+  end
+  subgraph github [GitHub]
+    subgraph deployRepo ["crag-to-all repo"]
+      deploy[deploy.yml]
+    end
+    subgraph pipelineRepo ["crag-to-all-pipeline repo"]
+      extract["External topo extractor"]
+    end
+  end
+  source["External topo source"] --> extract
+  visitor[Visitor] --> frontend
+  deploy -.-> frontend
+  deploy -.-> api
+  extract --> mongo
+  extract --> storage
+  frontend --> auth
+  frontend --> api
+  api --> auth
+  api --> mongo
+  api --> storage
+  api --- roles["Anyone can read. Owner, admin, or superadmin can edit an explorer crag. Superadmin creates crags and sets roles. An external crag is read-only."]
+```
+
+The Frontend is [`crag-explorer`](crag-explorer/) on Firebase Hosting. The API is [`crag-api`](crag-api/) on Firebase App Hosting. The Frontend signs in with Firebase Auth. The API checks that ID token. The superadmin flag is a custom claim on the Auth user. Owner and admin are rows in MongoDB `crag_members`.
+
+MongoDB Atlas is the hosted database for pre-prod and for the daily job. The cluster name is not in this repo. The database name is `crag-to-all`. A laptop uses MongoDB on `127.0.0.1` instead.
+
+Firebase Storage holds topo images, map-tile packs, and backups. Backups are the history copies under `crags/{id}/history`.
+
+`deploy.yml` in this repo is the manual pre-prod deploy. `data-update.yml` in the private `crag-to-all-pipeline` repo runs the external topo extractor (`crag-extract`) every day, and on demand. That job logs in to the external topo source, writes external crags to MongoDB, and uploads images, tile packs, and a JSON copy to Storage. The Frontend reads crag documents from the API, so it does not read that JSON copy. The job leaves explorer crags unchanged. It does not upload PDF guides.
 
 ## Packages
 
@@ -23,7 +66,9 @@ The rest of this document describes **v2**. Crag documents come from crag-api. I
 | [`crag-explorer/`](crag-explorer/)                           | Vite + React explorer (Firebase Hosting) |
 | [`crag-api/`](crag-api/)                                     | Local Express API (port 3010) + MongoDB documents |
 | [`packages/shared-crag/`](packages/shared-crag/)             | Shared TypeScript types, geo, Bézier, and GPX helpers |
-| [`packages/shared-firebase/`](packages/shared-firebase/)     | Firebase Admin SDK, Storage and Auth emulators, and the MongoDB client |
+| [`packages/shared-firebase/`](packages/shared-firebase/)     | Firebase Admin SDK, Auth and Storage emulators, Storage rules, and the MongoDB client |
+
+Hosting is configured in [`firebase.json`](firebase.json). App Hosting for the API is configured in [`crag-api/apphosting.yaml`](crag-api/apphosting.yaml).
 
 ## Quick start
 
@@ -71,7 +116,9 @@ See [`crag-api/README.md`](crag-api/README.md) and [`crag-explorer/README.md`](c
 npm run build
 ```
 
-CI (`.github/workflows/deploy.yml`) tests `crag-api`, builds `shared-crag`, then deploys `crag-explorer` to Firebase Hosting.
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) tests `crag-api` and `crag-explorer` on every pull request and on `main`. A manual run on the `pre-prod` environment rolls out `crag-api` to Firebase App Hosting, then deploys `crag-explorer` to Firebase Hosting.
+
+The daily extract is `data-update.yml` in the private `crag-to-all-pipeline` repo. It runs the external topo extractor (`crag-extract`).
 
 ## License
 

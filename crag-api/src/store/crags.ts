@@ -57,7 +57,8 @@ export async function listCrags(db: Db, caller: AuthCaller | null) {
     if (!caller || !staffIds) return caller?.superadmin === true;
     return staffIds.has(doc._id);
   });
-  return visible.map((doc) => toCrag(doc, countById.get(doc._id) ?? 0));
+  const includeExternalId = caller?.superadmin === true;
+  return visible.map((doc) => toCrag(doc, countById.get(doc._id) ?? 0, includeExternalId));
 }
 
 /** Inserts an empty crag and no `crag_members` row. */
@@ -72,6 +73,7 @@ export async function createCrag(db: Db, input: CragCreateInput): Promise<CragRe
     trails: [],
     markers: [],
     published: false,
+    country: input.country,
     version: 1,
     updatedAt,
   };
@@ -144,6 +146,7 @@ export async function patchCrag(
   const $set: Omit<Partial<CragDocument>, '_id'> = { updatedAt: now() };
   if (patch.name !== undefined) $set.name = patch.name;
   if (patch.published !== undefined) $set.published = patch.published;
+  if (patch.country !== undefined) $set.country = patch.country;
   if (patch.description !== undefined) $set.description = patch.description;
   if (patch.trails !== undefined) $set.trails = patch.trails;
   if (patch.markers !== undefined) $set.markers = patch.markers;

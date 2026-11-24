@@ -5,7 +5,9 @@ import {
   CRAG_ID_MAX_LENGTH,
   CRAG_MAP_MARKER_TYPES,
   CRAG_SOURCES,
+  DEFAULT_CRAG_COUNTRY,
   ROUTE_TYPES,
+  validateCragCountry,
   validateCragExternalId,
   validateCragId,
   validateCragName,
@@ -147,11 +149,20 @@ const markerSchema = z.object({
   geo: latLngSchema,
 });
 
+const countryCodeSchema = z.string().superRefine((value, ctx) => {
+  const result = validateCragCountry(value);
+  if (!result.ok) ctx.addIssue(result.error);
+}).transform((value) => {
+  const result = validateCragCountry(value);
+  return result.ok ? result.value : value.trim().toUpperCase();
+});
+
 const createCragBodySchema = z
   .strictObject({
     id: createCragIdSchema,
     name: cragString(validateCragName),
     source: z.enum(CRAG_SOURCES).default('explorer'),
+    country: countryCodeSchema.default(DEFAULT_CRAG_COUNTRY),
     externalId: cragString(validateCragExternalId).optional(),
   })
   .refine(
@@ -183,10 +194,15 @@ const cragSettingsPatchSchema = z
     version: versionSchema,
     name: cragString(validateCragName).optional(),
     published: z.boolean().optional(),
+    country: countryCodeSchema.optional(),
   })
   .refine(
-    (patch) => patch.name !== undefined || patch.published !== undefined,
-    { message: 'PATCH body must include name or published' },
+    (patch) => (
+      patch.name !== undefined
+      || patch.published !== undefined
+      || patch.country !== undefined
+    ),
+    { message: 'PATCH body must include name, published, or country' },
   );
 
 const sectorBodySchema = z.object({
@@ -301,6 +317,7 @@ function parseCreateCrag(body: unknown): CragCreateInput {
     name: parsed.name,
     cragId: parsed.id,
     source: parsed.source,
+    country: parsed.country,
   };
   if (parsed.externalId !== undefined) input.externalId = parsed.externalId;
   return input;

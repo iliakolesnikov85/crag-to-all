@@ -145,10 +145,20 @@ export interface Crag {
    * The catalog always sends a boolean. A missing stored value is true.
    */
   published: boolean;
+  /**
+   * ISO 3166-1 alpha-2 country code.
+   * Present on catalog responses when the crag has one. Older crags omit it.
+   */
+  country?: string;
   /** Present on catalog responses. */
   updatedAt?: string;
   /** Present on catalog responses. Used to rename without loading the crag. */
   version?: number;
+  /**
+   * Upstream crag id. Present on the catalog when the caller is a superadmin
+   * and the crag has one. Other responses omit it.
+   */
+  externalId?: string;
   /**
    * Plain-text excerpt of the crag description. Present on catalog responses
    * when the crag has one. The homepage uses it when no SEO blurb is set.

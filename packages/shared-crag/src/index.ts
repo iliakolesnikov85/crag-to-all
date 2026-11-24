@@ -1,6 +1,7 @@
 export * from './types';
 export * from './documents';
 export * from './cragFields';
+export * from './countries';
 export * from './geo';
 export * from './line';
 export * from './protocol';

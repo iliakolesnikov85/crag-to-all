@@ -1,3 +1,5 @@
+import { isCountryCode } from './countries';
+
 const CRAG_ID_MAX_LENGTH = 64;
 const CRAG_NAME_MAX_LENGTH = 200;
 const CRAG_EXTERNAL_ID_MAX_LENGTH = 128;
@@ -14,6 +16,8 @@ const CRAG_EXTERNAL_ID_REQUIRED_MESSAGE = 'externalId is required when source is
 const CRAG_EXTERNAL_ID_FORBIDDEN_MESSAGE = 'externalId is only allowed when source is external';
 const CRAG_EXTERNAL_ID_TOO_LONG_MESSAGE =
   `externalId must be ${CRAG_EXTERNAL_ID_MAX_LENGTH} characters or fewer.`;
+const CRAG_COUNTRY_REQUIRED_MESSAGE = 'Country is required';
+const CRAG_COUNTRY_INVALID_MESSAGE = 'Country must be an ISO 3166-1 alpha-2 code';
 
 type CragFieldCheck =
   | { ok: true; value: string }
@@ -48,6 +52,13 @@ function validateCragExternalId(value: string): CragFieldCheck {
   return { ok: true, value: externalId };
 }
 
+function validateCragCountry(value: string): CragFieldCheck {
+  const country = value.trim().toUpperCase();
+  if (!country) return { ok: false, error: CRAG_COUNTRY_REQUIRED_MESSAGE };
+  if (!isCountryCode(country)) return { ok: false, error: CRAG_COUNTRY_INVALID_MESSAGE };
+  return { ok: true, value: country };
+}
+
 export {
   CRAG_EXTERNAL_ID_FORBIDDEN_MESSAGE,
   CRAG_EXTERNAL_ID_MAX_LENGTH,
@@ -58,4 +69,4 @@ export {
 
 export type { CragFieldCheck };
 
-export { validateCragExternalId, validateCragId, validateCragName };
+export { validateCragCountry, validateCragExternalId, validateCragId, validateCragName };

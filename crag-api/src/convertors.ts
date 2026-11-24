@@ -33,7 +33,7 @@ function toPublicRoute(route: StoredRoute): Route {
   return rest;
 }
 
-export function toCrag(doc: CragDocument, sectorCount: number): Crag {
+export function toCrag(doc: CragDocument, sectorCount: number, includeExternalId = false): Crag {
   const description = descriptionExcerpt(doc.description);
   return {
     id: doc._id,
@@ -41,9 +41,11 @@ export function toCrag(doc: CragDocument, sectorCount: number): Crag {
     source: doc.source,
     sectorCount,
     published: doc.published !== false,
+    ...(doc.country ? { country: doc.country } : {}),
     updatedAt: doc.updatedAt.toISOString(),
     version: doc.version,
     ...(description ? { description } : {}),
+    ...(includeExternalId && doc.externalId ? { externalId: doc.externalId } : {}),
   };
 }
 
@@ -57,6 +59,7 @@ export function toCragResponse(doc: CragDocument): CragResponse {
     trails: doc.trails,
     markers: doc.markers,
     published: doc.published !== false,
+    ...(doc.country ? { country: doc.country } : {}),
     ...(doc.opentopoTilePack ? { opentopoTilePack: doc.opentopoTilePack } : {}),
     version: doc.version,
     updatedAt: doc.updatedAt.toISOString(),

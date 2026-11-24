@@ -35,6 +35,7 @@ const crags: Crag[] = [
     id: 'empty-crag',
     cragName: 'Empty',
     source: 'external',
+    externalId: '35366',
     sectorCount: 0,
     published: false,
     updatedAt,
@@ -129,6 +130,7 @@ describe('CragManagePage', () => {
         id: 'new-crag',
         name: 'New Crag',
         source: 'explorer',
+        country: 'GE',
       });
     });
   });
@@ -149,6 +151,7 @@ describe('CragManagePage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Roshka' }));
     const dialog = screen.getByRole('dialog', { name: 'Edit crag' });
+    expect(within(dialog).queryByLabelText('External id')).not.toBeInTheDocument();
     fireEvent.change(within(dialog).getByLabelText('Name'), {
       target: { value: '  Roshka Valley  ' },
     });
@@ -181,7 +184,7 @@ describe('CragManagePage', () => {
     errorSpy.mockRestore();
   });
 
-  it('opens an extracted crag as read-only without a name field', async () => {
+  it('opens an extracted crag without a name field', async () => {
     signIn(true);
     renderPage();
 
@@ -191,8 +194,12 @@ describe('CragManagePage', () => {
     expect(within(dialog).getByLabelText('Id')).toBeDisabled();
     expect(within(dialog).getByLabelText('Source')).toHaveValue('external');
     expect(within(dialog).getByLabelText('Source')).toBeDisabled();
+    expect(within(dialog).getByLabelText('External id')).toHaveValue('35366');
+    expect(within(dialog).getByLabelText('External id')).toBeDisabled();
     expect(within(dialog).queryByLabelText('Name')).not.toBeInTheDocument();
-    expect(within(dialog).getByText('An extracted crag is read-only.')).toBeInTheDocument();
+    expect(within(dialog).getByText(
+      'The name cannot be changed. You can still change the country and Published.',
+    )).toBeInTheDocument();
     expect(within(dialog).getByRole('checkbox', { name: 'Published' })).not.toBeChecked();
     expect(within(dialog).getByRole('button', { name: 'Save' })).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
@@ -210,6 +217,121 @@ describe('CragManagePage', () => {
 
     expect(within(dialog).getByText('id is reserved')).toBeInTheDocument();
     expect(createCrag).not.toHaveBeenCalled();
+  });
+
+  it('keeps the shown country when Enter is pressed without a search', async () => {
+    signIn(true);
+    vi.mocked(createCrag).mockResolvedValue(undefined);
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Add crag' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Add crag' });
+    const country = within(dialog).getByLabelText('Country');
+    expect(country).toHaveValue('Georgia (GE)');
+    fireEvent.focus(country);
+    fireEvent.keyDown(country, { key: 'Enter' });
+    expect(country).toHaveValue('Georgia (GE)');
+
+    fireEvent.change(within(dialog).getByLabelText('Id'), { target: { value: 'new-crag' } });
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'New Crag' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(createCrag).toHaveBeenCalledWith({
+        id: 'new-crag',
+        name: 'New Crag',
+        source: 'explorer',
+        country: 'GE',
+      });
+    });
+  });
+
+  it('selects the best country match on Enter', async () => {
+    signIn(true);
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Add crag' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Add crag' });
+    const country = within(dialog).getByLabelText('Country');
+    fireEvent.change(country, { target: { value: 'ge' } });
+    fireEvent.keyDown(country, { key: 'Enter' });
+    expect(country).toHaveValue('Georgia (GE)');
+
+    fireEvent.change(country, { target: { value: 'Sudan' } });
+    fireEvent.keyDown(country, { key: 'Enter' });
+    expect(country).toHaveValue('Sudan (SD)');
+
+    fireEvent.change(country, { target: { value: 'Turkey' } });
+    fireEvent.keyDown(country, { key: 'Enter' });
+    expect(country).toHaveValue('Türkiye (TR)');
+  });
+
+  it('chooses the highlighted country after the arrow keys', async () => {
+    signIn(true);
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Add crag' }));
+
+    const country = within(screen.getByRole('dialog', { name: 'Add crag' })).getByLabelText('Country');
+    fireEvent.focus(country);
+    fireEvent.keyDown(country, { key: 'ArrowDown' });
+    fireEvent.keyDown(country, { key: 'Enter' });
+    expect(country).toHaveValue('Afghanistan (AF)');
+  });
+
+  it('closes the country list on Escape and leaves the dialog open', async () => {
+    signIn(true);
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Add crag' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Add crag' });
+    const country = within(dialog).getByLabelText('Country');
+    fireEvent.change(country, { target: { value: 'fra' } });
+    expect(within(dialog).getByRole('option', { name: /^France/ })).toBeInTheDocument();
+    fireEvent.keyDown(country, { key: 'Escape' });
+    expect(country).toHaveValue('Georgia (GE)');
+    expect(within(dialog).queryByRole('option', { name: /^France/ })).not.toBeInTheDocument();
+    expect(dialog).toBeInTheDocument();
+  });
+
+  it('sends the country chosen from search', async () => {
+    signIn(true);
+    vi.mocked(createCrag).mockResolvedValue(undefined);
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Add crag' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Add crag' });
+    fireEvent.change(within(dialog).getByLabelText('Country'), { target: { value: 'France' } });
+    fireEvent.mouseDown(within(dialog).getByRole('option', { name: /^France/ }));
+    fireEvent.change(within(dialog).getByLabelText('Id'), { target: { value: 'new-crag' } });
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'New Crag' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(createCrag).toHaveBeenCalledWith({
+        id: 'new-crag',
+        name: 'New Crag',
+        source: 'explorer',
+        country: 'FR',
+      });
+    });
+  });
+
+  it('saves a country on an extracted crag', async () => {
+    signIn(true);
+    vi.mocked(patchCragSettings).mockResolvedValue({ version: 2, country: 'GE' });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Empty' }));
+    const dialog = screen.getByRole('dialog', { name: 'Crag' });
+    expect(within(dialog).getByLabelText('Country')).toBeEnabled();
+    expect(within(dialog).queryByLabelText('Name')).not.toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText('Country'), { target: { value: 'Georgia' } });
+    fireEvent.mouseDown(within(dialog).getByRole('option', { name: /^Georgia/ }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(patchCragSettings).toHaveBeenCalledWith('empty-crag', 1, { country: 'GE' });
+    });
   });
 
   it('offers delete only when the crag has no sectors', async () => {

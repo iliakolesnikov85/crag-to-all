@@ -129,11 +129,13 @@ export interface CragContentPatchResult {
 export interface CragSettingsPatch {
   name?: string;
   published?: boolean;
+  country?: string;
 }
 
 export interface CragSettingsPatchResult {
   name?: string;
   published?: boolean;
+  country?: string;
   version: number;
 }
 
@@ -141,6 +143,7 @@ export interface CragCreateInput {
   id: string;
   name: string;
   source: CragSource;
+  country: string;
   externalId?: string;
 }
 
@@ -269,6 +272,7 @@ export async function patchCragSettings(
   const body = (await response.json()) as {
     cragName?: unknown;
     published?: unknown;
+    country?: unknown;
     version?: unknown;
   };
   if (typeof body.version !== 'number') {
@@ -286,6 +290,12 @@ export async function patchCragSettings(
       throw new Error('Crag save returned an unexpected response');
     }
     saved.published = body.published;
+  }
+  if (patch.country !== undefined) {
+    if (typeof body.country !== 'string') {
+      throw new Error('Crag save returned an unexpected response');
+    }
+    saved.country = body.country;
   }
   return saved;
 }

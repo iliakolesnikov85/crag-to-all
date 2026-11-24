@@ -3,6 +3,8 @@ import {
   CRAG_EXTERNAL_ID_MAX_LENGTH,
   CRAG_ID_MAX_LENGTH,
   CRAG_NAME_MAX_LENGTH,
+  DEFAULT_CRAG_COUNTRY,
+  validateCragCountry,
   validateCragExternalId,
   validateCragId,
   validateCragName,
@@ -11,12 +13,14 @@ import type { CragCreateInput, CragSettingsPatch } from '../../api/client';
 import type { Crag, CragSource } from '../../types';
 import Button from '../Button';
 import Modal from '../Modal';
+import CountryField from './CountryField';
 import './CragManageModal.scss';
 
 interface FieldErrors {
   id?: string;
   name?: string;
   externalId?: string;
+  country?: string;
 }
 
 interface CragManageModalProps {
@@ -44,14 +48,17 @@ const CragManageModal: React.FC<CragManageModalProps> = ({
   const sourceField = `${formId}-source`;
   const externalField = `${formId}-external`;
   const publishedField = `${formId}-published`;
+  const countryField = `${formId}-country`;
   const editedCrag = mode === 'edit' ? crag : null;
   const readOnly = editedCrag?.source === 'external';
   const savedPublished = editedCrag?.published !== false;
+  const savedCountry = editedCrag?.country ?? '';
   const [id, setId] = useState('');
   const [name, setName] = useState(editedCrag?.cragName ?? '');
   const [source, setSource] = useState<CragSource>('explorer');
   const [externalId, setExternalId] = useState('');
   const [published, setPublished] = useState(savedPublished);
+  const [country, setCountry] = useState(editedCrag ? savedCountry : DEFAULT_CRAG_COUNTRY);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   const handleClose = () => {
@@ -73,9 +80,20 @@ const CragManageModal: React.FC<CragManageModalProps> = ({
     if (saving) return;
     if (editedCrag) {
       const publishedChanged = published !== savedPublished;
+      const countryChanged = country !== savedCountry;
+      let nextCountry: string | undefined;
+      if (countryChanged) {
+        const countryResult = validateCragCountry(country);
+        if (!countryResult.ok) {
+          setFieldErrors({ country: countryResult.error });
+          return;
+        }
+        nextCountry = countryResult.value;
+      }
+      const countryPatch = nextCountry !== undefined ? { country: nextCountry } : {};
       if (readOnly) {
-        if (publishedChanged) onSave({ published });
-        else onClose();
+        if (!publishedChanged && nextCountry === undefined) onClose();
+        else onSave({ ...(publishedChanged ? { published } : {}), ...countryPatch });
         return;
       }
       const nameResult = validateCragName(name);
@@ -84,24 +102,32 @@ const CragManageModal: React.FC<CragManageModalProps> = ({
         return;
       }
       const nameChanged = nameResult.value !== editedCrag.cragName;
-      if (!nameChanged && !publishedChanged) {
+      if (!nameChanged && !publishedChanged && nextCountry === undefined) {
         onClose();
         return;
       }
       onSave({
         ...(nameChanged ? { name: nameResult.value } : {}),
         ...(publishedChanged ? { published } : {}),
+        ...countryPatch,
       });
       return;
     }
     const idResult = validateCragId(id);
     const nameResult = validateCragName(name);
+    const countryResult = validateCragCountry(country);
     const externalResult = source === 'external' ? validateCragExternalId(externalId) : undefined;
     const errors: FieldErrors = {};
     if (!idResult.ok) errors.id = idResult.error;
     if (!nameResult.ok) errors.name = nameResult.error;
+    if (!countryResult.ok) errors.country = countryResult.error;
     if (externalResult && !externalResult.ok) errors.externalId = externalResult.error;
-    if (!idResult.ok || !nameResult.ok || (externalResult != null && !externalResult.ok)) {
+    if (
+      !idResult.ok
+      || !nameResult.ok
+      || !countryResult.ok
+      || (externalResult != null && !externalResult.ok)
+    ) {
       setFieldErrors(errors);
       return;
     }
@@ -109,16 +135,23 @@ const CragManageModal: React.FC<CragManageModalProps> = ({
       id: idResult.value,
       name: nameResult.value,
       source,
+      country: countryResult.value,
       ...(externalResult?.ok ? { externalId: externalResult.value } : {}),
     });
   };
 
+  const showExternalId = editedCrag
+    ? editedCrag.source === 'external' || Boolean(editedCrag.externalId)
+    : source === 'external';
+  const externalIdValue = editedCrag ? editedCrag.externalId ?? '' : externalId;
   const title = mode === 'create' ? 'Add crag' : readOnly ? 'Crag' : 'Edit crag';
   const nameReady = name.trim().length > 0;
+  const countryReady = country.trim().length > 0;
   const canSave = !saving && (
     editedCrag
       ? readOnly || nameReady
       : nameReady
+        && countryReady
         && id.trim().length > 0
         && (source !== 'external' || externalId.trim().length > 0)
   );
@@ -147,7 +180,7 @@ const CragManageModal: React.FC<CragManageModalProps> = ({
           </p>
         ) : null}
         {readOnly ? (
-          <p className="crag-manage-form__hint">An extracted crag is read-only.</p>
+          <p className="crag-manage-form__hint">The name cannot be changed. You can still change the country and Published.</p>
         ) : null}
         <div className="crag-manage-form__field">
           <label className="crag-manage-form__label" htmlFor={idField}>
@@ -228,6 +261,16 @@ const CragManageModal: React.FC<CragManageModalProps> = ({
             ) : null}
           </div>
         )}
+        <CountryField
+          id={countryField}
+          value={country}
+          disabled={saving}
+          error={fieldErrors.country}
+          onChange={(code) => {
+            setCountry(code);
+            clearError('country');
+          }}
+        />
         {editedCrag ? (
           <label className="crag-manage-form__check" htmlFor={publishedField}>
             <input
@@ -241,7 +284,7 @@ const CragManageModal: React.FC<CragManageModalProps> = ({
             Published
           </label>
         ) : null}
-        {editedCrag == null && source === 'external' ? (
+        {showExternalId ? (
           <div className="crag-manage-form__field">
             <label className="crag-manage-form__label" htmlFor={externalField}>
               External id
@@ -253,9 +296,9 @@ const CragManageModal: React.FC<CragManageModalProps> = ({
                   ? 'crag-manage-form__input is-invalid'
                   : 'crag-manage-form__input'
               }
-              value={externalId}
+              value={externalIdValue}
               maxLength={CRAG_EXTERNAL_ID_MAX_LENGTH}
-              disabled={saving}
+              disabled={saving || editedCrag != null}
               autoComplete="off"
               spellCheck={false}
               aria-invalid={fieldErrors.externalId ? true : undefined}

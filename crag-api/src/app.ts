@@ -177,7 +177,7 @@ export function createApp(db: Db, options: AppOptions = {}): Express {
     }),
   );
 
-  /** Name and published. A superadmin may publish an extracted crag, but not rename it. */
+  /** Name, published, and country. A superadmin may publish an extracted crag and set its country, but not rename it. */
   app.patch(
     '/api/crags/:cragId/settings',
     authenticate,
