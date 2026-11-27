@@ -82,6 +82,35 @@ describe('handleAppNavigation', () => {
     expect(await response.text()).toBe('live');
   });
 
+  it('serves the precached shell when the navigation response is an error', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const shell = new Response('<html>shell</html>', { status: 200 });
+    const response = await handleAppNavigation(navUrl('/'), {
+      online: true,
+      fetchNavigation: async () => new Response('Homepage failed', { status: 502 }),
+      matchShell: async () => shell,
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('<html>shell</html>');
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('returns the error response when no precached shell exists', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const response = await handleAppNavigation(navUrl('/'), {
+      online: true,
+      fetchNavigation: async () => new Response('Homepage failed', { status: 500 }),
+      matchShell: async () => undefined,
+    });
+
+    expect(response.status).toBe(500);
+    expect(await response.text()).toBe('Homepage failed');
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   it('falls back to the precached shell when the navigation fetch fails', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const shell = new Response('shell', { status: 200 });

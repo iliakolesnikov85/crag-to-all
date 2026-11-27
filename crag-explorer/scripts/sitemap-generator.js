@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { cragConfigs, siteConfig } from './seo-config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,9 +31,16 @@ function renderUrl({ loc, lastmod, changefreq, priority }) {
   </url>`;
 }
 
+function siteBase() {
+  const configured = process.env.VITE_SITE_URL?.trim().replace(/\/$/, '');
+  if (configured) return configured;
+  log('VITE_SITE_URL is not set. Sitemap uses https://crags-for-all.web.app', 'yellow');
+  return 'https://crags-for-all.web.app';
+}
+
 function generateSitemap() {
   const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-  const base = siteConfig.url.replace(/\/$/, '');
+  const base = siteBase();
 
   const homepage = {
     loc: `${base}/`,
@@ -58,21 +64,17 @@ function main() {
     log('🗺️  Generating sitemap with current build date...', 'blue');
 
     const { sitemapContent, urlCount } = generateSitemap();
-    // Write to public/ so dev mode (`vite dev`) serves it, and to dist/ so
-    // the current build's deploy contains the up-to-date file. Without the
-    // dist/ write the sitemap would always be one build behind, because
-    // vite build copies public/ -> dist/ before this script runs.
-    const publicPath = path.join(__dirname, '../public/sitemap.xml');
+    // Only the build output gets it. A copy in public/ would be committed and
+    // change on every build, because it carries the build date.
     const distPath = path.join(__dirname, '../dist/sitemap.xml');
-
-    fs.writeFileSync(publicPath, sitemapContent, 'utf8');
-    if (fs.existsSync(path.dirname(distPath))) {
-      fs.writeFileSync(distPath, sitemapContent, 'utf8');
+    if (!fs.existsSync(path.dirname(distPath))) {
+      throw new Error('dist/ not found. Run the Vite build first.');
     }
+    fs.writeFileSync(distPath, sitemapContent, 'utf8');
 
     log('✅ Sitemap generated successfully', 'green');
     log(`📅 Updated with date: ${new Date().toISOString().split('T')[0]}`, 'green');
-    log(`🔗 ${urlCount} URL(s) listed (${Object.keys(cragConfigs).length} crag(s))`, 'green');
+    log(`🔗 ${urlCount} URL(s) listed`, 'green');
 
     return true;
   } catch (error) {

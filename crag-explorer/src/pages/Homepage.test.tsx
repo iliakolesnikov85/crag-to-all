@@ -1,9 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { buildHomepageSeo } from '@crag-to-all/shared-crag';
 import { AppOnlineProvider } from '../context/AppOnlineContext';
 import { SAMPLE_CRAG_ID } from '../test/fixtures/cragData';
-import { setNavigatorOnLine } from '../test/helpers';
+import { headContent, insertPatchedHead, setNavigatorOnLine } from '../test/helpers';
 import type { Crag } from '../types';
 import {
   putOfflineManifest,
@@ -165,5 +166,72 @@ describe('Homepage country groups', () => {
     const flags = document.querySelectorAll('.crag-country__flag');
     expect(flags[0]).toHaveAttribute('src', expect.stringContaining('flags/fr.svg'));
     expect(flags[1]).toHaveAttribute('src', expect.stringContaining('flags/ge.svg'));
+  });
+
+  it('uses one country in the heading when every published crag is there', () => {
+    const draft: Crag = {
+      id: 'font',
+      cragName: 'Font',
+      published: false,
+      country: 'FR',
+    };
+
+    render(
+      <AppOnlineProvider>
+        <MemoryRouter>
+          <Homepage crags={[georgia, draft]} />
+        </MemoryRouter>
+      </AppOnlineProvider>,
+    );
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Climbing in Georgia');
+  });
+});
+
+describe('Homepage head tags', () => {
+  const roshka: Crag = {
+    id: 'roshka',
+    cragName: 'Roshka',
+    published: true,
+    country: 'GE',
+  };
+  let restoreHead: () => void;
+
+  beforeEach(() => {
+    // What a sector page leaves behind before the user goes back to `/`.
+    restoreHead = insertPatchedHead({
+      title: 'A Sector - Roshka Climbing Guide',
+      description: 'A sector at Roshka. 8 boulder problems.',
+    });
+    // Earlier tests in this file leave a canonical link in the head. Keep only
+    // the one a sector page leaves behind.
+    document.head.querySelectorAll('link[rel="canonical"]').forEach((link) => link.remove());
+    const stale = document.createElement('link');
+    stale.rel = 'canonical';
+    stale.href = `${window.location.origin}/roshka/sector/A`;
+    document.head.appendChild(stale);
+  });
+
+  afterEach(() => {
+    restoreHead();
+  });
+
+  it('puts the homepage title, description, and canonical back', () => {
+    render(
+      <AppOnlineProvider>
+        <MemoryRouter>
+          <Homepage crags={[roshka]} />
+        </MemoryRouter>
+      </AppOnlineProvider>,
+    );
+
+    const seo = buildHomepageSeo([roshka], window.location.origin);
+    expect(document.title).toBe(seo.title);
+    expect(headContent('meta[name="description"]')).toBe(seo.description);
+    expect(headContent('meta[property="og:description"]')).toBe(seo.description);
+    expect(headContent('meta[property="og:title"]')).toBe(seo.title);
+    const links = document.head.querySelectorAll('link[rel="canonical"]');
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute('href', `${window.location.origin}/`);
   });
 });

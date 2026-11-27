@@ -46,6 +46,7 @@ export function toCrag(doc: CragDocument, sectorCount: number, includeExternalId
     version: doc.version,
     ...(description ? { description } : {}),
     ...(includeExternalId && doc.externalId ? { externalId: doc.externalId } : {}),
+    ...(doc.routeStats ? { routeStats: doc.routeStats } : {}),
   };
 }
 

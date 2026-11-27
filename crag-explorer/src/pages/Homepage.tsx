@@ -1,10 +1,12 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router';
 import { MdCloudOff } from 'react-icons/md';
-import { countryByCode } from '@crag-to-all/shared-crag';
+import { buildHomepageSeo, countryByCode } from '@crag-to-all/shared-crag';
 import { Crag } from '../types';
 import './Homepage.scss';
 import { useIsMobileLayout } from '../hooks/useIsMobileLayout';
+import { usePageHead } from '../hooks/usePageHead';
+import { siteOrigin } from '../utils/siteUrl';
 import { useOfflineCrags } from '../hooks/useOfflineCrags';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import OfflineStatusBadge, {
@@ -12,17 +14,6 @@ import OfflineStatusBadge, {
 } from '../components/OfflineStatusBadge';
 import UnpublishedBadge from '../components/UnpublishedBadge';
 import { countryFlagUrl } from '../components/editors/countryFlags';
-import { cragConfigs } from '../../scripts/seo-config.js';
-
-const HOMEPAGE_TITLE = 'Free climbing guidebooks';
-
-// Per-crag SEO highlights surfaced as visible copy on the homepage. Lookup is
-// keyed by cragId; missing entries fall back to the crag description.
-type CragHighlight = {
-  homepageBlurb?: string;
-};
-
-const cragHighlights: Record<string, CragHighlight> = cragConfigs as Record<string, CragHighlight>;
 
 interface HomepageProps {
   crags: Crag[];
@@ -102,11 +93,16 @@ const Homepage: React.FC<HomepageProps> = ({ crags }) => {
     () => groupCragsByCountry(crags, window.location.hostname),
     [crags],
   );
+  const seo = useMemo(
+    () => buildHomepageSeo(crags, siteOrigin()),
+    [crags],
+  );
+  usePageHead(seo);
 
   return (
     <div className="page crag-selector">
       <div className="crag-selector-header">
-        <h1 className="crag-selector-header__title">{HOMEPAGE_TITLE}</h1>
+        <h1 className="crag-selector-header__title">{seo.heading}</h1>
       </div>
 
       {groups.map((group) => (
@@ -133,9 +129,7 @@ const Homepage: React.FC<HomepageProps> = ({ crags }) => {
                 updateStatusMap.get(crag.id) ?? false,
               );
               const showBadge = isMobile && (online || isDownloaded);
-              const blurb = cragHighlights[crag.id]?.homepageBlurb?.trim()
-                || crag.description?.trim()
-                || '';
+              const blurb = crag.description?.trim() || '';
               const overviewPath = `/${crag.id}/overview`;
               const downloadPath = `/${crag.id}/download`;
               const badgeTo =

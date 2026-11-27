@@ -1,0 +1,21 @@
+{
+  "name": "patch-homepage-seo",
+  "private": true,
+  "engines": {
+    "node": "24"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "patch": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@crag-to-all/shared-crag": "file:../../packages/shared-crag",
+    "google-auth-library": "^10.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.10",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.7"
+  }
+}

@@ -13,6 +13,7 @@ import { useAuthSession } from '../auth/useAuthSession';
 import Button from '../components/Button';
 import CragManageModal from '../components/editors/CragManageModal';
 import { confirm } from '../context/ConfirmContext';
+import { usePageHead } from '../hooks/usePageHead';
 import type { Crag } from '../types';
 import NotFound from './NotFound';
 import './CragManagePage.scss';
@@ -33,7 +34,13 @@ function formatUpdatedAt(value: string | undefined): string {
   return date.toLocaleString();
 }
 
+const PAGE_HEAD = {
+  title: 'Manage crags - Crag Explorer',
+  description: 'Create, rename, publish, and remove crag guidebooks.',
+};
+
 const CragManagePage: React.FC = () => {
+  usePageHead(PAGE_HEAD);
   const account = useAuthSession();
   const cragsQuery = useCragsQuery();
   const queryClient = useQueryClient();

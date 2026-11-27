@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { FaInstagram, FaTelegram } from 'react-icons/fa';
+import { usePageHead } from '../hooks/usePageHead';
 import { shuffle } from '../utils/shuffle';
 import './AboutPage.scss';
+
+const PAGE_HEAD = {
+  title: 'About the team - Crag Explorer',
+  description: 'The group of friends united by bouldering who make the free guidebooks on Crag Explorer.',
+};
 
 interface TeamMember {
   name: string;
@@ -41,6 +47,7 @@ function getSocialIcon(member: TeamMember): React.ReactNode {
 }
 
 const AboutPage: React.FC = () => {
+  usePageHead(PAGE_HEAD);
   const [shuffledTeam, setShuffledTeam] = useState<TeamMember[]>(TEAM_MEMBERS);
 
   useEffect(() => {

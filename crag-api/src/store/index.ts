@@ -6,6 +6,7 @@ export {
   listCrags,
   loadCrag,
   patchCrag,
+  refreshAllRouteStats,
   requireWritableCrag,
 } from './crags';
 export {

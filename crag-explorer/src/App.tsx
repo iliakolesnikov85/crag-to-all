@@ -1,6 +1,7 @@
-import React, { useCallback, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation, useMatch } from 'react-router';
 import './App.scss';
+import { IndexHttpError } from './api/client';
 import { useCragQuery } from './api/useCragQuery';
 import { useCragsQuery } from './api/useCragsQuery';
 import { Crag } from './types';
@@ -23,15 +24,13 @@ import { SeoDynamic, LoadingScreen, AppShell } from './components';
 import { AuthProvider } from './auth/AuthProvider';
 import { AppOnlineProvider } from './context/AppOnlineContext';
 import { ConfirmProvider } from './context/ConfirmContext';
-import { CragContext, useCrag, type CragContextType } from './context/CragContext';
+import {
+  CragContext,
+  EMPTY_CRAG_CONTEXT,
+  useCrag,
+  type CragContextType,
+} from './context/CragContext';
 import { FilterContext, useFilterState } from './context/FilterContext';
-
-const EMPTY_CRAG_CONTEXT: CragContextType = {
-  crag: { id: '', cragName: '', published: true },
-  getUrl: () => {
-    throw new Error('getUrl not implemented');
-  },
-};
 
 function cragContextValue(crag: Crag): CragContextType {
   return {
@@ -45,24 +44,15 @@ function cragContextValue(crag: Crag): CragContextType {
 
 function cragFromPath(pathname: string, crags: Crag[]): Crag | null {
   const segment = pathname.split('/')[1];
-  if (!segment || segment === 'crag-manage') return null;
   return crags.find((crag) => crag.id === segment) ?? null;
 }
 
 const AppContent: React.FC = () => {
   const { crag } = useCrag();
-  const [currentSector, setCurrentSector] = useState<string | undefined>();
-  const [currentRoute, setCurrentRoute] = useState<string | undefined>();
+  // The page routes sit below this component, so read their params from the URL.
+  const pageMatch = useMatch('/:cragId/sector/:sectorName/:routeName?');
   const cragQuery = useCragQuery(crag.id || null);
   const filterContext = useFilterState();
-
-  const handleSectorChange = useCallback((sectorName: string | undefined) => {
-    setCurrentSector(sectorName);
-  }, []);
-
-  const handleRouteChange = useCallback((routeName: string | undefined) => {
-    setCurrentRoute(routeName);
-  }, []);
 
   if (!crag.id) return <NotFound />;
 
@@ -80,11 +70,11 @@ const AppContent: React.FC = () => {
     const cragData = cragQuery.data;
     main = (
       <Routes>
-        <Route path={`/overview`} element={<OverviewPage description={cragData.description} sectors={cragData.sectors} />} />
-        <Route path={`/routes`} element={<RoutesPage sectors={cragData.sectors} />} />
-        <Route path={`/map`} element={<MapPage cragData={cragData} />} />
+        <Route path="/overview" element={<OverviewPage description={cragData.description} sectors={cragData.sectors} />} />
+        <Route path="/routes" element={<RoutesPage sectors={cragData.sectors} />} />
+        <Route path="/map" element={<MapPage cragData={cragData} />} />
         <Route
-          path={`/description`}
+          path="/description"
           element={
             <DescriptionPage
               description={cragData.description}
@@ -92,22 +82,11 @@ const AppContent: React.FC = () => {
             />
           }
         />
-        <Route
-          path={`/download`}
-          element={<DownloadPage cragData={cragData} />}
-        />
-        <Route path={`/authors`} element={<AuthorsPage />} />
-        <Route
-          path={`/sector/:sectorName`}
-          element={
-            <SectorPage
-              sectors={cragData.sectors}
-              onSectorChange={handleSectorChange}
-            />
-          }
-        />
-        <Route path={`/sector/:sectorName/:routeName`} element={<RoutePage sectors={cragData.sectors} onSectorChange={handleSectorChange} onRouteChange={handleRouteChange} />} />
-        <Route path={`/beta-videos/:sectorName/:routeName`} element={<BetaVideos sectors={cragData.sectors} />} />
+        <Route path="/download" element={<DownloadPage cragData={cragData} />} />
+        <Route path="/authors" element={<AuthorsPage />} />
+        <Route path="/sector/:sectorName" element={<SectorPage sectors={cragData.sectors} />} />
+        <Route path="/sector/:sectorName/:routeName" element={<RoutePage sectors={cragData.sectors} />} />
+        <Route path="/beta-videos/:sectorName/:routeName" element={<BetaVideos sectors={cragData.sectors} />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     );
@@ -115,17 +94,26 @@ const AppContent: React.FC = () => {
 
   return (
     <FilterContext.Provider value={filterContext}>
-      {cragQuery.data ? (
-        <SeoDynamic
-          cragData={cragQuery.data}
-          currentSector={currentSector}
-          currentRoute={currentRoute}
-        />
-      ) : null}
+      <SeoDynamic
+        crag={crag}
+        cragData={cragQuery.data}
+        currentSector={pageMatch?.params.sectorName}
+        currentRoute={pageMatch?.params.routeName}
+      />
       {main}
     </FilterContext.Provider>
   );
 };
+
+const CatalogUnavailable: React.FC<{ error: IndexHttpError | null }> = ({ error }) => (
+  <div className="page">
+    {error ? (
+      <p role="alert">{error.message}</p>
+    ) : (
+      <p>No crags available. Connect to the internet or download a crag for offline use first.</p>
+    )}
+  </div>
+);
 
 export const AppRoutes: React.FC = () => {
   const { pathname } = useLocation();
@@ -133,41 +121,26 @@ export const AppRoutes: React.FC = () => {
   const crags = cragsQuery.data ?? [];
   const crag = cragFromPath(pathname, crags);
 
-  let page: React.ReactNode;
-  if (cragsQuery.isPending) {
-    page = <LoadingScreen message="Loading crags list..." />;
-  } else if (crags.length === 0) {
-    page = (
-      <Routes>
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/crag-manage" element={<CragManagePage />} />
-        <Route
-          path="*"
-          element={(
-            <div className="page">
-              <p>No crags available. Connect to the internet or download a crag for offline use first.</p>
-            </div>
-          )}
-        />
-      </Routes>
-    );
-  } else {
-    page = (
-      <Routes>
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/crag-manage" element={<CragManagePage />} />
-        <Route path="/" element={<Homepage crags={crags} />} />
-        {crags.map((item) => (
-          <Route
-            key={item.id}
-            path={`/${item.id}/*`}
-            element={<AppContent />}
-          />
-        ))}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    );
-  }
+  const indexError = cragsQuery.error instanceof IndexHttpError ? cragsQuery.error : null;
+  const hasCatalog = !indexError && crags.length > 0;
+
+  const page = cragsQuery.isPending ? (
+    <LoadingScreen message="Loading crags list..." />
+  ) : (
+    <Routes>
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="/crag-manage" element={<CragManagePage />} />
+      {hasCatalog ? (
+        <>
+          <Route path="/" element={<Homepage crags={crags} />} />
+          {/* AppContent shows NotFound when the id is not a crag. */}
+          <Route path="/:cragId/*" element={<AppContent />} />
+        </>
+      ) : (
+        <Route path="*" element={<CatalogUnavailable error={indexError} />} />
+      )}
+    </Routes>
+  );
 
   return (
     <CragContext.Provider value={crag ? cragContextValue(crag) : EMPTY_CRAG_CONTEXT}>

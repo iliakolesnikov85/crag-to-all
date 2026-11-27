@@ -6,11 +6,14 @@ export interface CragContextType {
   getUrl: (url: string) => string;
 }
 
-export const CragContext = createContext<CragContextType>({
+/** Context value outside a crag: the crag id is empty. */
+export const EMPTY_CRAG_CONTEXT: CragContextType = {
   crag: { id: '', cragName: '', published: true },
   getUrl: () => {
     throw new Error('getUrl not implemented');
   },
-});
+};
+
+export const CragContext = createContext<CragContextType>(EMPTY_CRAG_CONTEXT);
 
 export const useCrag = () => useContext(CragContext);

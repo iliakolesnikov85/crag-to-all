@@ -3,7 +3,7 @@ import { useRef } from 'react';
 import { useAuthReady, useAuthSession } from '../auth/useAuthSession';
 import { useAppOnline } from '../context/AppOnlineContext';
 import { getOfflineCragIndex, putOfflineCragIndex } from '../utils/offline';
-import { listCrags } from './client';
+import { IndexHttpError, listCrags } from './client';
 import { queryKeys } from './queryClient';
 
 export function useCragsQuery() {
@@ -35,6 +35,11 @@ export function useCragsQuery() {
         return data;
       } catch (error) {
         if (signal.aborted) throw error;
+        // A status means the server answered. Offline mode is only for no response.
+        if (error instanceof IndexHttpError) {
+          console.error('Failed to fetch crag index:', error);
+          throw error;
+        }
         console.warn('Failed to fetch crag index, using offline fallback:', error);
         markNetworkLimitedRef.current();
         const cachedIndex = await getOfflineCragIndex();

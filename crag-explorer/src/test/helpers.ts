@@ -1,3 +1,4 @@
+import { renderHomepageHeadTags } from '@crag-to-all/shared-crag';
 import { fireEvent, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactNode } from 'react';
@@ -32,6 +33,37 @@ export function jsonResponse(data: unknown, status = 200): Response {
 
 export function okResponse(body: BodyInit = '', init: ResponseInit = {}): Response {
   return new Response(body, { status: 200, ...init });
+}
+
+interface PatchedHeadValues {
+  title: string;
+  description: string;
+}
+
+/**
+ * Adds the head tags the deploy script writes into the live index.html, built
+ * by the same renderer. Returns a cleanup that restores the head.
+ */
+export function insertPatchedHead({ title, description }: PatchedHeadValues): () => void {
+  const originalHead = document.head.innerHTML;
+  const originalTitle = document.title;
+  const tags = renderHomepageHeadTags({
+    title,
+    description,
+    heading: title,
+    image: 'http://localhost/header-bg.png',
+    jsonLd: [],
+  });
+  document.head.insertAdjacentHTML('beforeend', tags.join(' '));
+  document.title = title;
+  return () => {
+    document.head.innerHTML = originalHead;
+    document.title = originalTitle;
+  };
+}
+
+export function headContent(selector: string): string | null | undefined {
+  return document.head.querySelector(selector)?.getAttribute('content');
 }
 
 export function setNavigatorOnLine(value: boolean): void {

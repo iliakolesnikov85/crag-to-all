@@ -22,7 +22,6 @@ const DELETE_MISSING_ID_MESSAGE = 'This sector cannot be deleted because it has 
 
 interface SectorPageProps {
   sectors: Sector[];
-  onSectorChange?: (sectorName: string | undefined) => void;
 }
 
 type RouteDrawState = {
@@ -41,7 +40,7 @@ function indexOfDrawnRoute(routes: readonly Route[], draw: RouteDrawState): numb
   return routes.findIndex((route) => route.id === draw.route.id);
 }
 
-const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
+const SectorPage: React.FC<SectorPageProps> = ({ sectors }) => {
   const { sectorName } = useParams<{ sectorName: string }>();
   const { crag, getUrl } = useCrag();
   const navigate = useNavigate();
@@ -101,12 +100,6 @@ const SectorPage: React.FC<SectorPageProps> = ({ sectors, onSectorChange }) => {
     if (!sector) return null;
     return editors.requireEditable(sector);
   };
-
-  useEffect(() => {
-    if (onSectorChange) {
-      onSectorChange(sectorName);
-    }
-  }, [sectorName, onSectorChange]);
 
   useEffect(() => {
     if (!routesOpen && routeDraw === null) return;

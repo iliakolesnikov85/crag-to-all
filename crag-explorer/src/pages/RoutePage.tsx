@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useCanEditCrag } from '../auth/useAuthSession';
 import RoutePageOptionsMenu from '../components/RoutePageOptionsMenu';
@@ -11,8 +11,6 @@ import useDetailsEditors from '../components/editors/useDetailsEditors';
 
 interface RoutePageProps {
   sectors: Sector[];
-  onSectorChange?: (sectorName: string | undefined) => void;
-  onRouteChange?: (routeName: string | undefined) => void;
 }
 
 function indexOfRoute(routes: readonly Route[], route: Route): number {
@@ -21,7 +19,7 @@ function indexOfRoute(routes: readonly Route[], route: Route): number {
   return routes.findIndex((item) => item.name.toLowerCase() === route.name.toLowerCase());
 }
 
-const RoutePage: React.FC<RoutePageProps> = ({ sectors, onSectorChange, onRouteChange }) => {
+const RoutePage: React.FC<RoutePageProps> = ({ sectors }) => {
   const { sectorName, routeName } = useParams<{ sectorName: string; routeName: string }>();
   const { crag, getUrl } = useCrag();
   const navigate = useNavigate();
@@ -45,15 +43,6 @@ const RoutePage: React.FC<RoutePageProps> = ({ sectors, onSectorChange, onRouteC
     },
   });
   const canEdit = useCanEditCrag(crag);
-
-  useEffect(() => {
-    if (onSectorChange) {
-      onSectorChange(sectorName);
-    }
-    if (onRouteChange) {
-      onRouteChange(routeName);
-    }
-  }, [sectorName, routeName, onSectorChange, onRouteChange]);
 
   const openEdit = () => {
     if (!sector || !route) return;

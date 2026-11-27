@@ -102,6 +102,13 @@ function isCragMapMarker(value: unknown): value is CragMapMarker {
     && typeof geo.lon === 'number';
 }
 
+function indexHttpMessage(status: number): string {
+  if (status === 401) {
+    return 'Sign-in was rejected. Log out and log in again.';
+  }
+  return `Could not load the crag list (${status}).`;
+}
+
 async function readSectorResponse(response: Response): Promise<Sector> {
   const body = (await response.json()) as Partial<Sector>;
   if (
@@ -187,6 +194,17 @@ export function getCragGpxUrl(cragId: string): string {
   return apiUrl(`${cragDocumentPath(cragId)}/gpx`);
 }
 
+/** The catalog endpoint answered with an error status. The network was reached. */
+export class IndexHttpError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(indexHttpMessage(status));
+    this.name = 'IndexHttpError';
+    this.status = status;
+  }
+}
+
 /** Shared fetch. Sends Authorization only when a management token is available. */
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const token = await getAccessToken();
@@ -202,7 +220,7 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
 export async function listCrags(init?: RequestInit): Promise<Crag[]> {
   const response = await apiFetch(CRAGS_PATH, init);
   if (!response.ok) {
-    throw new Error('index fetch failed');
+    throw new IndexHttpError(response.status);
   }
   return response.json() as Promise<Crag[]>;
 }

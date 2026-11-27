@@ -19,7 +19,6 @@ npm ci
 npm run dev          # local API via the /api proxy, production Storage files
 npm run dev-local    # local API, Storage emulator at localhost:9199, Auth emulator at 127.0.0.1:9099
 npm run build
-npm run seo-check
 ```
 
 Start `crag-api` on port 3010 before `npm run dev`. Production builds set `VITE_API_BASE_URL` once the API is public. Storage URLs use `VITE_FIREBASE_STORAGE_BUCKET_v2` (default `crag-to-all`). Reads stay anonymous.
@@ -55,4 +54,8 @@ The explorer shows edit controls for a superadmin, or for an owner or admin of t
 
 ## SEO
 
-Hybrid SEO: build-time tags patched into `index.html`, plus runtime updates in `SeoDynamic.tsx`. The patch loads each crag from `VITE_API_BASE_URL` (default `http://localhost:3010`). See `scripts/README.md`.
+Homepage SEO is built from published crags by `buildHomepageSeo` in `@crag-to-all/shared-crag`. The GitHub Actions script `scripts/patch-homepage-seo` writes the title, description, share-preview, and JSON-LD tags into the live `index.html` after each deploy and after the nightly route-stats job. The site name in those tags is always "Crag Explorer".
+
+The app sets the title, description, and canonical link for each page it shows: `Homepage`, `AboutPage`, and `CragManagePage` use `usePageHead`, and `SeoDynamic` does it for every page of a crag. A sector or route page names that sector or route. Every other crag page describes the crag. The canonical link uses `VITE_SITE_URL`, so a visit through a preview host still names the real site. The page text comes from `buildCragSeo`, `buildSectorSeo`, and `buildRouteSeo` in `@crag-to-all/shared-crag`.
+
+Known limitation: every app path is served the same `index.html`, so a crawler that does not run JavaScript sees the homepage title, share-preview tags, and JSON-LD on crag pages too. The patched file has no canonical or URL tag for that reason. The site stays `noindex` until this changes. See `scripts/README.md`.

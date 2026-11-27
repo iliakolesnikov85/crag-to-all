@@ -49,19 +49,7 @@ async function main() {
       log('❌ Sitemap generation failed', 'red');
       process.exit(1);
     }
-    
-    // Step 5: Run SEO patch
-    log('🔧 Running SEO patch...', 'blue');
-    const { main: seoPatchMain } = await import('./seo-patch.js');
-    const seoResult = seoPatchMain();
-    
-    if (seoResult) {
-      log('✅ SEO patch complete', 'green');
-    } else {
-      log('❌ SEO patch failed', 'red');
-      process.exit(1);
-    }
-    
+
     log('🎉 Build process completed successfully!', 'green');
     
   } catch (error) {

@@ -81,6 +81,22 @@ describe('App load', () => {
     warn.mockRestore();
   });
 
+  it('stays online when the crag index returns 401', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await putOfflineCragIndex(sampleCrags);
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({ error: 'unauthorized' }, 401));
+
+    renderApp('/');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Sign-in was rejected. Log out and log in again.',
+    );
+    expect(screen.queryByText(/you are offline/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: /you're offline/i })).not.toBeInTheDocument();
+    expect(screen.queryByText('Test Crag')).not.toBeInTheDocument();
+    errorLog.mockRestore();
+  });
+
   it('shows a message when the index is empty', async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse([]));
 
@@ -105,6 +121,23 @@ describe('App load', () => {
       '/',
     );
     expect(screen.queryByText('Loading crag data...')).not.toBeInTheDocument();
+  });
+
+  it('titles a route page from the sector and route in the url', async () => {
+    const originalTitle = document.title;
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = requestUrl(input);
+      if (url === getCragsApiUrl()) return Promise.resolve(jsonResponse(sampleCrags));
+      if (url === getCragApiUrl(SAMPLE_CRAG_ID)) return Promise.resolve(jsonResponse(sampleCragData));
+      return Promise.reject(new Error(`unexpected fetch: ${url}`));
+    });
+
+    renderApp(`/${SAMPLE_CRAG_ID}/sector/${encodeURIComponent('main wall')}/${encodeURIComponent('classic')}`);
+
+    await vi.waitFor(() => {
+      expect(document.title).toBe('Classic - Main Wall | Test Crag Climbing');
+    });
+    document.title = originalTitle;
   });
 
   it('shows a load error when offline JSON fails and no pack is saved', async () => {

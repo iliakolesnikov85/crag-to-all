@@ -24,6 +24,36 @@ export type CragSource = (typeof CRAG_SOURCES)[number];
 
 export type RouteType = (typeof ROUTE_TYPES)[number];
 
+/**
+ * Grade span for one route type. Routes with no type join the range when the
+ * crag has exactly one route type. When the crag has no typed routes, their
+ * range has no `type`. Otherwise they are left out.
+ */
+export interface GradeRange {
+  type?: RouteType;
+  min: string;
+  max: string;
+}
+
+/** Totals folded from a crag's sectors for the homepage catalog. */
+export interface CragRouteStats {
+  routeCount: number;
+  /** Counts for route types that appear at least once. */
+  typeCounts: Partial<Record<RouteType, number>>;
+  /**
+   * Easiest and hardest grade per route type, in `ROUTE_TYPES` order, for
+   * types with at least one grade that can be ranked. Absent when there is
+   * none. See `GradeRange` for routes with no type.
+   */
+  gradeRanges?: GradeRange[];
+  latitude?: number;
+  longitude?: number;
+  /** Set when every sector that has a season uses the same text. */
+  season?: string;
+  /** Set when every sector that has an altitude uses the same text. */
+  altitude?: string;
+}
+
 export interface LatLng {
   lat: number;
   lon: number;
@@ -161,7 +191,12 @@ export interface Crag {
   externalId?: string;
   /**
    * Plain-text excerpt of the crag description. Present on catalog responses
-   * when the crag has one. The homepage uses it when no SEO blurb is set.
+   * when the crag has one. The homepage shows it on the crag card.
    */
   description?: string;
+  /**
+   * Route and place totals. Present on catalog responses.
+   * Older cached catalogs omit it.
+   */
+  routeStats?: CragRouteStats;
 }

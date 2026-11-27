@@ -29,7 +29,11 @@ export async function handleAppNavigation(
     return shell ?? Response.error();
   }
   try {
-    return await deps.fetchNavigation(url.href);
+    const response = await deps.fetchNavigation(url.href);
+    if (response.status !== 0 && response.status < 400) return response;
+    console.warn('Navigation response failed, serving precached shell:', response.status);
+    const shell = await deps.matchShell();
+    return shell ?? response;
   } catch (error) {
     console.warn('Navigation fetch failed, serving precached shell:', error);
     const shell = await deps.matchShell();

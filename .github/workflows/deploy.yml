@@ -58,6 +58,9 @@ jobs:
         # dist/ is gitignored; types/main resolve to dist, so CI must compile first.
         run: npm run build-shared-crag
 
+      - name: Test shared-crag
+        run: npm test --prefix packages/shared-crag
+
       - name: Install dependencies for crag-explorer
         working-directory: crag-explorer
         run: npm ci
@@ -65,6 +68,11 @@ jobs:
       - name: Run tests
         working-directory: crag-explorer
         run: npm test
+
+      - name: Test homepage SEO patch
+        run: |
+          npm ci --prefix scripts/patch-homepage-seo
+          npm test --prefix scripts/patch-homepage-seo
 
   deploy-api:
     needs:
@@ -127,6 +135,7 @@ jobs:
           VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
           VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_STORAGE_BUCKET_v2: crag-to-all
+          VITE_SITE_URL: https://crags-for-all.web.app
         run: |
           if [ -z "$VITE_API_BASE_URL" ]; then
             echo "Set the pre-prod variable VITE_API_BASE_URL to the App Hosting URL."
@@ -144,3 +153,24 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           projectId: crag-to-all
           channelId: live
+
+      - name: Patch homepage SEO
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "Set the pre-prod secret FIREBASE_SERVICE_ACCOUNT to the deployer service account JSON."
+            exit 1
+          fi
+          if [ -z "$VITE_API_BASE_URL" ]; then
+            echo "Set the pre-prod variable VITE_API_BASE_URL to the App Hosting URL."
+            exit 1
+          fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-deployer.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-deployer.json"
+          export API_BASE_URL="$VITE_API_BASE_URL"
+          export SITE_ORIGIN="https://crags-for-all.web.app"
+          npm run build-shared-crag
+          npm ci --prefix scripts/patch-homepage-seo
+          npm run patch --prefix scripts/patch-homepage-seo

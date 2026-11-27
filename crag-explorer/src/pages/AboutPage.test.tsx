@@ -1,6 +1,16 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import { headContent, insertPatchedHead } from '../test/helpers';
 import AboutPage from './AboutPage';
+
+function renderAbout() {
+  return render(
+    <MemoryRouter initialEntries={['/about']}>
+      <AboutPage />
+    </MemoryRouter>,
+  );
+}
 
 const open = vi.spyOn(window, 'open').mockImplementation(() => null);
 
@@ -14,7 +24,7 @@ afterAll(() => {
 
 describe('AboutPage', () => {
   it('renders the team blurb and member names', () => {
-    render(<AboutPage />);
+    renderAbout();
 
     expect(screen.getByRole('heading', { name: 'About Roshka Team' })).toBeInTheDocument();
     expect(screen.getByText('George Manukian')).toBeInTheDocument();
@@ -25,8 +35,24 @@ describe('AboutPage', () => {
     ).toHaveAttribute('href', 'https://www.instagram.com/roshka.climb/');
   });
 
+  it('sets its own title and description', () => {
+    const restoreHead = insertPatchedHead({
+      title: 'A Sector - Roshka Climbing Guide',
+      description: 'A sector at Roshka.',
+    });
+    try {
+      renderAbout();
+
+      expect(document.title).toBe('About the team - Crag Explorer');
+      expect(headContent('meta[name="description"]')).toContain('bouldering');
+      expect(headContent('meta[property="og:title"]')).toBe(document.title);
+    } finally {
+      restoreHead();
+    }
+  });
+
   it('opens Instagram ahead of Telegram when a card is clicked', () => {
-    render(<AboutPage />);
+    renderAbout();
 
     fireEvent.click(screen.getByText('Reclus').closest('.member-card')!);
     expect(open).toHaveBeenCalledWith(

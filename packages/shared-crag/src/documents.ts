@@ -1,6 +1,7 @@
 import type {
   CragMapMarker,
   CragMapTrail,
+  CragRouteStats,
   CragSource,
   DescriptionSection,
   Image,
@@ -31,6 +32,11 @@ export interface CragDocument {
   opentopoTilePack?: OpenTopoTilePackInfo;
   /** Upstream crag id. A superadmin catalog includes it. Other responses omit it. */
   externalId?: string;
+  /**
+   * Homepage totals folded from this crag's sectors.
+   * Absent until the daily refresh job has saved them.
+   */
+  routeStats?: CragRouteStats;
   version: number;
   updatedAt: Date;
 }

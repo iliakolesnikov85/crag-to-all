@@ -1,4 +1,10 @@
-import { CRAG_DATA_PROTOCOL, type CragData } from '@crag-to-all/shared-crag';
+import {
+  CRAG_DATA_PROTOCOL,
+  foldRouteStats,
+  type CragData,
+  type CragRouteStats,
+  type SectorRouteStatsInput,
+} from '@crag-to-all/shared-crag';
 import type { Db } from '@crag-to-all/shared-firebase';
 import { toCrag, toCragData, toCragResponse } from '../convertors';
 import {
@@ -32,11 +38,58 @@ function compareSectorsByOrder(a: SectorDocument, b: SectorDocument): number {
   return a.name.localeCompare(b.name, undefined, { numeric: true });
 }
 
+async function loadRouteStatsByCrag(db: Db): Promise<Map<string, CragRouteStats>> {
+  const docs = await sectorsCol(db)
+    .find(
+      {},
+      {
+        projection: {
+          cragId: 1,
+          geo: 1,
+          season: 1,
+          altitude: 1,
+          'routes.type': 1,
+          'routes.grade': 1,
+        },
+      },
+    )
+    .toArray();
+  const grouped = new Map<string, SectorRouteStatsInput[]>();
+  for (const doc of docs) {
+    const sectors = grouped.get(doc.cragId) ?? [];
+    // The projection keeps only each route's type and grade, which is all the fold reads.
+    sectors.push({ ...doc, routes: doc.routes ?? [] });
+    grouped.set(doc.cragId, sectors);
+  }
+  return new Map(
+    [...grouped.entries()].map(([cragId, sectors]) => [cragId, foldRouteStats(sectors)]),
+  );
+}
+
 function duplicateKeyField(error: unknown): string | undefined {
   if (typeof error !== 'object' || error === null || !('keyPattern' in error)) return undefined;
   const pattern = (error as { keyPattern?: unknown }).keyPattern;
   if (typeof pattern !== 'object' || pattern === null) return undefined;
   return Object.keys(pattern)[0];
+}
+
+/** Writes homepage totals onto every crag. A crag with no sectors gets an empty total. */
+export async function refreshAllRouteStats(db: Db): Promise<number> {
+  const [crags, statsByCrag] = await Promise.all([
+    cragsCol(db).find({}, { projection: { _id: 1 } }).toArray(),
+    loadRouteStatsByCrag(db),
+  ]);
+  if (crags.length === 0) return 0;
+  const emptyStats = foldRouteStats([]);
+  await cragsCol(db).bulkWrite(
+    crags.map((crag) => ({
+      updateOne: {
+        filter: { _id: crag._id },
+        update: { $set: { routeStats: statsByCrag.get(crag._id) ?? emptyStats } },
+      },
+    })),
+  );
+  return crags.length;
 }
 
 export async function listCrags(db: Db, caller: AuthCaller | null) {
@@ -58,6 +111,8 @@ export async function listCrags(db: Db, caller: AuthCaller | null) {
     return staffIds.has(doc._id);
   });
   const includeExternalId = caller?.superadmin === true;
+  // A crag the nightly refresh has not reached yet has no total. Leave it off
+  // rather than report zero routes.
   return visible.map((doc) => toCrag(doc, countById.get(doc._id) ?? 0, includeExternalId));
 }
 

@@ -46,9 +46,8 @@ jspm_packages/
 
 # Env
 .env
-.env.test
-.env.local
-.env.prod
+.env.*
+!.env.example
 
 # Temporary files
 temp

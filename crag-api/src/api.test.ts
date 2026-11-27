@@ -7,7 +7,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app';
 import { IMAGE_FIELD_NAME } from './images';
-import { ensureIndexes } from './store';
+import { ensureIndexes, refreshAllRouteStats } from './store';
 import type { AuthAccountProfile, AuthCaller, AuthDirectory, IdTokenVerifier, ImageStorage } from './types';
 
 const TEST_TOKEN = 'test-token';
@@ -209,6 +209,59 @@ describe('crag-api', () => {
       expect.objectContaining({ id: 'roshka', sectorCount: 1, version: 1 }),
       expect.objectContaining({ id: 'shulaveri', sectorCount: 0, version: 1 }),
     ]);
+  });
+
+  it('keeps route stats empty until the daily refresh', async () => {
+    await write().post('/api/crags').send({ name: 'Roshka', id: 'roshka' });
+    await write().post('/api/crags').send({ name: 'Empty', id: 'empty' });
+    const created = await write().post('/api/crags/roshka/sectors').send({
+      name: 'Cave',
+      geo: { lat: 42, lon: 44 },
+      season: 'June to October',
+      altitude: '2500m',
+      routes: [
+        { name: 'One', grade: '6A', type: 'Boulder' },
+        { name: 'Two', grade: '7A+', type: 'Boulder' },
+        { name: 'Three', grade: '6B', type: 'Sport' },
+        { name: 'Mystery', grade: '?', type: 'Boulder' },
+      ],
+    });
+    expect(created.status).toBe(201);
+    const second = await write().post('/api/crags/roshka/sectors').send({
+      name: 'Other',
+      geo: { lat: 44, lon: 46 },
+      season: 'June to October',
+      altitude: '2500m',
+      routes: [{ name: 'Four', grade: '6C', type: 'Boulder' }],
+    });
+    expect(second.status).toBe(201);
+
+    const before = await request(app).get('/api/crags');
+    const roshkaBefore = before.body.find((crag: { id: string }) => crag.id === 'roshka');
+    const emptyBefore = before.body.find((crag: { id: string }) => crag.id === 'empty');
+    expect(roshkaBefore.routeStats).toBeUndefined();
+    expect(emptyBefore.routeStats).toBeUndefined();
+
+    await refreshAllRouteStats(db);
+
+    const catalog = await request(app).get('/api/crags');
+    const roshka = catalog.body.find((crag: { id: string }) => crag.id === 'roshka');
+    const empty = catalog.body.find((crag: { id: string }) => crag.id === 'empty');
+    expect(roshka.routeStats).toEqual({
+      routeCount: 5,
+      typeCounts: { Boulder: 4, Sport: 1 },
+      gradeRanges: [
+        { type: 'Boulder', min: '6A', max: '7A+' },
+        { type: 'Sport', min: '6B', max: '6B' },
+      ],
+      latitude: 43,
+      longitude: 45,
+      season: 'June to October',
+      altitude: '2500m',
+    });
+    expect(empty.routeStats).toEqual({ routeCount: 0, typeCounts: {} });
+    const storedEmpty = await db.collection('crags').findOne({ _id: 'empty' });
+    expect(storedEmpty?.routeStats).toEqual({ routeCount: 0, typeCounts: {} });
   });
 
   it('rejects a duplicate crag id with 409', async () => {

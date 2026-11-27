@@ -21,6 +21,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "scripts/seo-config.js"],
+  "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

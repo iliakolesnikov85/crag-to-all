@@ -1,0 +1,83 @@
+name: Refresh route stats
+
+on:
+  schedule:
+    # Daily 02:00 Asia/Tbilisi (UTC+4) → 22:00 UTC
+    - cron: "0 22 * * *"
+  workflow_dispatch:
+
+jobs:
+  refresh-route-stats:
+    runs-on: ubuntu-latest
+    # MONGODB_URI and MONGODB_DB are pre-prod environment secrets, like the
+    # deploy secrets. A job without this environment receives them empty.
+    environment: pre-prod
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Build shared-crag package
+        run: npm run build-shared-crag
+
+      - name: Build shared-firebase package
+        run: npm run build-shared-firebase
+
+      - name: Install dependencies for crag-api
+        working-directory: crag-api
+        run: npm ci
+
+      - name: Refresh route stats
+        working-directory: crag-api
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          MONGODB_DB: ${{ secrets.MONGODB_DB }}
+        run: npx tsx scripts/refresh-route-stats.ts
+
+  patch-homepage-seo:
+    needs: refresh-route-stats
+    runs-on: ubuntu-latest
+    environment:
+      name: pre-prod
+      url: https://crags-for-all.web.app
+    concurrency:
+      group: pre-prod-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Build shared-crag package
+        run: npm run build-shared-crag
+
+      - name: Install the patch script
+        working-directory: scripts/patch-homepage-seo
+        run: npm ci
+
+      - name: Patch homepage SEO
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "Set the pre-prod secret FIREBASE_SERVICE_ACCOUNT to the deployer service account JSON."
+            exit 1
+          fi
+          if [ -z "$VITE_API_BASE_URL" ]; then
+            echo "Set the pre-prod variable VITE_API_BASE_URL to the App Hosting URL."
+            exit 1
+          fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-deployer.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-deployer.json"
+          export API_BASE_URL="$VITE_API_BASE_URL"
+          export SITE_ORIGIN="https://crags-for-all.web.app"
+          npm run patch --prefix scripts/patch-homepage-seo
